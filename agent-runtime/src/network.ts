@@ -41,6 +41,8 @@ export interface NetworkPreset {
   logRange: bigint
   /** AgentEco deployment defaults, where this repo has one. */
   deployment?: Deployment
+  /** The chain's official ERC-8004 registries (settings override; absent = none known here). */
+  erc8004?: { identity: Address; reputation: Address }
 }
 
 export interface Deployment {
@@ -75,6 +77,9 @@ export const NETWORK_PRESETS: Record<NetworkName, NetworkPreset> = {
     lowGasWarn: '0.01',
     logRange: BigInt(45000),
     multicall3: '0xcA11bde05977b3631167028862bE2a173976CA11',
+    // Official ERC-8004 registries (checked on-chain 10 Oct 2026: both exist, and the
+    // Reputation Registry points back at this Identity Registry).
+    erc8004: { identity: '0x8004A818BFB912233c491871b3d84c89A494BD9e', reputation: '0x8004B663056A597Dffe9eCcC1965A193B7388713' },
     // AgentEco v3 (the 2.5% platform fee, with its own ArbiterCouncil), numbering escrows
     // from 2001. v1 (#1–#1000) and v2 (#1001–#2000) are still read for their escrows.
     deployment: {
@@ -134,6 +139,8 @@ export const NETWORK_PRESETS: Record<NetworkName, NetworkPreset> = {
     lowGasWarn: '0.002',
     logRange: BigInt(45000),
     multicall3: '0xcA11bde05977b3631167028862bE2a173976CA11',
+    // Official ERC-8004 registries (same checks as on BSC Testnet).
+    erc8004: { identity: '0x8004A818BFB912233c491871b3d84c89A494BD9e', reputation: '0x8004B663056A597Dffe9eCcC1965A193B7388713' },
     // No AgentEco deployment yet: AGENT_ECO_ADDRESS (or AGENT_ECO_ADDRESS__eip155_84532) must be set.
   },
 }
@@ -207,6 +214,8 @@ export const HOSTED_MIN_GAS = env('HOSTED_MIN_GAS') ?? preset.hostedMinGas
 export const LOW_GAS_WARN = env('LOW_GAS_WARN_TBNB') ?? preset.lowGasWarn
 /** Block span per eth_getLogs call (LOG_RANGE_BLOCKS overrides, e.g. for a paid RPC). */
 export const LOG_RANGE = readBlock('LOG_RANGE_BLOCKS', preset.logRange) ?? preset.logRange
+/** The primary network's official ERC-8004 registries, when known (the settings override them). */
+export const PRESET_ERC8004 = preset.erc8004 ?? null
 export const AGENT_ECO_ADDRESS = readAddress('AGENT_ECO_ADDRESS', preset.deployment?.agentEcoAddress)
 export const USDT_ADDRESS = readAddress('USDT_ADDRESS', preset.usdtAddress)
 /** Block AgentEco.sol was deployed at — log scans start here. Null = unknown (scan from "now"). */

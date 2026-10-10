@@ -9,6 +9,7 @@ import {
   LOG_RANGE,
   LOW_GAS_WARN,
   NATIVE_SYMBOL,
+  PRESET_ERC8004,
   TOKEN_SYMBOL,
   USDT_ADDRESS,
   appChain,
@@ -40,7 +41,7 @@ export function defaultEvmConfig(): EvmChainConfig {
     logRange: LOG_RANGE,
     hostedMinGas: HOSTED_MIN_GAS,
     lowGasWarn: LOW_GAS_WARN,
-    erc8004: erc8004FromSettings((name) => process.env[name]?.trim() || undefined),
+    erc8004: erc8004FromSettings((name) => process.env[name]?.trim() || undefined) ?? PRESET_ERC8004,
   }
   return cached
 }

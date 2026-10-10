@@ -120,7 +120,8 @@ describe('one API, two chains', { skip }, () => {
       ]
     )
     assert.equal(body[1].token.symbol, 'USDC')
-    assert.equal(body[0].erc8004, null)
+    // The default chain (id 97) carries the official registries of its preset; chain B's come from the settings above.
+    assert.equal(body[0].erc8004.identity, '0x8004A818BFB912233c491871b3d84c89A494BD9e')
     assert.equal(body[1].erc8004.identity.toLowerCase(), chainB.erc8004!.identity.toLowerCase())
     assert.equal(body[1].agentEco.toLowerCase(), chainB.agentEco.toLowerCase())
   })

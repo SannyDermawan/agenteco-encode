@@ -136,7 +136,7 @@ function buildEntry(chainId: ChainId): ChainEntry {
       logRange: block('LOG_RANGE_BLOCKS', preset.logRange) ?? preset.logRange,
       hostedMinGas: env('HOSTED_MIN_GAS') ?? preset.hostedMinGas,
       lowGasWarn: env('LOW_GAS_WARN') ?? preset.lowGasWarn,
-      erc8004: erc8004FromSettings(env, `__${suffix}`),
+      erc8004: erc8004FromSettings(env, `__${suffix}`) ?? preset.erc8004 ?? null,
     },
     transport: transportFor(rpcUrls),
     rpcUrls,

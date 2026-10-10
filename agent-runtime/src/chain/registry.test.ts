@@ -70,6 +70,24 @@ test('another chain needs its own deployment address, by suffixed env', () => {
   assert.notEqual(config.agentEco, defaultEvmConfig().agentEco)
 })
 
+test('the official ERC-8004 registries are the preset default, and settings override them', () => {
+  const official = { identity: '0x8004A818BFB912233c491871b3d84c89A494BD9e', reputation: '0x8004B663056A597Dffe9eCcC1965A193B7388713' }
+  assert.deepEqual(chainConfig('bsc-testnet').erc8004, official)
+  process.env.AGENT_ECO_ADDRESS__eip155_84532 = ECO
+  assert.deepEqual(chainConfig('base-sepolia').erc8004, official)
+  process.env.ERC8004_IDENTITY_REGISTRY__eip155_84532 = '0x3333333333333333333333333333333333333333'
+  process.env.ERC8004_REPUTATION_REGISTRY__eip155_84532 = '0x4444444444444444444444444444444444444444'
+  resetChainRegistry()
+  assert.deepEqual(chainConfig('base-sepolia').erc8004, { identity: '0x3333333333333333333333333333333333333333', reputation: '0x4444444444444444444444444444444444444444' })
+  delete process.env.ERC8004_IDENTITY_REGISTRY__eip155_84532
+  delete process.env.ERC8004_REPUTATION_REGISTRY__eip155_84532
+  // A chain without a known registry has none.
+  process.env.AGENT_ECO_ADDRESS__eip155_968 = ECO
+  resetChainRegistry()
+  assert.equal(chainConfig('bot-testnet').erc8004, null)
+  delete process.env.AGENT_ECO_ADDRESS__eip155_968
+})
+
 test('suffixed RPC and token overrides', () => {
   process.env.AGENT_ECO_ADDRESS__eip155_84532 = ECO
   process.env.RPC_URL__eip155_84532 = 'https://rpc.example/base'

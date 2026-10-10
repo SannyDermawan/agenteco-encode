@@ -147,7 +147,13 @@ New database, created with a plain `prisma db push` (no data is carried over fro
 
 ## 6. Identity and reputation: ERC-8004
 
-[ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) (status: Draft) defines per-chain Identity, Reputation and Validation registries. Their addresses are not in the EIP: each chain sets `ERC8004_IDENTITY_REGISTRY` and `ERC8004_REPUTATION_REGISTRY` (both or neither); a chain without them has no ERC-8004 features.
+[ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) (status: Draft) defines per-chain Identity, Reputation and Validation registries. Their addresses are not in the EIP, so each chain has them configured: the presets carry the official ones for BSC Testnet and Base Sepolia, and `ERC8004_IDENTITY_REGISTRY` / `ERC8004_REPUTATION_REGISTRY` (both or neither, suffixed per chain) override them. A chain with none known has no ERC-8004 features.
+
+| Chain | Identity Registry | Reputation Registry |
+|---|---|---|
+| BSC Testnet, Base Sepolia | `0x8004A818BFB912233c491871b3d84c89A494BD9e` | `0x8004B663056A597Dffe9eCcC1965A193B7388713` |
+
+Checked on both chains on 10 Oct 2026: both contracts exist (proxies), the Reputation Registry's `getIdentityRegistry()` returns the Identity address, and the Identity Registry answers `name()` = `AgentIdentity`, `symbol()` = `AGENT`.
 
 **Identity.**
 - Every seller listing has a registration file at `GET /agents/:id/registration.json` (type `…#registration-v1`, services, `active`, `registrations`, `supportedTrust: ["reputation"]`). It needs `PUBLIC_API_URL` to be stable.
@@ -180,7 +186,11 @@ All on-chain suites run on throwaway local chains (anvil) with the real contract
 - **End to end:** `backend/src/multichain.e2e.test.ts` — the API serving two local chains (chain id 97 with an 18-decimal token, 84532 with a 6-decimal token): escrow #1 on both without mixing, access per chain, disputes per chain arbiter, ratings read from the right chain, cross-chain negotiation refused, ERC-8004 registration checks and deal feedback.
 - Test-only ERC-8004 registries: `test/mocks/ERC8004Registries.sol` (implements just what AgentEco calls; not the reference implementation).
 
-## 8. Work order
+## 8. Local setup pitfall: `npm ci` in `frontend/`
+
+`frontend/package.json` has a `postinstall` that runs `npm install --prefix ../agent-runtime --omit=dev` (the app imports the SDK's sources). That **removes agent-runtime's devDependencies** (`tsx`, `typescript`), so afterwards `npm test` in `agent-runtime` fails with `Cannot find package 'tsx'` for every test file. The same happens when the packages are installed in parallel and the frontend finishes last. After installing the frontend, run `npm ci` in `agent-runtime` again (and, if `agent-runtime/package-lock.json` shows a four-line metadata change from npm 11, `git checkout` it). The backend and the standalone agents are not affected.
+
+## 9. Work order
 
 1. `ChainAdapter` and `EvmAdapter` with no behaviour change. **Done.**
 2. `chainId` in the schema, every query scoped by it, `groupId`. **Done.**
@@ -189,7 +199,6 @@ All on-chain suites run on throwaway local chains (anvil) with the real contract
 5. Base Sepolia: preset, 6-decimal handling, deploy command. **Done in code**; the contract is not deployed yet.
 6. `SolanaAdapter` and the Anchor program. **Not started.**
 
-## 9. Open questions
+## 10. Open questions
 
 - How the council (`ArbiterCouncil`) is represented on Solana (multisig versus a program-owned set).
-- The ERC-8004 registry addresses per chain (not part of the EIP).
