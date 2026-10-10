@@ -1,7 +1,7 @@
 import { buildAuthHeaders, type WalletSigner } from './authHeaders'
 import { checkReadAccess, readHeaders } from './session'
+import { API_URL, chainFetch as fetch } from './base'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'
 
 /** A dispute's off-chain record (backend Dispute). Each text re-hashes to its on-chain hash. */
 export interface ApiDispute {

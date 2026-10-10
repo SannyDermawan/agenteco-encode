@@ -1,5 +1,5 @@
-import { formatEther, parseEther, type Address, type PublicClient } from 'viem'
-import { HOSTED_MIN_GAS, LOW_GAS_WARN, NATIVE_SYMBOL } from './network.ts'
+import { formatEther, parseEther, type Address } from 'viem'
+import type { EvmAdapter } from '../../agent-runtime/src/chain/evm.ts'
 import { log } from './log.ts'
 
 // A wallet's balance is re-read at most this often — the host loop runs every
@@ -9,27 +9,27 @@ const lastChecked = new Map<string, number>()
 
 /**
  * Logs a warning when a system wallet (keeper, arbiter, a hosted agent) runs
- * low on native gas, so an operator tops it up before transactions start
- * failing. Never throws — a failed balance read must not stop the loop.
+ * low on native gas on a chain, so an operator tops it up before transactions
+ * start failing. Never throws — a failed balance read must not stop the loop.
  */
 export async function warnIfLowGas(
-  publicClient: PublicClient,
+  chain: EvmAdapter,
   address: Address,
   label: string,
-  /** 'system' = keeper/arbiter (LOW_GAS_WARN_TBNB); 'hosted' = an agent wallet (HOSTED_MIN_GAS). */
+  /** 'system' = keeper/arbiter (the chain's lowGasWarn); 'hosted' = an agent wallet (its hostedMinGas). */
   kind: 'system' | 'hosted' = 'system'
 ): Promise<void> {
-  const key = address.toLowerCase()
+  const key = `${chain.chainId}:${address.toLowerCase()}`
   const now = Date.now()
   if (now - (lastChecked.get(key) ?? 0) < CHECK_EVERY_MS) return
   lastChecked.set(key, now)
 
   try {
-    const balance = await publicClient.getBalance({ address })
-    const threshold = kind === 'hosted' ? HOSTED_MIN_GAS : LOW_GAS_WARN
+    const balance = await chain.nativeBalance(address)
+    const threshold = kind === 'hosted' ? chain.config.hostedMinGas : chain.config.lowGasWarn
     if (balance < parseEther(threshold)) {
       log(
-        `WARNING low gas: ${label} ${address} has ${formatEther(balance)} ${NATIVE_SYMBOL} ` +
+        `WARNING low gas: ${label} ${address} has ${formatEther(balance)} ${chain.nativeSymbol} on ${chain.chainId} ` +
           `(below ${threshold}). Top it up before its transactions start failing.`
       )
     }

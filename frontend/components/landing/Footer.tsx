@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { BrandLogo } from '@/components/BrandLogo'
-import { AGENT_ECO_ADDRESS, EXPLORER_NAME, explorerAddressUrl } from '@/lib/web3/network'
+import { AGENT_ECO_ADDRESS, EXPLORER_NAME, explorerAddressUrl } from '@/lib/web3/landingNetwork'
 import { UnavailableModal } from './UnavailableModal'
 
 // A link with no href isn't live yet — clicking it opens the "coming soon" modal.

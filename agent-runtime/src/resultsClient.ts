@@ -1,5 +1,6 @@
 import type { LocalAccount } from 'viem'
 import { buildAuthHeaders } from './authHeaders.ts'
+import { withChain } from './chainQuery.ts'
 
 export interface EscrowResult {
   id: string
@@ -26,12 +27,13 @@ export async function publishEscrowResult(
   apiUrl: string,
   escrowId: string,
   capability: string,
-  result: Record<string, unknown>
+  result: Record<string, unknown>,
+  chainId?: string
 ): Promise<EscrowResult> {
   const res = await fetch(`${apiUrl}/escrow-results`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ escrowId, capability, result }),
+    body: JSON.stringify(chainId ? { chainId, escrowId, capability, result } : { escrowId, capability, result }),
   })
   if (!res.ok) {
     const body = await res.text()
@@ -45,8 +47,8 @@ export async function publishEscrowResult(
  * published it. Private to the escrow's buyer, seller and arbiter, so the
  * reader signs the request.
  */
-export async function getEscrowResult(apiUrl: string, escrowId: string, reader: LocalAccount): Promise<EscrowResult | null> {
-  const res = await fetch(`${apiUrl}/escrow-results/${escrowId}`, { headers: await buildAuthHeaders(reader) })
+export async function getEscrowResult(apiUrl: string, escrowId: string, reader: LocalAccount, chainId?: string): Promise<EscrowResult | null> {
+  const res = await fetch(withChain(`${apiUrl}/escrow-results/${escrowId}`, chainId), { headers: await buildAuthHeaders(reader) })
   if (res.status === 404) return null
   if (!res.ok) throw new Error(`Reading escrow result failed (${res.status}): ${await res.text()}`)
   return res.json() as Promise<EscrowResult>

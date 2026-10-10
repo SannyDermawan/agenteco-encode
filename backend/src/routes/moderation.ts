@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../db.ts'
 import { isAuthorizedForAgent, verifyOwnerAuth } from '../auth.ts'
 import { UUID_REGEX, getArbiterSetup, requireViewer } from '../access.ts'
+import { defaultChainId } from '../chains.ts'
 
 /**
  * Listing moderation. Anyone signed in can report a seller; the arbiter
@@ -45,9 +46,12 @@ moderationRouter.param('id', (_req, res, next, id: string) => {
   next()
 })
 
-/** Council members (lowercase) and how many matching votes decide a case. */
+/**
+ * Council members (lowercase) and how many matching votes decide a case. Listings are moderated
+ * once for every chain, by the arbiter council of the default (first served) chain.
+ */
 async function council(): Promise<{ members: string[]; threshold: number }> {
-  const setup = await getArbiterSetup()
+  const setup = await getArbiterSetup(defaultChainId())
   if (setup.council) return { members: setup.council.members.map((m) => m.toLowerCase()), threshold: setup.council.adminThreshold }
   return { members: [setup.arbiter.toLowerCase()], threshold: 1 }
 }

@@ -3,6 +3,7 @@ import { buildAuthHeaders, type WalletSigner } from './authHeaders'
 import { checkReadAccess, readHeaders } from './session'
 import type { ActivityEntry, NegotiationEntry, Order, OrderStatus } from '@/lib/agenteco-data'
 import { TOKEN_SYMBOL } from '@/lib/web3/network'
+import { API_URL, chainFetch as fetch } from './base'
 
 export type OrderDbStatus = 'agreed' | 'funded'
 
@@ -38,7 +39,6 @@ export interface ApiOrder {
   }
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'
 
 async function parseOrThrow(res: Response) {
   if (!res.ok) {

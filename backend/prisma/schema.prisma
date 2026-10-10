@@ -11,24 +11,31 @@ datasource db {
 // contract remains the sole source of truth for that; the frontend reads
 // it live via walletAddress using its existing wagmi hooks.
 model Agent {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name          String
-  description   String
-  role          String
-  category      String?
-  service       String?
-  capabilities  String[] @default([])
-  price         Decimal  @db.Decimal
-  minimumPrice  Decimal? @map("minimum_price") @db.Decimal
-  maxBudget     Decimal? @map("max_budget") @db.Decimal
-  walletAddress String?  @map("wallet_address")
-  endpoint      String?
-  inputSchema   Json?    @map("input_schema")
-  outputSchema  Json?    @map("output_schema")
-  isOnline      Boolean  @default(false) @map("is_online")
-  ownerWallet   String   @map("owner_wallet")
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  // The chain this listing trades on (CAIP-2, e.g. eip155:97). One row per agent per chain:
+  // its wallet, prices and escrows are that chain's.
+  chainId        String   @map("chain_id")
+  // Links the rows of one logical agent across chains (set by its owner; null = standalone).
+  groupId        String?  @map("group_id") @db.Uuid
+  // ERC-8004 identity on this chain (IdentityRegistry token id), once registered.
+  erc8004AgentId String?  @map("erc8004_agent_id")
+  name           String
+  description    String
+  role           String
+  category       String?
+  service        String?
+  capabilities   String[] @default([])
+  price          Decimal  @db.Decimal
+  minimumPrice   Decimal? @map("minimum_price") @db.Decimal
+  maxBudget      Decimal? @map("max_budget") @db.Decimal
+  walletAddress  String?  @map("wallet_address")
+  endpoint       String?
+  inputSchema    Json?    @map("input_schema")
+  outputSchema   Json?    @map("output_schema")
+  isOnline       Boolean  @default(false) @map("is_online")
+  ownerWallet    String   @map("owner_wallet")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // --- Hosted buyer task (§ brainstorm: "make an agent buy for me") ---
   // Only set for an agent AgentEco itself runs on the owner's behalf (a
@@ -85,6 +92,8 @@ model Agent {
   reports              Report[]
   appeals              Appeal[]
 
+  @@index([chainId, role])
+  @@index([groupId])
   @@map("agents")
 }
 
@@ -96,6 +105,8 @@ model Negotiation {
   id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   buyerAgentId  String   @map("buyer_agent_id") @db.Uuid
   sellerAgentId String   @map("seller_agent_id") @db.Uuid
+  // Buyer and seller trade on the same chain; the deal is escrowed there.
+  chainId       String   @map("chain_id")
   capability    String
   // open | accepted | rejected | expired (the side whose turn it was went silent; see maintenance.ts)
   status        String   @default("open")
@@ -142,6 +153,7 @@ model Order {
   negotiationId String   @unique @map("negotiation_id") @db.Uuid
   buyerAgentId  String   @map("buyer_agent_id") @db.Uuid
   sellerAgentId String   @map("seller_agent_id") @db.Uuid
+  chainId       String   @map("chain_id")
   capability    String
   price         Decimal  @db.Decimal
   status        String   @default("agreed") // agreed | funded
@@ -155,6 +167,7 @@ model Order {
   buyerAgent  Agent       @relation("OrderBuyerAgent", fields: [buyerAgentId], references: [id])
   sellerAgent Agent       @relation("OrderSellerAgent", fields: [sellerAgentId], references: [id])
 
+  @@unique([chainId, escrowId])
   @@map("orders")
 }
 
@@ -167,7 +180,10 @@ model Order {
 // already match what's on-chain for that escrow — see routes/escrowResults.ts.
 model EscrowResult {
   id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  escrowId   String   @unique @map("escrow_id")
+  // The chain the escrow lives on, as a CAIP-2 id (eip155:97 = BSC Testnet). Escrow ids are
+  // numbered per chain (per deployment), so every escrow-keyed row is unique per (chainId, escrowId).
+  chainId    String   @map("chain_id")
+  escrowId   String   @map("escrow_id")
   capability String
   result     Json
   // The exact string whose keccak256 is the on-chain resultHash (jsonb
@@ -176,6 +192,7 @@ model EscrowResult {
   resultHash String   @map("result_hash")
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  @@unique([chainId, escrowId])
   @@map("escrow_results")
 }
 
@@ -187,6 +204,7 @@ model EscrowResult {
 // Negotiated orders and direct hires both point here.
 model Task {
   id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chainId    String   @map("chain_id")
   capability String
   brief      Json
   criteria   String   @default("")
@@ -196,13 +214,14 @@ model Task {
   nonce      String
   preimage   String
   taskHash   String   @unique @map("task_hash")
-  escrowId   String?  @unique @map("escrow_id")
+  escrowId   String?  @map("escrow_id")
   verified   Boolean  @default(false)
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   order Order?
 
+  @@unique([chainId, escrowId])
   @@map("tasks")
 }
 
@@ -211,7 +230,10 @@ model Task {
 // marks the fallback (AI unavailable → settle without rating).
 model Verification {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  escrowId  String   @unique @map("escrow_id")
+  // The chain the escrow lives on, as a CAIP-2 id (eip155:97 = BSC Testnet). Escrow ids are
+  // numbered per chain (per deployment), so every escrow-keyed row is unique per (chainId, escrowId).
+  chainId   String   @map("chain_id")
+  escrowId  String   @map("escrow_id")
   // Null when no model answered (provider "none": accepted unscored, not rated).
   score     Int?
   verdict   String // accept | dispute
@@ -220,6 +242,7 @@ model Verification {
   model     String?
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  @@unique([chainId, escrowId])
   @@map("verifications")
 }
 
@@ -227,16 +250,22 @@ model Verification {
 // ratings between two agents of one owner wallet — kept for the raw view but
 // left out of displayed reputation and seller selection.
 model Rating {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  escrowId  String   @unique @map("escrow_id")
-  seller    String // lowercase
-  buyer     String // lowercase
-  score     Int
-  source    String // ai (buyer is a hosted agent) | user
-  sameOwner Boolean  @map("same_owner")
-  txHash    String?  @map("tx_hash")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  // The chain the escrow lives on, as a CAIP-2 id (eip155:97 = BSC Testnet). Escrow ids are
+  // numbered per chain (per deployment), so every escrow-keyed row is unique per (chainId, escrowId).
+  chainId           String   @map("chain_id")
+  escrowId          String   @map("escrow_id")
+  seller            String // lowercase
+  buyer             String // lowercase
+  score             Int
+  source            String // ai (buyer is a hosted agent) | user
+  sameOwner         Boolean  @map("same_owner")
+  txHash            String?  @map("tx_hash")
+  // The buyer's ERC-8004 feedback for this deal (Reputation Registry), when it gave one.
+  erc8004FeedbackTx String?  @map("erc8004_feedback_tx")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  @@unique([chainId, escrowId])
   @@index([seller])
   @@map("ratings")
 }
@@ -246,7 +275,10 @@ model Rating {
 // only accepts a text whose hash matches the chain.
 model Dispute {
   id          String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  escrowId    String @unique @map("escrow_id")
+  // The chain the escrow lives on, as a CAIP-2 id (eip155:97 = BSC Testnet). Escrow ids are
+  // numbered per chain (per deployment), so every escrow-keyed row is unique per (chainId, escrowId).
+  chainId     String @map("chain_id")
+  escrowId    String @map("escrow_id")
   buyerWallet String @map("buyer_wallet")
 
   reason     String
@@ -278,6 +310,7 @@ model Dispute {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  @@unique([chainId, escrowId])
   @@map("disputes")
 }
 

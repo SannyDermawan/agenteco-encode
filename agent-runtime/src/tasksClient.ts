@@ -1,11 +1,15 @@
 import type { Hex, LocalAccount } from 'viem'
 import { buildAuthHeaders } from './authHeaders.ts'
+import { withChain } from './chainQuery.ts'
+import type { ChainAdapter } from './chain/types.ts'
 import { createAndFundEscrow } from './onchain/escrow.ts'
 import type { OnchainClients } from './onchain/clients.ts'
 
 /** A stored task (backend/prisma: Task). `preimage` re-hashes to `taskHash`. */
 export interface RegistryTask {
   id: string
+  /** The chain its escrow lives on (CAIP-2). */
+  chainId?: string
   capability: string
   brief: unknown
   criteria: string
@@ -27,7 +31,7 @@ async function parseOrThrow<T>(res: Response, action: string): Promise<T> {
 export async function createTask(
   apiUrl: string,
   buyer: LocalAccount,
-  input: { capability: string; brief: unknown; criteria?: string | null; price: string | number; seller: string }
+  input: { capability: string; brief: unknown; criteria?: string | null; price: string | number; seller: string; chainId?: string }
 ): Promise<RegistryTask> {
   const res = await fetch(`${apiUrl}/tasks`, {
     method: 'POST',
@@ -38,7 +42,7 @@ export async function createTask(
 }
 
 /** What linking returns — never the brief (the caller already has it). */
-export type TaskLinkReceipt = Pick<RegistryTask, 'id' | 'escrowId' | 'taskHash' | 'verified'>
+export type TaskLinkReceipt = Pick<RegistryTask, 'id' | 'chainId' | 'escrowId' | 'taskHash' | 'verified'>
 
 export async function linkTaskEscrow(apiUrl: string, buyer: LocalAccount, taskId: string, escrowId: string): Promise<TaskLinkReceipt> {
   const res = await fetch(`${apiUrl}/tasks/${taskId}/escrow`, {
@@ -53,8 +57,8 @@ export async function linkTaskEscrow(apiUrl: string, buyer: LocalAccount, taskId
  * The task behind an escrow, or null when none was linked. Private to the
  * escrow's buyer, seller and arbiter, so the reader signs the request.
  */
-export async function getTaskByEscrow(apiUrl: string, escrowId: string, reader: LocalAccount): Promise<RegistryTask | null> {
-  const res = await fetch(`${apiUrl}/tasks/by-escrow/${escrowId}`, { headers: await buildAuthHeaders(reader) })
+export async function getTaskByEscrow(apiUrl: string, escrowId: string, reader: LocalAccount, chainId?: string): Promise<RegistryTask | null> {
+  const res = await fetch(withChain(`${apiUrl}/tasks/by-escrow/${escrowId}`, chainId), { headers: await buildAuthHeaders(reader) })
   if (res.status === 404) return null
   return parseOrThrow(res, 'Reading task')
 }
@@ -62,15 +66,20 @@ export async function getTaskByEscrow(apiUrl: string, escrowId: string, reader: 
 /**
  * A buyer agent's whole hire, in the order spec §5 requires: store the task
  * (the API returns its taskHash) → createEscrow with that hash + fund → link
- * the escrow to the task (the API checks the chain agrees).
+ * the escrow to the task (the API checks the chain agrees). With `chain`, the
+ * escrow is created on that chain (the adapter signs as `clients.account`);
+ * without it, on the process's primary chain.
  */
 export async function hireWithTask(
   apiUrl: string,
-  clients: OnchainClients,
-  input: { capability: string; brief: unknown; criteria?: string | null; price: string; seller: `0x${string}` }
+  clients: Pick<OnchainClients, 'account'> & Partial<OnchainClients>,
+  input: { capability: string; brief: unknown; criteria?: string | null; price: string; seller: `0x${string}` },
+  chain?: ChainAdapter
 ): Promise<{ escrowId: bigint; task: RegistryTask }> {
-  const task = await createTask(apiUrl, clients.account, input)
-  const escrowId = await createAndFundEscrow(clients, input.seller, input.price, task.taskHash)
+  const task = await createTask(apiUrl, clients.account, chain ? { ...input, chainId: chain.chainId } : input)
+  const escrowId = chain
+    ? await chain.createAndFundEscrow({ seller: input.seller, amount: input.price, taskHash: task.taskHash })
+    : await createAndFundEscrow(clients as OnchainClients, input.seller, input.price, task.taskHash)
   const linked = await linkTaskEscrow(apiUrl, clients.account, task.id, escrowId.toString())
   return { escrowId, task: { ...task, ...linked } }
 }

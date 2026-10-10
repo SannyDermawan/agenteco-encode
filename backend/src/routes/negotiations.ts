@@ -4,6 +4,7 @@ import { isAuthorizedForAgent, verifyOwnerAuth } from '../auth.ts'
 import { UUID_REGEX, isArbiter, isPartyOf, partyFilter, requireViewer } from '../access.ts'
 import { createNegotiationSchema, listNegotiationsQuerySchema, negotiationMessageSchema } from '../schemas/negotiation.ts'
 import { turnExpired } from '../maintenance.ts'
+import { optionalChainFilter } from '../chains.ts'
 import { NEGOTIATION_TURN_SECONDS } from '../../../agent-runtime/src/durations.ts'
 
 export const negotiationsRouter = Router()
@@ -22,6 +23,8 @@ negotiationsRouter.get('/', async (req, res) => {
   const parsed = listNegotiationsQuerySchema.safeParse(req.query)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { agentId, status } = parsed.data
+  const chainId = optionalChainFilter(parsed.data.chain, res)
+  if (chainId === null) return
 
   const negotiations = await prisma.negotiation.findMany({
     where: {
@@ -30,6 +33,7 @@ negotiationsRouter.get('/', async (req, res) => {
         ...(agentId ? [{ OR: [{ buyerAgentId: agentId }, { sellerAgentId: agentId }] }] : []),
       ],
       ...(status && { status }),
+      ...(chainId && { chainId }),
     },
     include: messagesOrderAsc,
     orderBy: { updatedAt: 'desc' },
@@ -46,7 +50,7 @@ negotiationsRouter.get('/:id', async (req, res) => {
   })
   if (!negotiation) return res.status(404).json({ error: 'Negotiation not found' })
   const { buyerAgent, sellerAgent, ...rest } = negotiation
-  if (!isPartyOf(viewer, buyerAgent) && !isPartyOf(viewer, sellerAgent) && !(await isArbiter(viewer))) {
+  if (!isPartyOf(viewer, buyerAgent) && !isPartyOf(viewer, sellerAgent) && !(await isArbiter(viewer, negotiation.chainId))) {
     return res.status(403).json({ error: 'This negotiation is private — only its buyer, seller and the arbiter can see it.' })
   }
   res.json(rest)
@@ -70,6 +74,10 @@ negotiationsRouter.post('/', async (req, res) => {
   if (!seller) return res.status(404).json({ error: 'sellerAgentId not found' })
   if (buyer.role !== 'buyer') return res.status(400).json({ error: 'buyerAgentId does not belong to a buyer agent' })
   if (seller.role !== 'seller') return res.status(400).json({ error: 'sellerAgentId does not belong to a seller agent' })
+  // The deal is escrowed on one chain: both agents must trade there.
+  if (buyer.chainId !== seller.chainId) {
+    return res.status(400).json({ error: `The buyer agent is on ${buyer.chainId} but the seller agent is on ${seller.chainId}` })
+  }
   if (!seller.capabilities.includes(capability)) {
     return res.status(400).json({ error: `Seller agent does not offer capability "${capability}"` })
   }
@@ -88,6 +96,7 @@ negotiationsRouter.post('/', async (req, res) => {
     data: {
       buyerAgentId,
       sellerAgentId,
+      chainId: seller.chainId,
       capability,
       messages: {
         create: [{ side: 'buyer', action: 'offer', price, reason: parsed.data.reason ?? null, source: parsed.data.source, adjusted: parsed.data.adjusted }],
@@ -161,6 +170,7 @@ negotiationsRouter.post('/:id/messages', async (req, res) => {
           negotiationId: negotiation.id,
           buyerAgentId: negotiation.buyerAgentId,
           sellerAgentId: negotiation.sellerAgentId,
+          chainId: negotiation.chainId,
           capability: negotiation.capability,
           price: finalPrice!,
         },

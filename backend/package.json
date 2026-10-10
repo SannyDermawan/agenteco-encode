@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tsconfig.scripts.json",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "postinstall": "prisma generate",
+    "db:local": "tsx scripts/localDb.ts",
     "seed:sellers": "tsx --env-file-if-exists=../.env --env-file-if-exists=.env scripts/seedDemoSellers.ts",
     "load-test": "tsx --env-file-if-exists=../.env --env-file-if-exists=.env scripts/loadTest.ts"
   },
@@ -30,6 +31,8 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.4.3",
+    "@electric-sql/pglite-socket": "^0.1.3",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^22",

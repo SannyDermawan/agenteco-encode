@@ -26,6 +26,7 @@ depth = 64
 
 [rpc_endpoints]
 bsc_testnet = "${BSC_TESTNET_RPC_URL}"
+base_sepolia = "${BASE_SEPOLIA_RPC_URL}"
 
 # BscScan verification uses an Etherscan V2 API key, passed on the command line:
 #   forge verify-contract <addr> <path:Name> --chain 97 --etherscan-api-key $ETHERSCAN_API_KEY

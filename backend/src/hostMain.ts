@@ -4,13 +4,8 @@ import { runSellerHostCycleOnce } from './host/sellerTaskHost.ts'
 import { initArbiter, runArbiterCycleOnce } from './host/arbiter.ts'
 import { indexRecentRatings } from './ratings.ts'
 import { installAiCallLog } from './ai/aiCallLog.ts'
-import { createPublicClient } from 'viem'
-import { AGENT_ECO_ADDRESS, TOKEN_SYMBOL, USDT_ADDRESS, assertRpcMatchesNetwork, appChain, appTransport } from './network.ts'
-import {
-  EXECUTION_WINDOW_SECONDS,
-  REVIEW_WINDOW_SECONDS,
-  assertDurationsFitContract,
-} from '../../agent-runtime/src/durations.ts'
+import { assertServedChainsMatchRpc, readChain, servedChainIds } from './chains.ts'
+import { EXECUTION_WINDOW_SECONDS, REVIEW_WINDOW_SECONDS, assertDurationsFit } from '../../agent-runtime/src/durations.ts'
 
 setLogTag('HOST')
 // Every AI attempt the host makes is counted (GET /ai-calls/stats).
@@ -33,13 +28,16 @@ function sleep(ms: number): Promise<void> {
  */
 async function main(): Promise<void> {
   log('Host runtime started', 'HOST')
-  log(`Network: ${appChain.name} — contract ${AGENT_ECO_ADDRESS}, ${TOKEN_SYMBOL} ${USDT_ADDRESS}`, 'HOST')
+  for (const id of servedChainIds()) {
+    const { config } = readChain(id)
+    log(`Chain: ${config.chain.name} (${id}) — contract ${config.agentEco}, ${config.tokenSymbol} ${config.usdt}`, 'HOST')
+  }
   log(`Polling interval: ${INTERVAL_MS}ms`, 'HOST')
+
   // The host signs real transactions — never let it run against the wrong
-  // chain, or with escrow windows the contract would reject.
-  const publicClient = createPublicClient({ chain: appChain, transport: appTransport() })
-  await assertRpcMatchesNetwork(() => publicClient.getChainId())
-  await assertDurationsFitContract(publicClient)
+  // chain, or with escrow windows a chain's contract would reject.
+  await assertServedChainsMatchRpc()
+  for (const id of servedChainIds()) assertDurationsFit(await readChain(id).timerLimits())
   log(`Escrow windows: execution ${EXECUTION_WINDOW_SECONDS}s, review ${REVIEW_WINDOW_SECONDS}s`, 'HOST')
   await initArbiter()
 
@@ -73,8 +71,16 @@ async function main(): Promise<void> {
     loop('Buyer host', INTERVAL_MS, runHostCycleOnce),
     loop('Seller host', INTERVAL_MS, runSellerHostCycleOnce),
     loop('Arbiter', INTERVAL_MS, runArbiterCycleOnce),
-    // Ratings made outside our own flows, about once a minute.
-    loop('Rating index', RATING_SCAN_MS, () => indexRecentRatings(publicClient)),
+    // Ratings made outside our own flows, about once a minute, on every served chain.
+    loop('Rating index', RATING_SCAN_MS, async () => {
+      for (const id of servedChainIds()) {
+        try {
+          await indexRecentRatings(id)
+        } catch (error) {
+          logError(`Rating index ${id} failed`, error, 'HOST')
+        }
+      }
+    }),
   ])
 
   log('Stopped.', 'HOST')

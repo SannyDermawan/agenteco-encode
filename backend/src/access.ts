@@ -1,12 +1,11 @@
 import type { Request, Response } from 'express'
-import { createPublicClient, zeroAddress, type Address } from 'viem'
+import { zeroAddress, type Address } from 'viem'
 import type { Prisma } from '@prisma/client'
 import { READ_SESSION_HEADER } from '../../agent-runtime/src/shared/session.ts'
-import { AGENT_ECO_ABI } from './abi/agentEcoAbi.ts'
 import { verifyOwnerAuth, type AuthResult } from './auth.ts'
 import { prisma } from './db.ts'
-import { AGENT_ECO_ADDRESS, agentEcoFor, appChain, appTransport } from './network.ts'
-import { canRule, readArbiterSetup, type ArbiterSetup } from '../../agent-runtime/src/onchain/arbiter.ts'
+import { canRule, type ArbiterSetup } from '../../agent-runtime/src/chain/evm.ts'
+import { readChain, requestChain, servedChainIds, servedEvmChainIds, type ChainId } from './chains.ts'
 import { FRONTEND_HOSTS } from './origins.ts'
 import { verifyReadSession } from './session.ts'
 
@@ -14,11 +13,9 @@ import { verifyReadSession } from './session.ts'
  * Who may read what. Everything behind an order — the task brief, the
  * negotiation, the result, the verification, the dispute and the rating — is
  * visible only to that order's buyer and seller (their wallets, or the owner
- * of the hosted agent acting for them) and to the contract's arbiter. Being
- * signed in is not enough on its own.
+ * of the hosted agent acting for them) and to the arbiter of that escrow's chain.
+ * Being signed in is not enough on its own.
  */
-
-const publicClient = createPublicClient({ chain: appChain, transport: appTransport() })
 
 /**
  * The caller's proven wallet: a read session from the website, or the
@@ -26,7 +23,7 @@ const publicClient = createPublicClient({ chain: appChain, transport: appTranspo
  */
 export async function authenticateViewer(req: Request): Promise<AuthResult | null> {
   const session = req.header(READ_SESSION_HEADER)
-  if (session) return verifyReadSession(session, { domains: FRONTEND_HOSTS, chainId: appChain.id })
+  if (session) return verifyReadSession(session, { domains: FRONTEND_HOSTS, chainId: servedEvmChainIds() })
   if (req.header('x-owner-wallet')) return verifyOwnerAuth(req)
   return null
 }
@@ -57,14 +54,16 @@ const arbiterSetups = new Map<string, { at: number; setup: Promise<ArbiterSetup>
 const ARBITER_TTL_MS = 60_000
 
 /**
- * A deployment's arbiter: a wallet, or an ArbiterCouncil and its members.
- * The current deployment's by default. Cached for a minute.
+ * A deployment's arbiter on a chain: a wallet, or an ArbiterCouncil and its members.
+ * The chain's current deployment by default. Cached for a minute.
  */
-export function getArbiterSetup(agentEco: Address = AGENT_ECO_ADDRESS): Promise<ArbiterSetup> {
-  const key = agentEco.toLowerCase()
+export function getArbiterSetup(chainId: ChainId, agentEco?: Address): Promise<ArbiterSetup> {
+  const reader = readChain(chainId)
+  const eco = agentEco ?? reader.config.agentEco
+  const key = `${chainId}:${eco.toLowerCase()}`
   const cached = arbiterSetups.get(key)
   if (cached && Date.now() - cached.at <= ARBITER_TTL_MS) return cached.setup
-  const setup = readArbiterSetup(publicClient as never, agentEco).catch((error) => {
+  const setup = reader.arbiterSetupAt(eco).catch((error) => {
     arbiterSetups.delete(key) // retry on the next request
     throw error
   })
@@ -73,16 +72,27 @@ export function getArbiterSetup(agentEco: Address = AGENT_ECO_ADDRESS): Promise<
 }
 
 /**
- * The arbiter wallet itself, or any member of the arbiter council: of the
- * deployment holding `escrowId`, or of the current one when none is given.
+ * The arbiter wallet itself, or any member of the arbiter council: on `chainId` (of the
+ * deployment holding `escrowId`, or of the current one when none is given), or on any
+ * served chain when no chain is given.
  */
-export async function isArbiter(viewer: string, escrowId?: string): Promise<boolean> {
-  try {
-    const eco = escrowId !== undefined && isEscrowId(escrowId) ? agentEcoFor(BigInt(escrowId)) : AGENT_ECO_ADDRESS
-    return canRule(await getArbiterSetup(eco), viewer)
-  } catch {
-    return false
+export async function isArbiter(viewer: string, chainId?: ChainId, escrowId?: string): Promise<boolean> {
+  for (const chain of chainId ? [chainId] : servedChainIds()) {
+    try {
+      const eco = escrowId !== undefined && isEscrowId(escrowId) ? readChain(chain).agentEcoFor(BigInt(escrowId)) : undefined
+      if (canRule(await getArbiterSetup(chain, eco), viewer)) return true
+    } catch {
+      // An unreadable chain grants nothing.
+    }
   }
+  return false
+}
+
+/** The served chains whose current arbiter (wallet or council member) this viewer is. */
+export async function arbiterChains(viewer: string): Promise<ChainId[]> {
+  const chains: ChainId[] = []
+  for (const chain of servedChainIds()) if (await isArbiter(viewer, chain)) chains.push(chain)
+  return chains
 }
 
 export interface EscrowParties {
@@ -98,28 +108,27 @@ export function isEscrowId(value: string): boolean {
   return /^\d{1,30}$/.test(value)
 }
 
-/** Buyer and seller (lowercase) of an escrow, or null if it does not exist. */
-export async function escrowParties(escrowId: string): Promise<EscrowParties | null> {
-  const cached = partiesCache.get(escrowId)
+/** Buyer and seller (lowercase) of an escrow on a chain, or null if it does not exist. */
+export async function escrowParties(chainId: ChainId, escrowId: string): Promise<EscrowParties | null> {
+  const key = `${chainId}:${escrowId}`
+  const cached = partiesCache.get(key)
   if (cached) return cached
 
   // A linked task was checked against the chain when it was linked (routes/tasks.ts).
-  const task = await prisma.task.findUnique({ where: { escrowId }, select: { buyer: true, seller: true, verified: true } })
+  const task = await prisma.task.findUnique({
+    where: { chainId_escrowId: { chainId, escrowId } },
+    select: { buyer: true, seller: true, verified: true },
+  })
   let parties: EscrowParties
   if (task?.verified) {
     parties = { buyer: task.buyer.toLowerCase(), seller: task.seller.toLowerCase() }
   } else {
-    const [buyer, seller] = await publicClient.readContract({
-      address: agentEcoFor(BigInt(escrowId)),
-      abi: AGENT_ECO_ABI,
-      functionName: 'getEscrowBasic',
-      args: [BigInt(escrowId)],
-    })
+    const { buyer, seller } = await readChain(chainId).getEscrowBasic(BigInt(escrowId))
     if (buyer === zeroAddress) return null
     parties = { buyer: buyer.toLowerCase(), seller: seller.toLowerCase() }
   }
   if (partiesCache.size >= PARTIES_CACHE_LIMIT) partiesCache.clear()
-  partiesCache.set(escrowId, parties)
+  partiesCache.set(key, parties)
   return parties
 }
 
@@ -127,11 +136,11 @@ export async function escrowParties(escrowId: string): Promise<EscrowParties | n
  * The viewer is the buyer or seller wallet itself, the arbiter, or the owner
  * of a hosted agent whose wallet is the buyer or seller. Only hosted agents
  * count for that last case: their wallet was generated by this server, while
- * a self-custody agent's walletAddress is just a claim.
+ * a self-custody agent's walletAddress is just a claim. The arbiter is that chain's.
  */
-export async function canViewParties(viewer: string, parties: EscrowParties): Promise<boolean> {
+export async function canViewParties(viewer: string, parties: EscrowParties, chainId: ChainId): Promise<boolean> {
   if (viewer === parties.buyer || viewer === parties.seller) return true
-  if (await isArbiter(viewer)) return true
+  if (await isArbiter(viewer, chainId)) return true
   const owned = await prisma.agent.count({
     where: {
       ownerWallet: { equals: viewer, mode: 'insensitive' },
@@ -147,29 +156,32 @@ export async function canViewParties(viewer: string, parties: EscrowParties): Pr
 
 export type EscrowAccess = 'ok' | 'not_found' | 'forbidden'
 
-export async function checkEscrowAccess(viewer: string, escrowId: string): Promise<EscrowAccess> {
+export async function checkEscrowAccess(viewer: string, chainId: ChainId, escrowId: string): Promise<EscrowAccess> {
   let parties: EscrowParties | null
   try {
-    parties = await escrowParties(escrowId)
+    parties = await escrowParties(chainId, escrowId)
   } catch {
     return 'not_found'
   }
   if (!parties) return 'not_found'
-  return (await canViewParties(viewer, parties)) ? 'ok' : 'forbidden'
+  return (await canViewParties(viewer, parties, chainId)) ? 'ok' : 'forbidden'
 }
 
 /**
- * Answers the request itself unless the viewer may see this escrow's
- * off-chain records. Returns the viewer when access is granted.
+ * Answers the request itself unless the viewer may see this escrow's off-chain records.
+ * The chain comes from the request (?chain=, default: the default chain). Returns the
+ * viewer and the chain when access is granted.
  */
-export async function guardEscrow(req: Request, res: Response, escrowId: string): Promise<string | undefined> {
+export async function guardEscrow(req: Request, res: Response, escrowId: string): Promise<{ viewer: string; chainId: ChainId } | undefined> {
   if (!isEscrowId(escrowId)) {
     res.status(400).json({ error: 'escrowId must be a number' })
     return undefined
   }
+  const chainId = requestChain(req, res)
+  if (!chainId) return undefined
   const viewer = await requireViewer(req, res)
   if (!viewer) return undefined
-  const access = await checkEscrowAccess(viewer, escrowId)
+  const access = await checkEscrowAccess(viewer, chainId, escrowId)
   if (access === 'not_found') {
     res.status(404).json({ error: 'Escrow not found' })
     return undefined
@@ -178,7 +190,7 @@ export async function guardEscrow(req: Request, res: Response, escrowId: string)
     res.status(403).json({ error: 'This order is private — only its buyer, seller and the arbiter can see it.' })
     return undefined
   }
-  return viewer
+  return { viewer, chainId }
 }
 
 interface AgentParty {

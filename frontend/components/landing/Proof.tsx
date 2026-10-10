@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef } from 'react'
 import { animate, motion, useInView, useReducedMotion } from 'framer-motion'
-import { TOKEN_SYMBOL } from '@/lib/web3/network'
+import { TOKEN_SYMBOL } from '@/lib/web3/landingNetwork'
 import { SectionGlow, SpotlightCard } from './cinema'
 import { fadeUp, REVEAL_VIEWPORT } from './scrollReveal'
 import { SectionHeader } from './ui'

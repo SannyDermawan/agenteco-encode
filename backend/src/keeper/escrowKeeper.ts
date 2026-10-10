@@ -1,18 +1,9 @@
-import { AGENT_ECO_ABI } from '../abi/agentEcoAbi.ts'
-import { agentEcoFor } from '../network.ts'
-import { readAllEscrows } from '../../../agent-runtime/src/onchain/escrowIndex.ts'
+import { evmAdapterFor } from '../../../agent-runtime/src/chain/default.ts'
+import type { EvmAdapter } from '../../../agent-runtime/src/chain/evm.ts'
 import type { Clients } from '../clients.ts'
 import type { KeeperConfig } from '../config.ts'
 import { log, logError } from '../log.ts'
-import { decideKeeperAction, FLAG_FOR_STATUS, type KeeperAction, type TimeoutFlags } from './decide.ts'
-
-/** The AgentEco.sol view behind each timeout flag. */
-const FLAG_READER = {
-  acceptTimedOut: 'isAcceptTimedOut',
-  executionTimedOut: 'isExecutionTimedOut',
-  reviewExpired: 'isReviewExpired',
-  disputeTimedOut: 'isDisputeTimedOut',
-} as const satisfies Record<keyof TimeoutFlags, string>
+import { decideKeeperAction, FLAG_FOR_STATUS, type KeeperAction } from './decide.ts'
 
 const ACTION_REASON: Record<NonNullable<KeeperAction>, string> = {
   claimAcceptTimeout: 'seller never started the funded job',
@@ -22,7 +13,7 @@ const ACTION_REASON: Record<NonNullable<KeeperAction>, string> = {
 }
 
 async function submitKeeperTx(
-  clients: Clients,
+  chain: EvmAdapter,
   config: KeeperConfig,
   escrowId: bigint,
   functionName: NonNullable<KeeperAction>
@@ -33,69 +24,61 @@ async function submitKeeperTx(
   }
 
   try {
-    // Simulate first: catches a stale/ineligible escrow (e.g. someone
-    // else's keeper already claimed it) before we spend gas.
-    const { request } = await clients.publicClient.simulateContract({
-      address: agentEcoFor(escrowId),
-      abi: AGENT_ECO_ABI,
-      functionName,
-      args: [escrowId],
-      account: clients.account,
+    // claimTimeout simulates first (catches a stale/ineligible escrow, e.g. someone
+    // else's keeper already claimed it, before we spend gas), then sends, then awaits
+    // the receipt — not just the hash — which is what guarantees this escrow can't be
+    // double-submitted: processEscrow() is only called sequentially within a cycle, and
+    // cycles never overlap (see index.ts), so nothing else touches this escrowId until
+    // this resolves.
+    const claim = await chain.claimTimeout(escrowId, functionName, {
+      onSubmitting: () => log(`Submitting ${functionName}(#${escrowId})`),
+      onSent: (hash) => log(`Transaction: ${hash}`),
     })
-
-    log(`Submitting ${functionName}(#${escrowId})`)
-    const hash = await clients.walletClient.writeContract(request)
-    log(`Transaction: ${hash}`)
-
-    // Awaiting the receipt here — not just the hash — is what guarantees
-    // this escrow can't be double-submitted: processEscrow() is only
-    // called sequentially within a cycle, and cycles never overlap
-    // (see index.ts), so nothing else touches this escrowId until this
-    // resolves.
-    const receipt = await clients.publicClient.waitForTransactionReceipt({ hash })
     log(
-      `${functionName}(#${escrowId}) ${receipt.status === 'success' ? 'succeeded' : 'reverted'} — ` +
-        `block ${receipt.blockNumber}, tx ${receipt.transactionHash}`
+      `${functionName}(#${escrowId}) ${claim.success ? 'succeeded' : 'reverted'} — ` +
+        `block ${claim.blockNumber}, tx ${claim.hash}`
     )
   } catch (error) {
     logError(`${functionName}(#${escrowId}) failed`, error)
   }
 }
 
-async function processEscrow(clients: Clients, config: KeeperConfig, escrowId: bigint, status: number): Promise<void> {
+async function processEscrow(chain: EvmAdapter, config: KeeperConfig, escrowId: bigint, status: number): Promise<void> {
   try {
     // Only the flag that matters for this status is read (one RPC call, not four).
     const flag = FLAG_FOR_STATUS[status]
     if (!flag) return
-    const flagValue = await clients.publicClient.readContract({
-      address: agentEcoFor(escrowId),
-      abi: AGENT_ECO_ABI,
-      functionName: FLAG_READER[flag],
-      args: [escrowId],
-    })
+    const flagValue = await chain.readTimeoutFlag(escrowId, flag)
 
     const action = decideKeeperAction(status, { [flag]: flagValue })
     if (!action) return
 
     log(`Escrow #${escrowId}: ${ACTION_REASON[action]} — calling ${action}`)
-    await submitKeeperTx(clients, config, escrowId, action)
+    await submitKeeperTx(chain, config, escrowId, action)
   } catch (error) {
     logError(`Failed checking escrow #${escrowId}`, error)
   }
 }
 
+
 /**
- * One full keeper pass: read every escrow's status straight from the contract
- * (batched — no event logs, so it works on RPCs that prune history), then act
- * on each one that can time out. Escrows are processed sequentially so a slow
- * or stuck transaction can't cause overlapping submissions.
+ * One full keeper pass on one chain: read every escrow's status straight from
+ * the contract (batched — no event logs, so it works on RPCs that prune history),
+ * then act on each one that can time out. Escrows are processed sequentially so
+ * a slow or stuck transaction can't cause overlapping submissions. `chain` signs
+ * with the keeper's wallet.
  */
-export async function runKeeperCycle(clients: Clients, config: KeeperConfig): Promise<void> {
-  const escrows = await readAllEscrows(clients.publicClient)
+export async function runKeeperCycleOn(chain: EvmAdapter, config: KeeperConfig, label = ''): Promise<void> {
+  const escrows = await chain.listEscrows()
   const live = escrows.filter((e) => FLAG_FOR_STATUS[e.status] !== undefined)
-  if (live.length) log(`${escrows.length} escrows, ${live.length} live — checking timeouts`)
+  if (live.length) log(`${label}${escrows.length} escrows, ${live.length} live — checking timeouts`)
 
   for (const escrow of live) {
-    await processEscrow(clients, config, escrow.id, escrow.status)
+    await processEscrow(chain, config, escrow.id, escrow.status)
   }
+}
+
+/** One keeper pass on the primary chain, with the keeper's clients. */
+export function runKeeperCycle(clients: Clients, config: KeeperConfig): Promise<void> {
+  return runKeeperCycleOn(evmAdapterFor(clients), config)
 }

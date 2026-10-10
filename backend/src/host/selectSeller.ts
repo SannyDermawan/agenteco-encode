@@ -1,5 +1,5 @@
-import type { DiscoveredAgent, OnchainClients } from '../../../agent-runtime/src/index.ts'
-import { getOnchainReputation } from './reputation.ts'
+import type { DiscoveredAgent } from '../../../agent-runtime/src/index.ts'
+import type { EvmAdapter } from '../../../agent-runtime/src/chain/evm.ts'
 import { ratingSummaries } from '../ratings.ts'
 
 export interface SellerFilters {
@@ -21,7 +21,7 @@ export interface SellerFilters {
  * the indexed average without same-owner ratings (spec §10.3).
  */
 export async function selectSeller(
-  onchain: OnchainClients,
+  chain: EvmAdapter,
   candidates: DiscoveredAgent[],
   checkPolicy: (price: number) => boolean,
   filters: SellerFilters
@@ -33,11 +33,11 @@ export async function selectSeller(
   let qualified = affordable
   if (hasCustomFilter) {
     const wallets = affordable.map((c) => c.walletAddress).filter((w): w is string => !!w)
-    const ratings = new Map((await ratingSummaries(wallets)).map((r) => [r.seller, r.avgScore]))
+    const ratings = new Map((await ratingSummaries(wallets, chain.chainId)).map((r) => [r.seller, r.avgScore]))
     const checked = await Promise.all(
       affordable.map(async (candidate) => {
         if (!candidate.walletAddress) return null
-        const rep = await getOnchainReputation(onchain.publicClient, candidate.walletAddress as `0x${string}`)
+        const rep = await chain.getReputation(candidate.walletAddress)
         const okSuccess = filters.minSuccessRate === null || rep.successRatePct >= filters.minSuccessRate
         const okCompleted = filters.minCompletedJobs === null || rep.completedJobs >= filters.minCompletedJobs
         // A minimum rating excludes sellers nobody has rated yet.

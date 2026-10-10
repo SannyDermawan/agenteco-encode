@@ -1,9 +1,8 @@
 import { Router } from 'express'
 import type { Prisma } from '@prisma/client'
-import { createPublicClient, type Address } from 'viem'
 import { prisma } from '../db.ts'
 import { buildResultPreimage, hashPreimage } from '../../../agent-runtime/src/shared/hashes.ts'
-import { agentEcoFor, appChain, appTransport } from '../network.ts'
+import { readChain, requestChain } from '../chains.ts'
 import { createEscrowResultSchema } from '../schemas/escrowResult.ts'
 import { guardEscrow } from '../access.ts'
 import { checkResultShape } from '../capabilityRegistry.ts'
@@ -12,23 +11,12 @@ import { isCapabilityId } from '../../../agent-runtime/src/shared/capabilities/d
 
 export const escrowResultsRouter = Router()
 
-const RESULT_HASH_ABI = [
-  {
-    inputs: [{ internalType: 'uint256', name: 'escrowId', type: 'uint256' }],
-    name: 'getResultHash',
-    outputs: [{ internalType: 'bytes32', name: '', type: 'bytes32' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-] as const
-
-const publicClient = createPublicClient({ chain: appChain, transport: appTransport() })
-
 // The delivered work belongs to the deal: only its buyer, seller and the
 // arbiter can read it (and re-hash it against the chain).
 escrowResultsRouter.get('/:escrowId', async (req, res) => {
-  if (!(await guardEscrow(req, res, req.params.escrowId))) return
-  const result = await prisma.escrowResult.findUnique({ where: { escrowId: req.params.escrowId } })
+  const access = await guardEscrow(req, res, req.params.escrowId)
+  if (!access) return
+  const result = await prisma.escrowResult.findUnique({ where: { chainId_escrowId: { chainId: access.chainId, escrowId: req.params.escrowId } } })
   if (!result) return res.status(404).json({ error: 'No result recorded for this escrow' })
   res.json(result)
 })
@@ -40,9 +28,11 @@ escrowResultsRouter.get('/:escrowId', async (req, res) => {
 escrowResultsRouter.post('/', async (req, res) => {
   const parsed = createEscrowResultSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  const chainId = requestChain(req, res)
+  if (!chainId) return
   const { escrowId, result } = parsed.data
   // The task behind the escrow fixes the capability; a claim in the body can't dodge its schema.
-  const task = await prisma.task.findUnique({ where: { escrowId }, select: { capability: true } })
+  const task = await prisma.task.findUnique({ where: { chainId_escrowId: { chainId, escrowId } }, select: { capability: true } })
   if (task && task.capability !== parsed.data.capability) {
     return res.status(400).json({ error: `This escrow is for ${task.capability}, not ${parsed.data.capability}.` })
   }
@@ -57,12 +47,7 @@ escrowResultsRouter.post('/', async (req, res) => {
 
   let onChainHash: `0x${string}`
   try {
-    onChainHash = await publicClient.readContract({
-      address: agentEcoFor(BigInt(escrowId)),
-      abi: RESULT_HASH_ABI,
-      functionName: 'getResultHash',
-      args: [BigInt(escrowId)],
-    })
+    onChainHash = await readChain(chainId).getResultHash(BigInt(escrowId))
   } catch {
     return res.status(400).json({ error: 'Could not read this escrow on-chain — is the id correct?' })
   }
@@ -83,8 +68,8 @@ escrowResultsRouter.post('/', async (req, res) => {
   }
 
   const saved = await prisma.escrowResult.upsert({
-    where: { escrowId },
-    create: { escrowId, capability, result: result as Prisma.InputJsonValue, resultJson, resultHash: computedHash },
+    where: { chainId_escrowId: { chainId, escrowId } },
+    create: { chainId, escrowId, capability, result: result as Prisma.InputJsonValue, resultJson, resultHash: computedHash },
     update: { capability, result: result as Prisma.InputJsonValue, resultJson, resultHash: computedHash },
   })
   res.status(201).json(saved)

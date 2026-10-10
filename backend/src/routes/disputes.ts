@@ -1,31 +1,30 @@
 import { Router } from 'express'
-import { createPublicClient } from 'viem'
 import { prisma } from '../db.ts'
-import { agentEcoFor, appChain, appTransport } from '../network.ts'
+import { optionalChainFilter, readChain, requestChain, type ChainId } from '../chains.ts'
 import { verifyOwnerAuth } from '../auth.ts'
-import { guardEscrow, isArbiter, requireViewer } from '../access.ts'
-import { AGENT_ECO_ABI } from '../abi/agentEcoAbi.ts'
+import { arbiterChains, guardEscrow, requireViewer } from '../access.ts'
 import { buildRationalePreimage, hashPreimage, textHash } from '../../../agent-runtime/src/shared/hashes.ts'
 import { disputeReasonSchema, disputeResolutionSchema, disputeResponseSchema } from '../schemas/dispute.ts'
 
 export const disputesRouter = Router()
-
-const publicClient = createPublicClient({ chain: appChain, transport: appTransport() })
 
 // AgentEco.sol OrderStatus
 const DISPUTED = 4
 const SETTLED = 5
 const REFUNDED = 6
 
-async function readEscrow(escrowId: string) {
+async function readEscrow(chainId: ChainId, escrowId: string) {
   const id = BigInt(escrowId)
-  const [basic, hashes] = await Promise.all([
-    publicClient.readContract({ address: agentEcoFor(id), abi: AGENT_ECO_ABI, functionName: 'getEscrowBasic', args: [id] }),
-    publicClient.readContract({ address: agentEcoFor(id), abi: AGENT_ECO_ABI, functionName: 'getEscrowHashes', args: [id] }),
-  ])
-  const [buyer, seller, , status] = basic
-  const [, , reasonHash, responseHash, resolutionHash] = hashes
-  return { buyer, seller, status: Number(status), reasonHash, responseHash, resolutionHash }
+  const chain = readChain(chainId)
+  const [basic, hashes] = await Promise.all([chain.getEscrowBasic(id), chain.getEscrowHashes(id)])
+  return {
+    buyer: basic.buyer,
+    seller: basic.seller,
+    status: basic.status,
+    reasonHash: hashes.disputeReasonHash,
+    responseHash: hashes.disputeResponseHash,
+    resolutionHash: hashes.resolutionHash,
+  }
 }
 
 function badId(escrowId: string): boolean {
@@ -33,17 +32,22 @@ function badId(escrowId: string): boolean {
 }
 
 // Dispute texts are private to the escrow's buyer, seller and the arbiter,
-// who can re-hash them against the chain. The full list is the arbiter's queue.
+// who can re-hash them against the chain. The full list is the arbiter's queue:
+// every dispute on the chains whose arbiter (or council member) the viewer is.
 disputesRouter.get('/', async (req, res) => {
   const viewer = await requireViewer(req, res)
   if (!viewer) return
-  if (!(await isArbiter(viewer))) return res.status(403).json({ error: 'Only the arbiter can list every dispute' })
-  res.json(await prisma.dispute.findMany({ orderBy: { createdAt: 'desc' } }))
+  const only = optionalChainFilter(typeof req.query.chain === 'string' ? req.query.chain : undefined, res)
+  if (only === null) return
+  const chains = (await arbiterChains(viewer)).filter((c) => !only || c === only)
+  if (!chains.length) return res.status(403).json({ error: 'Only the arbiter can list every dispute' })
+  res.json(await prisma.dispute.findMany({ where: { chainId: { in: chains } }, orderBy: { createdAt: 'desc' } }))
 })
 
 disputesRouter.get('/:escrowId', async (req, res) => {
-  if (!(await guardEscrow(req, res, req.params.escrowId))) return
-  const dispute = await prisma.dispute.findUnique({ where: { escrowId: req.params.escrowId } })
+  const access = await guardEscrow(req, res, req.params.escrowId)
+  if (!access) return
+  const dispute = await prisma.dispute.findUnique({ where: { chainId_escrowId: { chainId: access.chainId, escrowId: req.params.escrowId } } })
   if (!dispute) return res.status(404).json({ error: 'No dispute recorded for this escrow' })
   res.json(dispute)
 })
@@ -57,13 +61,15 @@ disputesRouter.put('/:escrowId', async (req, res) => {
   if (!auth.ok) return res.status(401).json({ error: auth.error })
   const { escrowId } = req.params
   if (badId(escrowId)) return res.status(400).json({ error: 'escrowId must be a number' })
+  const chainId = requestChain(req, res)
+  if (!chainId) return
 
   const parsed = disputeReasonSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid reason' })
 
   let escrow: Awaited<ReturnType<typeof readEscrow>>
   try {
-    escrow = await readEscrow(escrowId)
+    escrow = await readEscrow(chainId, escrowId)
   } catch {
     return res.status(400).json({ error: 'Could not read this escrow on-chain — is the id correct?' })
   }
@@ -76,8 +82,8 @@ disputesRouter.put('/:escrowId', async (req, res) => {
   }
 
   const saved = await prisma.dispute.upsert({
-    where: { escrowId },
-    create: { escrowId, buyerWallet: auth.wallet.toLowerCase(), reason: parsed.data.reason, reasonHash },
+    where: { chainId_escrowId: { chainId, escrowId } },
+    create: { chainId, escrowId, buyerWallet: auth.wallet.toLowerCase(), reason: parsed.data.reason, reasonHash },
     // Fills in a placeholder the arbiter made while the text was missing (same hash, so same text).
     update: { reason: parsed.data.reason, reasonHash },
   })
@@ -94,16 +100,18 @@ disputesRouter.post('/:escrowId/response', async (req, res) => {
   if (!auth.ok) return res.status(401).json({ error: auth.error })
   const { escrowId } = req.params
   if (badId(escrowId)) return res.status(400).json({ error: 'escrowId must be a number' })
+  const chainId = requestChain(req, res)
+  if (!chainId) return
 
   const parsed = disputeResponseSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid response' })
 
-  const dispute = await prisma.dispute.findUnique({ where: { escrowId } })
+  const dispute = await prisma.dispute.findUnique({ where: { chainId_escrowId: { chainId, escrowId } } })
   if (!dispute) return res.status(404).json({ error: 'The buyer has not submitted this dispute yet' })
 
   let escrow: Awaited<ReturnType<typeof readEscrow>>
   try {
-    escrow = await readEscrow(escrowId)
+    escrow = await readEscrow(chainId, escrowId)
   } catch {
     return res.status(400).json({ error: 'Could not read this escrow on-chain — is the id correct?' })
   }
@@ -116,7 +124,7 @@ disputesRouter.post('/:escrowId/response', async (req, res) => {
   }
 
   const saved = await prisma.dispute.update({
-    where: { escrowId },
+    where: { chainId_escrowId: { chainId, escrowId } },
     data: {
       sellerResponse: parsed.data.response,
       responseHash,
@@ -136,12 +144,14 @@ disputesRouter.post('/:escrowId/response', async (req, res) => {
 disputesRouter.post('/:escrowId/resolution', async (req, res) => {
   const { escrowId } = req.params
   if (badId(escrowId)) return res.status(400).json({ error: 'escrowId must be a number' })
+  const chainId = requestChain(req, res)
+  if (!chainId) return
   const parsed = disputeResolutionSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid resolution' })
 
   let escrow: Awaited<ReturnType<typeof readEscrow>>
   try {
-    escrow = await readEscrow(escrowId)
+    escrow = await readEscrow(chainId, escrowId)
   } catch {
     return res.status(400).json({ error: 'Could not read this escrow on-chain — is the id correct?' })
   }
@@ -157,7 +167,7 @@ disputesRouter.post('/:escrowId/resolution', async (req, res) => {
   }
 
   const saved = await prisma.dispute.update({
-    where: { escrowId },
+    where: { chainId_escrowId: { chainId, escrowId } },
     data: {
       resolution: rationale.decidedBy,
       releasedToSeller: escrow.status === SETTLED,
@@ -169,6 +179,7 @@ disputesRouter.post('/:escrowId/resolution', async (req, res) => {
   })
   // Unsigned route: confirm the ruling without echoing the private dispute texts.
   res.json({
+    chainId: saved.chainId,
     escrowId: saved.escrowId,
     resolution: saved.resolution,
     releasedToSeller: saved.releasedToSeller,

@@ -5,7 +5,7 @@ import { motion, useInView, useReducedMotion } from 'framer-motion'
 import { simulateNegotiation, type SimResult, type SimRound } from '@/lib/negotiationSim'
 import { fadeUp, REVEAL_VIEWPORT } from './scrollReveal'
 import { RobotAvatar, formatUsdt, fragmentMono } from './ui'
-import { TOKEN_SYMBOL } from '@/lib/web3/network'
+import { TOKEN_SYMBOL } from '@/lib/web3/landingNetwork'
 
 const STEP_MS = 650
 

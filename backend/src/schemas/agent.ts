@@ -45,6 +45,9 @@ const baseAgentSchema = z.object({
   // schema below) and what a good result must satisfy (spec §8.2).
   taskBrief: z.unknown().optional(),
   acceptanceCriteria: z.string().trim().max(LIMITS.textChars).optional(),
+  // Links this listing to the owner's listings of the same agent on other chains
+  // (any UUID the owner picks; null unlinks). chainId itself is fixed at creation.
+  groupId: z.string().uuid().nullable().optional(),
   // ownerWallet is NOT accepted here — it's derived from the verified
   // signature (see src/auth.ts), not trusted from the request body.
 })
@@ -115,6 +118,10 @@ export const listAgentsQuerySchema = z.object({
   // `capability`, which matches an exact capability tag. Per §10: "Mulai
   // dengan keyword matching, capability matching, dan filtering."
   q: z.string().min(1).optional(),
+  // One chain's agents only (CAIP-2 id, network name or EVM chain id); default: every served chain.
+  chain: z.string().min(1).optional(),
+  // One logical agent's listings across chains.
+  groupId: z.string().uuid().optional(),
 })
 
 export const heartbeatSchema = z.object({ online: z.boolean().default(true) })

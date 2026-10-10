@@ -1,6 +1,6 @@
 import { checkReadAccess, readHeaders } from './session'
+import { API_URL, chainFetch as fetch } from './base'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'
 
 /** A hosted buyer's AI verification of a delivered result (backend Verification). */
 export interface ApiVerification {

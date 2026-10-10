@@ -1,21 +1,29 @@
 import { isAddress, type Address } from 'viem'
 
 /**
- * Which network the app runs on and which AgentEco deployment it talks to.
- * Mirrors agent-runtime/src/network.ts (the backend side) — keep in sync.
+ * Which networks the app serves, which one this browser is on, and which AgentEco
+ * deployment it talks to there. Mirrors agent-runtime/src/network.ts and
+ * agent-runtime/src/chain/registry.ts (the backend side) — keep in sync.
  *
- * Pick the network with NEXT_PUBLIC_NETWORK=bsc-testnet|bot-testnet|bot-mainnet
- * (default bsc-testnet; "testnet"/"mainnet" still mean the BOT Chain presets).
- * Chain params come from the presets below; the deployment — contract, token,
- * deploy block — comes from env, with working defaults where this repo has
- * deployed. A build for a network without a default deployment fails loudly
- * instead of silently pointing users at another chain's contracts.
+ * - NEXT_PUBLIC_NETWORK (default bsc-testnet; "testnet"/"mainnet" still mean the BOT
+ *   Chain presets) is the primary network: the unsuffixed NEXT_PUBLIC_* deployment
+ *   settings below are its, exactly as before.
+ * - NEXT_PUBLIC_CHAINS lists the networks the app offers (CAIP-2 ids or names, the
+ *   default first); unset = the primary network alone. Every other network takes its
+ *   deployment from the same settings suffixed with its CAIP-2 id (colon as underscore),
+ *   e.g. NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_84532.
+ * - The visitor picks one in the top bar (selectNetwork): it is remembered in this
+ *   browser and applied on reload, and every export of this module is that network's.
+ *   The /app pages render in the browser only (see app/app/layout.tsx), so they never
+ *   disagree with a server render; the landing page uses ./landingNetwork.ts instead.
  *
- * NEXT_PUBLIC_* values are inlined at build time, so each must be read with a
- * literal `process.env.NEXT_PUBLIC_…` — and changing one needs a redeploy.
+ * A build that offers a network without a deployment fails loudly instead of silently
+ * pointing users at another chain's contracts. NEXT_PUBLIC_* values are inlined at build
+ * time, so each must be read with a literal `process.env.NEXT_PUBLIC_…` — and changing one
+ * needs a redeploy.
  */
 
-type NetworkName = 'bsc-testnet' | 'bot-testnet' | 'bot-mainnet'
+export type NetworkName = 'bsc-testnet' | 'bot-testnet' | 'bot-mainnet' | 'base-sepolia'
 
 export interface FaucetLink {
   label: string
@@ -34,13 +42,13 @@ interface NetworkPreset {
   explorerName: string
   nativeSymbol: string
   testnet: boolean
-  /** Settlement token — MockUSDT on BSC Testnet, USDT on BOT Chain. */
+  /** Settlement token — MockUSDT on BSC Testnet, USDT on BOT Chain, USDC on Base Sepolia. */
   usdtAddress: Address
   /** What the UI calls the settlement token. */
   tokenSymbol: string
   /** True when the settlement token is MockUSDT, which has a public faucet(). */
   tokenHasFaucet: boolean
-  /** Where users get native gas tokens for this network (outside the app). */
+  /** Where users get native gas tokens (and, without a token faucet, test tokens) for this network. */
   gasFaucets: FaucetLink[]
   /** Multicall3, when deployed on this chain — batches contract reads. */
   multicall3?: Address
@@ -135,6 +143,33 @@ const PRESETS: Record<NetworkName, NetworkPreset> = {
     logHistory: null,
     logRange: BigInt(500000),
   },
+  'base-sepolia': {
+    chainId: 84532,
+    name: 'Base Sepolia',
+    label: 'Base Sepolia',
+    // PublicNode serves eth_getLogs over 50,000 blocks; the official sepolia.base.org caps it
+    // at 200, but reads and transactions work there, so it is the fallback.
+    rpcUrl: 'https://base-sepolia-rpc.publicnode.com',
+    fallbackRpcUrls: ['https://sepolia.base.org'],
+    explorerUrl: 'https://sepolia.basescan.org',
+    explorerName: 'BaseScan Sepolia',
+    nativeSymbol: 'ETH',
+    testnet: true,
+    // Circle's test USDC (6 decimals).
+    usdtAddress: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+    tokenSymbol: 'USDC',
+    tokenHasFaucet: false,
+    gasFaucets: [
+      { label: 'Coinbase Developer Platform faucet (Base Sepolia ETH)', url: 'https://portal.cdp.coinbase.com/products/faucet' },
+      { label: 'Circle faucet (test USDC on Base Sepolia)', url: 'https://faucet.circle.com' },
+    ],
+    // Base Sepolia gas is a fraction of a gwei.
+    agentGasTopup: '0.002',
+    logHistory: null,
+    logRange: BigInt(45000),
+    multicall3: '0xcA11bde05977b3631167028862bE2a173976CA11',
+    // No AgentEco deployment yet: NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_84532 and _DEPLOY_BLOCK__ must be set.
+  },
 }
 
 // Names from before the BSC Testnet deployment.
@@ -145,36 +180,77 @@ function clean(value: string | undefined): string | undefined {
   return trimmed ? trimmed : undefined
 }
 
-function readNetwork(raw: string | undefined): NetworkName {
-  const value = (clean(raw) ?? 'bsc-testnet').toLowerCase()
+/** A network name for a name, an alias, a CAIP-2 id or an EVM chain id; null when unknown. */
+function toNetworkName(raw: string): NetworkName | null {
+  const value = raw.trim().toLowerCase()
   const name = ALIASES[value] ?? value
-  if (!(name in PRESETS)) {
-    throw new Error(`NEXT_PUBLIC_NETWORK must be one of ${Object.keys(PRESETS).join(', ')}, got: ${value}`)
-  }
-  return name as NetworkName
+  if (name in PRESETS) return name as NetworkName
+  const id = value.startsWith('eip155:') ? value.slice('eip155:'.length) : value
+  return (Object.keys(PRESETS) as NetworkName[]).find((n) => String(PRESETS[n].chainId) === id) ?? null
 }
 
-export const NETWORK: NetworkName = readNetwork(process.env.NEXT_PUBLIC_NETWORK)
-const preset = PRESETS[NETWORK]
-
-function readAddress(name: string, raw: string | undefined, fallback: Address | undefined): Address {
-  const value = clean(raw) ?? fallback
-  if (!value) throw new Error(`${name} must be set when NEXT_PUBLIC_NETWORK=${NETWORK} — there is no default deployment for it.`)
-  if (!isAddress(value)) throw new Error(`${name} is not a valid EVM address: ${value}`)
-  return value
+function readNetwork(raw: string | undefined): NetworkName {
+  const value = clean(raw) ?? 'bsc-testnet'
+  const name = toNetworkName(value)
+  if (!name) throw new Error(`NEXT_PUBLIC_NETWORK must be one of ${Object.keys(PRESETS).join(', ')}, got: ${value}`)
+  return name
 }
 
-function readBlock(raw: string | undefined, fallback: bigint | undefined): bigint {
-  const value = clean(raw)
-  if (!value) {
-    if (fallback === undefined) throw new Error(`NEXT_PUBLIC_DEPLOY_BLOCK must be set when NEXT_PUBLIC_NETWORK=${NETWORK}.`)
-    return fallback
-  }
-  try {
-    return BigInt(value)
-  } catch {
-    throw new Error(`NEXT_PUBLIC_DEPLOY_BLOCK must be an integer block number, got: ${value}`)
-  }
+/** The primary network: the unsuffixed NEXT_PUBLIC_* deployment settings are its. */
+export const PRIMARY_NETWORK: NetworkName = readNetwork(process.env.NEXT_PUBLIC_NETWORK)
+
+interface DeploymentEnv {
+  rpcUrl?: string
+  rpcFallbacks?: string
+  agentEco?: string
+  usdt?: string
+  deployBlock?: string
+  agentGasTopup?: string
+}
+
+const PRIMARY_ENV: DeploymentEnv = {
+  rpcUrl: process.env.NEXT_PUBLIC_RPC_URL,
+  rpcFallbacks: process.env.NEXT_PUBLIC_RPC_FALLBACK_URLS,
+  agentEco: process.env.NEXT_PUBLIC_AGENT_ECO_ADDRESS,
+  usdt: process.env.NEXT_PUBLIC_USDT_ADDRESS,
+  deployBlock: process.env.NEXT_PUBLIC_DEPLOY_BLOCK,
+  agentGasTopup: process.env.NEXT_PUBLIC_AGENT_GAS_TOPUP,
+}
+
+// Every other network's settings, suffixed with its CAIP-2 id — read literally (build-time inlining).
+const SUFFIXED_ENV: Record<NetworkName, DeploymentEnv> = {
+  'bsc-testnet': {
+    rpcUrl: process.env.NEXT_PUBLIC_RPC_URL__eip155_97,
+    rpcFallbacks: process.env.NEXT_PUBLIC_RPC_FALLBACK_URLS__eip155_97,
+    agentEco: process.env.NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_97,
+    usdt: process.env.NEXT_PUBLIC_USDT_ADDRESS__eip155_97,
+    deployBlock: process.env.NEXT_PUBLIC_DEPLOY_BLOCK__eip155_97,
+    agentGasTopup: process.env.NEXT_PUBLIC_AGENT_GAS_TOPUP__eip155_97,
+  },
+  'bot-testnet': {
+    rpcUrl: process.env.NEXT_PUBLIC_RPC_URL__eip155_968,
+    rpcFallbacks: process.env.NEXT_PUBLIC_RPC_FALLBACK_URLS__eip155_968,
+    agentEco: process.env.NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_968,
+    usdt: process.env.NEXT_PUBLIC_USDT_ADDRESS__eip155_968,
+    deployBlock: process.env.NEXT_PUBLIC_DEPLOY_BLOCK__eip155_968,
+    agentGasTopup: process.env.NEXT_PUBLIC_AGENT_GAS_TOPUP__eip155_968,
+  },
+  'bot-mainnet': {
+    rpcUrl: process.env.NEXT_PUBLIC_RPC_URL__eip155_677,
+    rpcFallbacks: process.env.NEXT_PUBLIC_RPC_FALLBACK_URLS__eip155_677,
+    agentEco: process.env.NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_677,
+    usdt: process.env.NEXT_PUBLIC_USDT_ADDRESS__eip155_677,
+    deployBlock: process.env.NEXT_PUBLIC_DEPLOY_BLOCK__eip155_677,
+    agentGasTopup: process.env.NEXT_PUBLIC_AGENT_GAS_TOPUP__eip155_677,
+  },
+  'base-sepolia': {
+    rpcUrl: process.env.NEXT_PUBLIC_RPC_URL__eip155_84532,
+    rpcFallbacks: process.env.NEXT_PUBLIC_RPC_FALLBACK_URLS__eip155_84532,
+    agentEco: process.env.NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_84532,
+    usdt: process.env.NEXT_PUBLIC_USDT_ADDRESS__eip155_84532,
+    deployBlock: process.env.NEXT_PUBLIC_DEPLOY_BLOCK__eip155_84532,
+    agentGasTopup: process.env.NEXT_PUBLIC_AGENT_GAS_TOPUP__eip155_84532,
+  },
 }
 
 function readNumber(name: string, raw: string | undefined, fallback: number): number {
@@ -185,66 +261,187 @@ function readNumber(name: string, raw: string | undefined, fallback: number): nu
   return n
 }
 
-export const CHAIN_ID = preset.chainId
-export const CHAIN_NAME = preset.name
-export const NETWORK_LABEL = preset.label
-export const IS_TESTNET = preset.testnet
-export const RPC_URL = clean(process.env.NEXT_PUBLIC_RPC_URL) ?? preset.rpcUrl
+/** Everything the app needs to know about one network and its AgentEco deployment. */
+export interface NetworkConfig {
+  name: NetworkName
+  /** CAIP-2 id, as the API names chains (`?chain=`). */
+  chainKey: string
+  chainId: number
+  chainName: string
+  label: string
+  isTestnet: boolean
+  rpcUrl: string
+  rpcUrls: string[]
+  explorerUrl: string
+  explorerName: string
+  logRange: bigint
+  logHistory: bigint | null
+  multicall3?: Address
+  nativeSymbol: string
+  tokenSymbol: string
+  tokenHasFaucet: boolean
+  gasFaucets: FaucetLink[]
+  agentGasTopup: string
+  agentEcoAddress: Address
+  usdtAddress: Address
+  deployBlock: bigint
+  firstEscrowId: bigint
+  legacyDeployments: { address: Address; firstEscrowId: bigint; endEscrowId: bigint }[]
+}
+
+export function networkConfig(name: NetworkName): NetworkConfig {
+  const preset = PRESETS[name]
+  const env = name === PRIMARY_NETWORK ? PRIMARY_ENV : SUFFIXED_ENV[name]
+  const chainKey = `eip155:${preset.chainId}`
+  const suffix = name === PRIMARY_NETWORK ? '' : `__${chainKey.replace(':', '_')}`
+
+  const address = (setting: string, raw: string | undefined, fallback: Address | undefined): Address => {
+    const value = clean(raw) ?? fallback
+    if (!value) throw new Error(`NEXT_PUBLIC_${setting}${suffix} must be set to offer ${preset.name} — there is no default deployment for it.`)
+    if (!isAddress(value)) throw new Error(`NEXT_PUBLIC_${setting}${suffix} is not a valid EVM address: ${value}`)
+    return value
+  }
+  const deployBlock = (() => {
+    const value = clean(env.deployBlock)
+    if (!value) {
+      if (preset.deployment?.deployBlock === undefined) throw new Error(`NEXT_PUBLIC_DEPLOY_BLOCK${suffix} must be set to offer ${preset.name}.`)
+      return preset.deployment.deployBlock
+    }
+    if (!/^\d+$/.test(value)) throw new Error(`NEXT_PUBLIC_DEPLOY_BLOCK${suffix} must be an integer block number, got: ${value}`)
+    return BigInt(value)
+  })()
+
+  const rpcUrl = clean(env.rpcUrl) ?? preset.rpcUrl
+  const fallbacks = clean(env.rpcFallbacks)
+  const rpcUrls = [
+    rpcUrl,
+    ...(fallbacks?.toLowerCase() === 'none' ? [] : (fallbacks?.split(',').map((u) => u.trim()).filter(Boolean) ?? preset.fallbackRpcUrls ?? [])),
+  ].filter((url, i, all) => all.indexOf(url) === i)
+
+  /*
+   * Earlier AgentEco deployments, whose escrows are still read there. Only used with the
+   * preset's own deployment: setting the address points everything at that one contract.
+   */
+  const ownDeployment = !!clean(env.agentEco)
+  const legacyList = ownDeployment ? [] : (preset.deployment?.legacy ?? [])
+  const firstEscrowId = ownDeployment ? BigInt(1) : (preset.deployment?.firstEscrowId ?? BigInt(1))
+
+  return {
+    name,
+    chainKey,
+    chainId: preset.chainId,
+    chainName: preset.name,
+    label: preset.label,
+    isTestnet: preset.testnet,
+    rpcUrl,
+    rpcUrls,
+    explorerUrl: preset.explorerUrl,
+    explorerName: preset.explorerName,
+    logRange: preset.logRange,
+    logHistory: preset.logHistory,
+    multicall3: preset.multicall3,
+    nativeSymbol: preset.nativeSymbol,
+    tokenSymbol: preset.tokenSymbol,
+    tokenHasFaucet: preset.tokenHasFaucet,
+    gasFaucets: preset.gasFaucets,
+    agentGasTopup: clean(env.agentGasTopup) ?? preset.agentGasTopup,
+    agentEcoAddress: address('AGENT_ECO_ADDRESS', env.agentEco, preset.deployment?.agentEcoAddress),
+    usdtAddress: address('USDT_ADDRESS', env.usdt, preset.usdtAddress),
+    deployBlock,
+    firstEscrowId,
+    legacyDeployments: legacyList.map((d, i) => ({
+      address: d.agentEcoAddress,
+      firstEscrowId: d.firstEscrowId,
+      endEscrowId: legacyList[i + 1]?.firstEscrowId ?? firstEscrowId,
+    })),
+  }
+}
+
+/** The networks this build offers, the default first (NEXT_PUBLIC_CHAINS; unset = the primary alone). */
+export const AVAILABLE_NETWORKS: NetworkConfig[] = (() => {
+  const raw = clean(process.env.NEXT_PUBLIC_CHAINS)
+  const names: NetworkName[] = []
+  for (const item of raw ? raw.split(',').map((s) => s.trim()).filter(Boolean) : [PRIMARY_NETWORK]) {
+    const name = toNetworkName(item)
+    if (!name) throw new Error(`NEXT_PUBLIC_CHAINS lists an unknown network: ${item}`)
+    if (!names.includes(name)) names.push(name)
+  }
+  // Every offered network must be fully configured: the build fails here otherwise.
+  return names.map(networkConfig)
+})()
+
+/** The network a visitor starts on. */
+export const DEFAULT_NETWORK: NetworkName = AVAILABLE_NETWORKS[0].name
+
+const STORAGE_KEY = 'agenteco.network'
+
+/** The network this browser picked (remembered across visits), or the default one. */
+function selectedNetwork(): NetworkName {
+  if (typeof window === 'undefined') return DEFAULT_NETWORK
+  try {
+    const saved = window.localStorage.getItem(STORAGE_KEY)
+    if (saved && AVAILABLE_NETWORKS.some((n) => n.name === saved)) return saved as NetworkName
+  } catch {
+    // Storage blocked: the default network.
+  }
+  return DEFAULT_NETWORK
+}
+
+/** Switch this browser to another offered network: the app reloads on it. */
+export function selectNetwork(name: NetworkName): void {
+  if (!AVAILABLE_NETWORKS.some((n) => n.name === name)) return
+  try {
+    window.localStorage.setItem(STORAGE_KEY, name)
+  } catch {
+    // Storage blocked: nothing to remember the choice in.
+    return
+  }
+  window.location.reload()
+}
+
+export const NETWORK: NetworkName = selectedNetwork()
+const active = AVAILABLE_NETWORKS.find((n) => n.name === NETWORK)!
+
+/** The selected network's CAIP-2 id — every API call names it (lib/api/base.ts). */
+export const CHAIN_KEY = active.chainKey
+export const CHAIN_ID = active.chainId
+export const CHAIN_NAME = active.chainName
+export const NETWORK_LABEL = active.label
+export const IS_TESTNET = active.isTestnet
+export const RPC_URL = active.rpcUrl
 /** RPC_URL, then fallbacks (NEXT_PUBLIC_RPC_FALLBACK_URLS, comma-separated, or "none"). */
-export const RPC_URLS: string[] = [
-  RPC_URL,
-  ...(clean(process.env.NEXT_PUBLIC_RPC_FALLBACK_URLS)?.toLowerCase() === 'none'
-    ? []
-    : (clean(process.env.NEXT_PUBLIC_RPC_FALLBACK_URLS)?.split(',').map((u) => u.trim()).filter(Boolean) ?? preset.fallbackRpcUrls ?? [])),
-].filter((url, i, all) => all.indexOf(url) === i)
-export const EXPLORER_URL = preset.explorerUrl
+export const RPC_URLS: string[] = active.rpcUrls
+export const EXPLORER_URL = active.explorerUrl
 /** Block span per eth_getLogs call for this network's RPC. */
-export const LOG_RANGE = preset.logRange
-export const MULTICALL3 = preset.multicall3
+export const LOG_RANGE = active.logRange
+export const MULTICALL3 = active.multicall3
 /**
  * How far back the default RPC still serves logs (PublicNode on BSC Testnet
  * prunes after ~80,000 blocks). Log scans — only used for explorer links —
  * never reach further back; escrow discovery reads contract state instead.
  */
-export const LOG_HISTORY_BLOCKS = preset.logHistory
-export const EXPLORER_NAME = preset.explorerName
-export const NATIVE_SYMBOL = preset.nativeSymbol
-export const TOKEN_SYMBOL = preset.tokenSymbol
-export const TOKEN_HAS_FAUCET = preset.tokenHasFaucet
-export const GAS_FAUCETS = preset.gasFaucets
+export const LOG_HISTORY_BLOCKS = active.logHistory
+export const EXPLORER_NAME = active.explorerName
+export const NATIVE_SYMBOL = active.nativeSymbol
+export const TOKEN_SYMBOL = active.tokenSymbol
+export const TOKEN_HAS_FAUCET = active.tokenHasFaucet
+export const GAS_FAUCETS = active.gasFaucets
+
+/** Native gas sent to a hosted agent's wallet at activation (NEXT_PUBLIC_AGENT_GAS_TOPUP overrides). */
+export const AGENT_GAS_TOPUP = active.agentGasTopup
 
 /** Below this native balance the app asks for gas before anything else (default 0.002). */
-/** Native gas sent to a hosted agent's wallet at activation (NEXT_PUBLIC_AGENT_GAS_TOPUP overrides). */
-export const AGENT_GAS_TOPUP = clean(process.env.NEXT_PUBLIC_AGENT_GAS_TOPUP) ?? preset.agentGasTopup
-
 export const MIN_NATIVE_BALANCE = readNumber('NEXT_PUBLIC_MIN_TBNB', process.env.NEXT_PUBLIC_MIN_TBNB, 0.002)
 
-export const AGENT_ECO_ADDRESS = readAddress(
-  'NEXT_PUBLIC_AGENT_ECO_ADDRESS',
-  process.env.NEXT_PUBLIC_AGENT_ECO_ADDRESS,
-  preset.deployment?.agentEcoAddress
-)
-export const USDT_ADDRESS = readAddress(
-  'NEXT_PUBLIC_USDT_ADDRESS',
-  process.env.NEXT_PUBLIC_USDT_ADDRESS,
-  preset.usdtAddress
-)
+export const AGENT_ECO_ADDRESS = active.agentEcoAddress
+export const USDT_ADDRESS = active.usdtAddress
 /** Block AgentEco.sol was deployed at — every event-log scan starts here. */
-export const DEPLOY_BLOCK = readBlock(process.env.NEXT_PUBLIC_DEPLOY_BLOCK, preset.deployment?.deployBlock)
+export const DEPLOY_BLOCK = active.deployBlock
 
-/*
- * Earlier AgentEco deployments, whose escrows are still read there. Only used with the
- * preset's own deployment: setting NEXT_PUBLIC_AGENT_ECO_ADDRESS points everything at that one contract.
- */
-const legacyList: { agentEcoAddress: Address; firstEscrowId: bigint }[] = clean(process.env.NEXT_PUBLIC_AGENT_ECO_ADDRESS) ? [] : (preset.deployment?.legacy ?? [])
 /** First escrow id of AGENT_ECO_ADDRESS (the current deployment); lower ids belong to a legacy one. */
-export const FIRST_ESCROW_ID: bigint = clean(process.env.NEXT_PUBLIC_AGENT_ECO_ADDRESS) ? BigInt(1) : (preset.deployment?.firstEscrowId ?? BigInt(1))
+export const FIRST_ESCROW_ID: bigint = active.firstEscrowId
 /** Earlier AgentEco deployments, oldest first, each with its escrow ids [firstEscrowId, endEscrowId). */
-export const LEGACY_DEPLOYMENTS: { address: Address; firstEscrowId: bigint; endEscrowId: bigint }[] = legacyList.map((d, i) => ({
-  address: d.agentEcoAddress,
-  firstEscrowId: d.firstEscrowId,
-  endEscrowId: legacyList[i + 1]?.firstEscrowId ?? FIRST_ESCROW_ID,
-}))
+export const LEGACY_DEPLOYMENTS: { address: Address; firstEscrowId: bigint; endEscrowId: bigint }[] = active.legacyDeployments
 /** The most recent earlier deployment (older code paths read one legacy contract). */
 export const LEGACY_AGENT_ECO_ADDRESS: Address | null = LEGACY_DEPLOYMENTS[LEGACY_DEPLOYMENTS.length - 1]?.address ?? null
 /** Every AgentEco deployment this app reads, the current one first. A seller's reputation is summed over all of them. */

@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { useRef } from 'react'
 import { motion, useAnimationFrame, useInView, useMotionValue, useReducedMotion, useTransform, type MotionValue } from 'framer-motion'
-import { TOKEN_SYMBOL } from '@/lib/web3/network'
+import { TOKEN_SYMBOL } from '@/lib/web3/landingNetwork'
 import { SellerArt } from './SellerAgent'
 import { SectionHeader, fragmentMono } from './ui'
 import { SectionGlow } from './cinema'

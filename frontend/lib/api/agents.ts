@@ -1,8 +1,8 @@
 import type { AgentSummary } from '@/lib/agenteco-data'
 import { buildAuthHeaders, type WalletSigner } from './authHeaders'
 import { dropReadSession, readHeaders } from './session'
+import { API_URL, chainFetch as fetch } from './base'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'
 
 export type ApiAgentRole = 'buyer' | 'seller'
 

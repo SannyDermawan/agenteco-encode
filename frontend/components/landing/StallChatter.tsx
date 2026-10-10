@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useInView, useReducedMotion } from 'framer-motion'
-import { TOKEN_SYMBOL } from '@/lib/web3/network'
+import { TOKEN_SYMBOL } from '@/lib/web3/landingNetwork'
 
 /**
  * Deals happening at the market's own stalls: small bubbles that float over robot

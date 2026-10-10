@@ -15,15 +15,17 @@ export async function capabilityStats(): Promise<Map<string, CapabilityStats>> {
   if (cache && Date.now() - cache.at < TTL_MS) return cache.stats
 
   const [tasks, results, disputes, ratings, sellers] = await Promise.all([
-    prisma.task.findMany({ where: { escrowId: { not: null } }, select: { capability: true, escrowId: true } }),
-    prisma.escrowResult.findMany({ select: { escrowId: true } }),
-    prisma.dispute.findMany({ select: { escrowId: true } }),
-    prisma.rating.findMany({ where: { sameOwner: false }, select: { escrowId: true, score: true } }),
+    prisma.task.findMany({ where: { escrowId: { not: null } }, select: { capability: true, chainId: true, escrowId: true } }),
+    prisma.escrowResult.findMany({ select: { chainId: true, escrowId: true } }),
+    prisma.dispute.findMany({ select: { chainId: true, escrowId: true } }),
+    prisma.rating.findMany({ where: { sameOwner: false }, select: { chainId: true, escrowId: true, score: true } }),
     prisma.agent.findMany({ where: { role: 'seller', deletedAt: null }, select: { capabilities: true, isOnline: true } }),
   ])
 
+  // Escrow ids are numbered per chain.
+  const key = (r: { chainId: string; escrowId: string }) => `${r.chainId}:${r.escrowId}`
   const capabilityOf = new Map<string, string>()
-  for (const t of tasks) if (t.escrowId) capabilityOf.set(t.escrowId, t.capability)
+  for (const t of tasks) if (t.escrowId) capabilityOf.set(key({ chainId: t.chainId, escrowId: t.escrowId }), t.capability)
 
   const blank = (): CapabilityStats => ({ sellers: 0, onlineSellers: 0, hires: 0, delivered: 0, disputes: 0, ratings: 0, avgRating: null, disputeRatePct: null, score: 0 })
   const stats = new Map<string, CapabilityStats>()
@@ -36,15 +38,15 @@ export async function capabilityStats(): Promise<Map<string, CapabilityStats>> {
 
   for (const t of tasks) of(t.capability).hires++
   for (const r of results) {
-    const id = capabilityOf.get(r.escrowId)
+    const id = capabilityOf.get(key(r))
     if (id) of(id).delivered++
   }
   for (const d of disputes) {
-    const id = capabilityOf.get(d.escrowId)
+    const id = capabilityOf.get(key(d))
     if (id) of(id).disputes++
   }
   for (const r of ratings) {
-    const id = capabilityOf.get(r.escrowId)
+    const id = capabilityOf.get(key(r))
     if (!id) continue
     of(id).ratings++
     ratingSum.set(id, (ratingSum.get(id) ?? 0) + r.score)

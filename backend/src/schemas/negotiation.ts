@@ -28,4 +28,6 @@ export const negotiationMessageSchema = z.object({
 export const listNegotiationsQuerySchema = z.object({
   agentId: UUID.optional(),
   status: z.enum(['open', 'accepted', 'rejected', 'expired']).optional(),
+  // One chain's negotiations only (CAIP-2 id, network name or EVM chain id).
+  chain: z.string().min(1).optional(),
 })

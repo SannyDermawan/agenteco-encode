@@ -3,6 +3,7 @@ import { prisma } from '../db.ts'
 import { isAuthorizedForAgent, verifyOwnerAuth } from '../auth.ts'
 import { UUID_REGEX, agentView, isArbiter, isPartyOf, partyFilter, requireViewer } from '../access.ts'
 import { fundOrderSchema, listOrdersQuerySchema } from '../schemas/order.ts'
+import { optionalChainFilter } from '../chains.ts'
 
 export const ordersRouter = Router()
 
@@ -18,7 +19,7 @@ ordersRouter.param('id', (_req, res, next, id: string) => {
 })
 
 type AgentLike = Parameters<typeof agentView>[0]
-type OrderWithAgents = { buyerAgent: AgentLike; sellerAgent: AgentLike }
+type OrderWithAgents = { chainId: string; buyerAgent: AgentLike; sellerAgent: AgentLike }
 
 /** Each side's private agent settings stay hidden from the other side. */
 function orderView<T extends OrderWithAgents>(order: T, viewer: string): T {
@@ -26,7 +27,7 @@ function orderView<T extends OrderWithAgents>(order: T, viewer: string): T {
 }
 
 async function canViewOrder(viewer: string, order: OrderWithAgents): Promise<boolean> {
-  return isPartyOf(viewer, order.buyerAgent) || isPartyOf(viewer, order.sellerAgent) || isArbiter(viewer)
+  return isPartyOf(viewer, order.buyerAgent) || isPartyOf(viewer, order.sellerAgent) || isArbiter(viewer, order.chainId)
 }
 
 // Only the viewer's own orders — ownerWallet / agentId just narrow them further.
@@ -36,6 +37,8 @@ ordersRouter.get('/', async (req, res) => {
   const parsed = listOrdersQuerySchema.safeParse(req.query)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { agentId, ownerWallet, status } = parsed.data
+  const chainId = optionalChainFilter(parsed.data.chain, res)
+  if (chainId === null) return
   if (ownerWallet && ownerWallet.toLowerCase() !== viewer) {
     return res.status(403).json({ error: 'You can only list your own orders' })
   }
@@ -47,6 +50,7 @@ ordersRouter.get('/', async (req, res) => {
         ...(agentId ? [{ OR: [{ buyerAgentId: agentId }, { sellerAgentId: agentId }] }] : []),
       ],
       ...(status && { status }),
+      ...(chainId && { chainId }),
     },
     include: fullInclude,
     orderBy: { createdAt: 'desc' },
@@ -84,11 +88,11 @@ ordersRouter.patch('/:id/escrow', async (req, res) => {
   }
 
   // The task was linked to this escrow (and checked on-chain) just before —
-  // see routes/tasks.ts. It must be this order's deal: its buyer is this
-  // order's buyer (the agent or its owner) and its seller this order's seller,
-  // so nobody can pin someone else's escrow onto their order.
+  // see routes/tasks.ts. It must be this order's deal on this order's chain: its
+  // buyer is this order's buyer (the agent or its owner) and its seller this
+  // order's seller, so nobody can pin someone else's escrow onto their order.
   const task = await prisma.task.findUnique({
-    where: { escrowId: parsed.data.escrowId },
+    where: { chainId_escrowId: { chainId: order.chainId, escrowId: parsed.data.escrowId } },
     select: { id: true, buyer: true, seller: true, verified: true },
   })
   if (!task?.verified) {

@@ -1,5 +1,6 @@
 import { privateKeyToAccount } from 'viem/accounts'
 import { formatUnits, type Address } from 'viem'
+import type { EvmAdapter } from '../../../agent-runtime/src/chain/evm.ts'
 import { hireWithTask } from '../../../agent-runtime/src/tasksClient.ts'
 import { NEGOTIATION_ROUNDS } from '../../../agent-runtime/src/runtime.ts'
 import { decideTurn } from '../ai/negotiate.ts'
@@ -14,8 +15,6 @@ import {
   isMyTurn,
   listOrdersForAgent,
   attachEscrowToOrder,
-  createOnchainClients,
-  type OnchainClients,
 } from '../../../agent-runtime/src/index.ts'
 import { decryptAgentKey } from '../agentKeyCrypto.ts'
 import { prisma, prismaWithAgentKey } from '../db.ts'
@@ -23,7 +22,7 @@ import { log, logError } from '../log.ts'
 import { selectSeller } from './selectSeller.ts'
 import { reviewEscrow } from './buyerReview.ts'
 import { warnIfLowGas } from '../gasWatch.ts'
-import { RPC_URL, TOKEN_SYMBOL, USDT_ADDRESS } from '../network.ts'
+import { servedChainIds, signerChain } from '../chains.ts'
 
 // The host talks to the registry over HTTP like any other agent. Set
 // AGENTECO_API_URL when the API runs as a separate service (e.g. on Railway);
@@ -37,35 +36,10 @@ function normalizeApiUrl(raw: string | undefined): string {
   return /^https?:\/\//i.test(value) ? value : `https://${value}`
 }
 
-const ERC20_ABI = [
-  {
-    inputs: [
-      { internalType: 'address', name: 'to', type: 'address' },
-      { internalType: 'uint256', name: 'amount', type: 'uint256' },
-    ],
-    name: 'transfer',
-    outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [{ internalType: 'address', name: 'account', type: 'address' }],
-    name: 'balanceOf',
-    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [],
-    name: 'decimals',
-    outputs: [{ internalType: 'uint8', name: '', type: 'uint8' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-] as const
-
 export interface HostedBuyerAgentRow {
   id: string
+  /** The chain this buyer trades on — its wallet, budget and escrows are there. */
+  chainId: string
   name: string
   capabilities: string[]
   price: unknown // Prisma.Decimal
@@ -82,34 +56,17 @@ export interface HostedBuyerAgentRow {
 }
 
 /**
- * Sends whatever USDT remains in the agent's wallet back to whoever deposited
- * it — a buyer's unspent budget, or a hosted seller's settled earnings.
+ * Sends whatever settlement token remains in the agent's wallet (the adapter's
+ * signer) back to whoever deposited it — a buyer's unspent budget, or a hosted
+ * seller's settled earnings.
  */
-export async function refundLeftover(
-  onchain: OnchainClients,
-  depositorWallet: Address,
-  label: string,
-  verb = 'refunded'
-): Promise<void> {
-  const [decimals, balance] = await Promise.all([
-    onchain.publicClient.readContract({ address: USDT_ADDRESS, abi: ERC20_ABI, functionName: 'decimals' }),
-    onchain.publicClient.readContract({
-      address: USDT_ADDRESS,
-      abi: ERC20_ABI,
-      functionName: 'balanceOf',
-      args: [onchain.account.address],
-    }),
-  ])
+export async function refundLeftover(chain: EvmAdapter, depositorWallet: Address, label: string, verb = 'refunded'): Promise<void> {
+  if (!chain.signer) throw new Error('refundLeftover needs a signing adapter')
+  const [{ decimals, symbol }, balance] = await Promise.all([chain.token(), chain.tokenBalance(chain.signer)])
   if (balance === BigInt(0)) return
 
-  const hash = await onchain.walletClient.writeContract({
-    address: USDT_ADDRESS,
-    abi: ERC20_ABI,
-    functionName: 'transfer',
-    args: [depositorWallet, balance],
-  })
-  await onchain.publicClient.waitForTransactionReceipt({ hash })
-  log(`[host:${label}] ${verb} ${formatUnits(balance, decimals)} ${TOKEN_SYMBOL} to ${depositorWallet}`)
+  await chain.transferToken(depositorWallet, balance)
+  log(`[host:${label}] ${verb} ${formatUnits(balance, decimals)} ${symbol} to ${depositorWallet}`)
 }
 
 // A hosted buyer opens at this fraction of the chosen seller's listed price —
@@ -159,9 +116,10 @@ export async function processHostedBuyerTask(agentRow: HostedBuyerAgentRow): Pro
 
   const privateKey = decryptAgentKey(agentRow.agentWalletKey)
   const account = privateKeyToAccount(privateKey)
-  const onchain = createOnchainClients(privateKey, RPC_URL)
+  const chain = signerChain(agentRow.chainId, privateKey)
+  const tokenSymbol = chain.config.tokenSymbol
   const depositorWallet = agentRow.depositorWallet as Address
-  await warnIfLowGas(onchain.publicClient, account.address, `hosted buyer "${agentRow.name}"`, 'hosted')
+  await warnIfLowGas(chain, account.address, `hosted buyer "${agentRow.name}"`, 'hosted')
 
   const maxBudget = Number(agentRow.maxBudget)
   const allNegotiations = await listNegotiationsForAgent(API_URL, account, agentRow.id)
@@ -176,7 +134,7 @@ export async function processHostedBuyerTask(agentRow: HostedBuyerAgentRow): Pro
 
     const lastMessage = negotiation.messages[negotiation.messages.length - 1]
     const offeredPrice = Number(lastMessage.price)
-    const extras = await buildNegotiationExtras(API_URL, onchain.publicClient, negotiation, {
+    const extras = await buildNegotiationExtras(API_URL, chain, negotiation, {
       taskBrief: agentRow.taskBrief,
       sellerWallet: seller.walletAddress,
     })
@@ -191,8 +149,8 @@ export async function processHostedBuyerTask(agentRow: HostedBuyerAgentRow): Pro
       ...extras,
     })
     log(
-      `[host:${agentRow.name}] negotiation ${negotiation.id}: incoming ${offeredPrice} ${TOKEN_SYMBOL} -> ${move.action}` +
-        (move.action === 'counter' ? ` (${move.price} ${TOKEN_SYMBOL})` : '') +
+      `[host:${agentRow.name}] negotiation ${negotiation.id}: incoming ${offeredPrice} ${tokenSymbol} -> ${move.action}` +
+        (move.action === 'counter' ? ` (${move.price} ${tokenSymbol})` : '') +
         ` [${move.source}${move.adjusted ? ', adjusted' : ''}]`
     )
     await respondToNegotiation(API_URL, account, negotiation.id, { side: 'buyer', ...move })
@@ -211,10 +169,11 @@ export async function processHostedBuyerTask(agentRow: HostedBuyerAgentRow): Pro
     const rejectedSellerIds = new Set(
       allNegotiations.filter((n) => n.capability === capability && ended(n.status)).map((n) => n.sellerAgentId)
     )
-    const sellers = (await discoverAgents(API_URL, { role: 'seller', capability, onlineOnly: true })).filter(
+    // Only sellers on this buyer's chain: the deal is escrowed where the budget is.
+    const sellers = (await discoverAgents(API_URL, { role: 'seller', capability, onlineOnly: true, chainId: agentRow.chainId })).filter(
       (s) => !rejectedSellerIds.has(s.id)
     )
-    const chosen = await selectSeller(onchain, sellers, (p) => canOpenWith(p, maxBudget), {
+    const chosen = await selectSeller(chain, sellers, (p) => canOpenWith(p, maxBudget), {
       minSuccessRate: agentRow.minSuccessRate,
       minCompletedJobs: agentRow.minCompletedJobs,
       minReputation: agentRow.minReputation,
@@ -225,7 +184,7 @@ export async function processHostedBuyerTask(agentRow: HostedBuyerAgentRow): Pro
     }
     const openingOffer = buyerRuntimeFor(agentRow, Number(chosen.price)).config.basePrice
     log(
-      `[host:${agentRow.name}] opening negotiation with "${chosen.name}" (asks ${chosen.price} ${TOKEN_SYMBOL}) — offering ${openingOffer} ${TOKEN_SYMBOL}`
+      `[host:${agentRow.name}] opening negotiation with "${chosen.name}" (asks ${chosen.price} ${tokenSymbol}) — offering ${openingOffer} ${tokenSymbol}`
     )
     await openNegotiation(API_URL, account, {
       buyerAgentId: agentRow.id,
@@ -253,18 +212,23 @@ export async function processHostedBuyerTask(agentRow: HostedBuyerAgentRow): Pro
     }
 
     // Store the task, escrow its hash, link the two (spec §5).
-    log(`[host:${agentRow.name}] funding escrow for ${order.price} ${TOKEN_SYMBOL} (deposit was ${agentRow.maxBudget} ${TOKEN_SYMBOL})…`)
-    const { escrowId, task } = await hireWithTask(API_URL, onchain, {
-      capability: order.capability,
-      brief: agentRow.taskBrief,
-      criteria: agentRow.acceptanceCriteria,
-      price: order.price,
-      seller: seller.walletAddress,
-    })
+    log(`[host:${agentRow.name}] funding escrow for ${order.price} ${tokenSymbol} (deposit was ${agentRow.maxBudget} ${tokenSymbol})…`)
+    const { escrowId, task } = await hireWithTask(
+      API_URL,
+      { account },
+      {
+        capability: order.capability,
+        brief: agentRow.taskBrief,
+        criteria: agentRow.acceptanceCriteria,
+        price: order.price,
+        seller: seller.walletAddress,
+      },
+      chain
+    )
     await attachEscrowToOrder(API_URL, account, order.id, escrowId.toString())
     log(`[host:${agentRow.name}] order ${order.id}: funded as escrow #${escrowId} (task ${task.taskHash.slice(0, 10)}…).`)
 
-    await refundLeftover(onchain, depositorWallet, agentRow.name)
+    await refundLeftover(chain, depositorWallet, agentRow.name)
     return
   }
 
@@ -274,10 +238,10 @@ export async function processHostedBuyerTask(agentRow: HostedBuyerAgentRow): Pro
   const fundedOrders = await listOrdersForAgent(API_URL, account, agentRow.id, 'funded')
   for (const order of fundedOrders) {
     if (!order.escrowId) continue
-    const step = await reviewEscrow(API_URL, agentRow, onchain, account, BigInt(order.escrowId))
+    const step = await reviewEscrow(API_URL, agentRow, chain, account, BigInt(order.escrowId))
     if (step === 'waiting') continue
     if (step === 'final') {
-      await refundLeftover(onchain, depositorWallet, agentRow.name)
+      await refundLeftover(chain, depositorWallet, agentRow.name)
       await prisma.agent.update({ where: { id: agentRow.id }, data: { taskStatus: 'completed' } })
       log(`[host:${agentRow.name}] task completed.`)
     }
@@ -287,7 +251,11 @@ export async function processHostedBuyerTask(agentRow: HostedBuyerAgentRow): Pro
 
 export async function runHostCycleOnce(): Promise<void> {
   // The only place allowed to read agentWalletKey — see db.ts.
-  const activeAgents = await prismaWithAgentKey.agent.findMany({ where: { role: 'buyer', taskStatus: 'active', deletedAt: null } })
+  const served = servedChainIds()
+  // Buyers on a chain this host does not serve (CHAINS) wait until it does.
+  const activeAgents = await prismaWithAgentKey.agent.findMany({
+    where: { role: 'buyer', taskStatus: 'active', deletedAt: null, chainId: { in: served } },
+  })
 
   for (const agentRow of activeAgents) {
     try {

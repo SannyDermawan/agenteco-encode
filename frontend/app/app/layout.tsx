@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -10,9 +10,16 @@ import { DemoModeBanner } from '@/components/app/DemoModeBanner'
 import { FaucetStrip } from '@/components/app/FaucetStrip'
 import { SessionSync } from '@/components/app/SessionGate'
 
+const noSubscription = () => () => {}
+
 export default function AppLayout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [queryClient] = useState(() => new QueryClient())
+  // The app renders in the browser only: it runs on the network this browser picked
+  // (lib/web3/network.ts), which a server render cannot know.
+  // False on the server and while hydrating, true from the browser's next render on.
+  const mounted = useSyncExternalStore(noSubscription, () => true, () => false)
+  if (!mounted) return <div className="min-h-screen bg-[#08090D]" />
 
   return (
     <WagmiProvider config={wagmiConfig}>

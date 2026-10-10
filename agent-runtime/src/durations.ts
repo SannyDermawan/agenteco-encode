@@ -49,7 +49,11 @@ export async function assertDurationsFitContract(publicClient: PublicClient): Pr
     read<bigint>('MAX_WINDOW'),
     read<bigint>('disputeTimeout'),
   ])
+  assertDurationsFit({ minWindow, maxWindow, disputeTimeout })
+}
 
+/** The same check against limits already read (e.g. a chain adapter's timerLimits()), for any chain. */
+export function assertDurationsFit({ minWindow, maxWindow, disputeTimeout }: { minWindow: bigint; maxWindow: bigint; disputeTimeout: bigint }): void {
   for (const [name, value] of [
     ['EXECUTION_WINDOW_SECONDS', EXECUTION_WINDOW_SECONDS],
     ['REVIEW_WINDOW_SECONDS', REVIEW_WINDOW_SECONDS],

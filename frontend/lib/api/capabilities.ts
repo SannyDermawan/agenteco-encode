@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import type { CapabilityInfo, RegisterCapabilityInput } from '@shared/capabilities/custom'
 import { buildAuthHeaders, type WalletSigner } from './authHeaders'
+import { API_URL, chainFetch as fetch } from './base'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'
 
 export type { CapabilityInfo, RegisterCapabilityInput }
 

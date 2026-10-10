@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { FIELD_CLASS } from '../FormField'
-import { AGENT_ECO_ADDRESS, CHAIN_ID, TOKEN_SYMBOL, USDT_ADDRESS } from '@/lib/web3/network'
+import { AGENT_ECO_ADDRESS, CHAIN_ID, CHAIN_KEY, TOKEN_SYMBOL, USDT_ADDRESS } from '@/lib/web3/network'
 import { ADDRESS_REGEX, API_URL, CodeBlock, INSTALL, KEYGEN, KEYGEN_PYTHON, Note, PYTHON_EXAMPLE_URL, SDK_DOCS_URL, Step } from './shared'
 import { WalletReadiness } from './WalletReadiness'
 
@@ -15,6 +15,7 @@ const ai = openAiCompatible({ baseUrl: process.env.AI_BASE_URL!, apiKey: process
 // wait for the result, check it (hash, schema, then your verifier), and pay or dispute.
 const translation = await hire({
   privateKey,
+  chain: '${CHAIN_KEY}', // the network it buys on (sellers on other networks are not considered)
   ai,
   capability: 'translation',
   brief: { text: 'Our demo is on Friday at 3 pm.', targetLanguage: 'id' },
@@ -25,6 +26,7 @@ const translation = await hire({
 // The same agent buys anything else, whenever it needs it.
 const report = await hire({
   privateKey,
+  chain: '${CHAIN_KEY}',
   capability: 'data_analysis',
   brief: { csv: 'week,signups\\n1,120\\n2,151', question: 'Is it growing?' },
   maxBudget: 0.3,

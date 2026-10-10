@@ -3,7 +3,7 @@ import { usePathname } from 'next/navigation'
 import { formatUnits } from 'viem'
 import { useAccount, useConnect, useDisconnect, useSwitchChain } from 'wagmi'
 import { appChain } from '@/lib/web3/chain'
-import { NETWORK_LABEL, TOKEN_SYMBOL } from '@/lib/web3/network'
+import { AVAILABLE_NETWORKS, NETWORK, NETWORK_LABEL, TOKEN_SYMBOL, selectNetwork, type NetworkName } from '@/lib/web3/network'
 import { useUsdtBalance, useUsdtDecimals } from '@/lib/web3/hooks'
 import { MenuIcon, WalletIcon } from './icons'
 
@@ -91,6 +91,39 @@ function WalletControl() {
   )
 }
 
+/**
+ * The network badge — a picker when the app offers several networks. Picking one reloads
+ * the app on it (listings, orders, escrows and balances are all per network).
+ */
+function NetworkPicker() {
+  const dot = <i className="h-1.5 w-1.5 rounded-full bg-[#22A06B] shadow-[0_0_6px_#22A06B]" />
+  if (AVAILABLE_NETWORKS.length <= 1) {
+    return (
+      <span className="hidden items-center gap-1.5 rounded-full border border-white/[0.06] bg-[#0D0F14] px-3 py-1.5 text-[11.5px] font-medium text-[#8B8D96] sm:inline-flex">
+        {dot}
+        {NETWORK_LABEL}
+      </span>
+    )
+  }
+  return (
+    <label className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-[#0D0F14] py-1.5 pl-3 pr-2 text-[11.5px] font-medium text-[#8B8D96]">
+      {dot}
+      <span className="sr-only">Network</span>
+      <select
+        value={NETWORK}
+        onChange={(e) => selectNetwork(e.target.value as NetworkName)}
+        className="cursor-pointer bg-transparent text-[#F5F5F7] outline-none"
+      >
+        {AVAILABLE_NETWORKS.map((n) => (
+          <option key={n.name} value={n.name} className="bg-[#0D0F14]">
+            {n.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
 export function AppTopbar({ onMenuClick }: { onMenuClick: () => void }) {
   const pathname = usePathname()
 
@@ -107,10 +140,7 @@ export function AppTopbar({ onMenuClick }: { onMenuClick: () => void }) {
       <h1 className="text-[15px] font-semibold tracking-[-0.01em] text-[#F5F5F7]">{titleFor(pathname)}</h1>
 
       <div className="ml-auto flex items-center gap-3">
-        <span className="hidden items-center gap-1.5 rounded-full border border-white/[0.06] bg-[#0D0F14] px-3 py-1.5 text-[11.5px] font-medium text-[#8B8D96] sm:inline-flex">
-          <i className="h-1.5 w-1.5 rounded-full bg-[#22A06B] shadow-[0_0_6px_#22A06B]" />
-          {NETWORK_LABEL}
-        </span>
+        <NetworkPicker />
         <WalletControl />
       </div>
     </header>

@@ -1,6 +1,6 @@
 import { checkReadAccess, readHeaders } from './session'
+import { API_URL, chainFetch as fetch } from './base'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'
 
 /** May the signed-in wallet open this escrow's order page? Null when the escrow doesn't exist. */
 export async function getEscrowAccess(escrowId: string): Promise<boolean | null> {

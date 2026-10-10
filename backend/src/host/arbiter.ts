@@ -1,13 +1,6 @@
-import { createPublicClient, isHex } from 'viem'
+import { isHex, type Hex } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
-import {
-  createOnchainClients,
-  getEscrowDisputeInfo,
-  getEscrowHashes,
-  type OnchainClients,
-} from '../../../agent-runtime/src/index.ts'
-import { canRule, readArbiterSetup, ruleDispute } from '../../../agent-runtime/src/onchain/arbiter.ts'
-import { readAllEscrows, type EscrowBasic } from '../../../agent-runtime/src/onchain/escrowIndex.ts'
+import { canRule, type EscrowBasic, type EvmAdapter } from '../../../agent-runtime/src/chain/evm.ts'
 import { ARBITER_OVERRIDE_WINDOW_SECONDS, SELLER_RESPONSE_WINDOW_SECONDS } from '../../../agent-runtime/src/durations.ts'
 import { buildRationalePreimage, hashPreimage, type RationaleInput } from '../../../agent-runtime/src/shared/hashes.ts'
 import { getCapability } from '../capabilityRegistry.ts'
@@ -16,7 +9,7 @@ import { ARBITER_AUTO_MIN_CONFIDENCE } from '../ai/config.ts'
 import { prisma } from '../db.ts'
 import { log, logError } from '../log.ts'
 import { warnIfLowGas } from '../gasWatch.ts'
-import { AGENT_ECO_ADDRESS, ALL_AGENT_ECO_ADDRESSES, RPC_URL, agentEcoFor, appChain, appTransport } from '../network.ts'
+import { readChain, servedChainIds, signerChain, type ChainId } from '../chains.ts'
 
 /**
  * The AI arbiter (spec §11 steps 3–5), run by the host process: it already has
@@ -35,6 +28,9 @@ import { AGENT_ECO_ADDRESS, ALL_AGENT_ECO_ADDRESSES, RPC_URL, agentEcoFor, appCh
  * when the council's ruling threshold is 1, or waits for a human's matching vote.
  * Each deployment has its own council (v2's, v3's); disputes on an older one
  * are still recommended and ruled there, through that deployment's council.
+ *
+ * Every served chain is worked the same way, with the same key: on each chain it
+ * rules only where it is that chain's arbiter or a member of its council.
  */
 
 // AgentEco.sol OrderStatus
@@ -43,83 +39,102 @@ const SETTLED = 5
 const REFUNDED = 6
 const ZERO_HASH = `0x${'0'.repeat(64)}`
 
-const publicClient = createPublicClient({ chain: appChain, transport: appTransport() })
-// The runtime's read helpers are typed against its own viem copy.
-const chain = { publicClient } as unknown as Pick<OnchainClients, 'publicClient'>
+interface ChainArbiter {
+  /** Signs rulings on this chain; null = recommendations only. */
+  signer: EvmAdapter | null
+  /** AgentEco deployments (lowercase) on this chain whose disputes the key can rule. */
+  rulable: Set<string>
+}
 
-let arbiter: OnchainClients | null | undefined
-/** AgentEco deployments (lowercase) whose disputes ARBITER_PRIVATE_KEY can rule. */
-let rulable = new Set<string>()
+let arbiters: Map<ChainId, ChainArbiter> | undefined
 
-/**
- * The arbiter wallet, if ARBITER_PRIVATE_KEY is set and is the contract's
- * arbiter or a member of its council; otherwise recommend-only.
- */
-export async function initArbiter(): Promise<void> {
+function arbiterKey(): Hex | null {
   const raw = process.env.ARBITER_PRIVATE_KEY?.trim()
   const key = raw && !raw.startsWith('0x') ? `0x${raw}` : raw
-  if (!key || !isHex(key) || key.length !== 66) {
-    arbiter = null
+  return key && isHex(key) && key.length === 66 ? key : null
+}
+
+/**
+ * On every served chain: the arbiter wallet, if ARBITER_PRIVATE_KEY is set and is
+ * that chain's contract arbiter or a member of its council; otherwise recommend-only.
+ */
+export async function initArbiter(): Promise<void> {
+  const key = arbiterKey()
+  const next = new Map<ChainId, ChainArbiter>()
+  if (!key) {
+    for (const chainId of servedChainIds()) next.set(chainId, { signer: null, rulable: new Set() })
+    arbiters = next
     log('Arbiter: no ARBITER_PRIVATE_KEY — AI recommendations only, no automatic rulings.', 'HOST')
     return
   }
-  const setup = await readArbiterSetup(publicClient, AGENT_ECO_ADDRESS)
   const account = privateKeyToAccount(key)
-  if (!canRule(setup, account.address)) {
-    arbiter = null
-    const who = setup.council ? `a member of the arbiter council ${setup.council.address}` : `the contract's arbiter (${setup.arbiter})`
-    log(`Arbiter: ARBITER_PRIVATE_KEY is ${account.address}, which is not ${who} — recommendations only.`, 'HOST')
-    return
-  }
-  arbiter = createOnchainClients(key, RPC_URL)
-  rulable = new Set([AGENT_ECO_ADDRESS.toLowerCase()])
-  for (const eco of ALL_AGENT_ECO_ADDRESSES.slice(1)) {
-    try {
-      if (canRule(await readArbiterSetup(publicClient, eco), account.address)) rulable.add(eco.toLowerCase())
-    } catch (error) {
-      logError(`Arbiter: could not read the arbiter of ${eco}`, error, 'HOST')
+  for (const chainId of servedChainIds()) {
+    const reader = readChain(chainId)
+    const setup = await reader.arbiterSetupAt()
+    if (!canRule(setup, account.address)) {
+      next.set(chainId, { signer: null, rulable: new Set() })
+      const who = setup.council ? `a member of the arbiter council ${setup.council.address}` : `the contract's arbiter (${setup.arbiter})`
+      log(`Arbiter (${chainId}): ARBITER_PRIVATE_KEY is ${account.address}, which is not ${who} — recommendations only.`, 'HOST')
+      continue
     }
+    const rulable = new Set([reader.config.agentEco.toLowerCase()])
+    for (const eco of reader.allAgentEcoAddresses.slice(1)) {
+      try {
+        if (canRule(await reader.arbiterSetupAt(eco), account.address)) rulable.add(eco.toLowerCase())
+      } catch (error) {
+        logError(`Arbiter (${chainId}): could not read the arbiter of ${eco}`, error, 'HOST')
+      }
+    }
+    next.set(chainId, { signer: signerChain(chainId, key), rulable })
+    const via = setup.council
+      ? `, voting in ArbiterCouncil ${setup.council.address} (${setup.council.rulingThreshold} of ${setup.council.members.length} votes rule)`
+      : ''
+    log(
+      `Arbiter (${chainId}): ${account.address}${via} — auto-rules at confidence ≥ ${ARBITER_AUTO_MIN_CONFIDENCE} after a ${ARBITER_OVERRIDE_WINDOW_SECONDS}s override window.`,
+      'HOST'
+    )
   }
-  const via = setup.council
-    ? `, voting in ArbiterCouncil ${setup.council.address} (${setup.council.rulingThreshold} of ${setup.council.members.length} votes rule)`
-    : ''
-  log(`Arbiter: ${account.address}${via} — auto-rules at confidence ≥ ${ARBITER_AUTO_MIN_CONFIDENCE} after a ${ARBITER_OVERRIDE_WINDOW_SECONDS}s override window.`, 'HOST')
+  arbiters = next
 }
 
 const nowSec = () => Math.floor(Date.now() / 1000)
 /** Waiting reasons already logged per escrow, so a long wait logs once. */
 const loggedWait = new Map<string, string>()
 
-function logOnce(escrowId: string, key: string, message: string): void {
-  if (loggedWait.get(escrowId) === key) return
-  loggedWait.set(escrowId, key)
+function logOnce(chainId: ChainId, escrowId: string, key: string, message: string): void {
+  const k = `${chainId}:${escrowId}`
+  if (loggedWait.get(k) === key) return
+  loggedWait.set(k, key)
   log(message)
 }
 
-async function recommend(escrow: EscrowBasic, disputedAt: number): Promise<void> {
+const where = (chainId: ChainId, escrowId: string) => ({ chainId_escrowId: { chainId, escrowId } })
+
+async function recommend(chain: EvmAdapter, escrow: EscrowBasic, disputedAt: number): Promise<void> {
+  const chainId = chain.chainId
   const id = escrow.id.toString()
   const responseWindowOver = nowSec() >= disputedAt + SELLER_RESPONSE_WINDOW_SECONDS
 
-  let row = await prisma.dispute.findUnique({ where: { escrowId: id } })
+  let row = await prisma.dispute.findUnique({ where: where(chainId, id) })
   if (!row) {
     // The buyer's text never arrived (only its hash is on-chain): after the
     // response window, judge without it rather than let the deadline lapse.
     if (!responseWindowOver) return
-    const { disputeReasonHash } = await getEscrowHashes(chain, escrow.id)
-    row = await prisma.dispute.create({ data: { escrowId: id, buyerWallet: escrow.buyer.toLowerCase(), reason: '', reasonHash: disputeReasonHash } })
+    const { disputeReasonHash } = await chain.getEscrowHashes(escrow.id)
+    row = await prisma.dispute.create({ data: { chainId, escrowId: id, buyerWallet: escrow.buyer.toLowerCase(), reason: '', reasonHash: disputeReasonHash } })
   }
 
-  const { disputeResponseHash } = await getEscrowHashes(chain, escrow.id)
+  const { disputeResponseHash } = await chain.getEscrowHashes(escrow.id)
   const responded = disputeResponseHash !== ZERO_HASH
   // Wait for the seller's answer (and its text) until the window closes.
   if (!responseWindowOver && (!responded || !row.sellerResponse)) {
-    logOnce(id, 'awaiting-response', `[arbiter] escrow #${id}: waiting for the seller's response…`)
+    logOnce(chainId, id, 'awaiting-response', `[arbiter] ${chainId} escrow #${id}: waiting for the seller's response…`)
     return
   }
 
   const [task, result] = await Promise.all([
-    prisma.task.findUnique({ where: { escrowId: id } }),
-    prisma.escrowResult.findUnique({ where: { escrowId: id } }),
+    prisma.task.findUnique({ where: where(chainId, id) }),
+    prisma.escrowResult.findUnique({ where: where(chainId, id) }),
   ])
   // Platform or community capability — a community one is judged by its published rubric.
   const capability = task ? await getCapability(task.capability) : null
@@ -142,12 +157,12 @@ async function recommend(escrow: EscrowBasic, disputedAt: number): Promise<void>
 
   const recommendedAt = new Date()
   if (!rec) {
-    await prisma.dispute.update({ where: { escrowId: id }, data: { recUnavailable: true, recommendedAt } })
-    log(`[arbiter] escrow #${id}: AI recommendation unavailable — waiting for the arbiter or the timeout.`)
+    await prisma.dispute.update({ where: where(chainId, id), data: { recUnavailable: true, recommendedAt } })
+    log(`[arbiter] ${chainId} escrow #${id}: AI recommendation unavailable — waiting for the arbiter or the timeout.`)
     return
   }
   await prisma.dispute.update({
-    where: { escrowId: id },
+    where: where(chainId, id),
     data: {
       recVerdict: rec.verdict,
       recConfidence: rec.confidence,
@@ -159,16 +174,21 @@ async function recommend(escrow: EscrowBasic, disputedAt: number): Promise<void>
       overrideDeadline: new Date(recommendedAt.getTime() + ARBITER_OVERRIDE_WINDOW_SECONDS * 1000),
     },
   })
-  log(`[arbiter] escrow #${id}: AI recommends ${rec.verdict} (${rec.confidence}% confident, ${rec.provider}/${rec.model}); override window ${ARBITER_OVERRIDE_WINDOW_SECONDS}s.`)
+  log(
+    `[arbiter] ${chainId} escrow #${id}: AI recommends ${rec.verdict} (${rec.confidence}% confident, ${rec.provider}/${rec.model}); override window ${ARBITER_OVERRIDE_WINDOW_SECONDS}s.`
+  )
 }
 
-async function autoResolve(escrow: EscrowBasic, disputeDeadline: number): Promise<void> {
+async function autoResolve(chain: EvmAdapter, escrow: EscrowBasic, disputeDeadline: number): Promise<void> {
+  const chainId = chain.chainId
   const id = escrow.id.toString()
-  const row = await prisma.dispute.findUnique({ where: { escrowId: id } })
+  const row = await prisma.dispute.findUnique({ where: where(chainId, id) })
   if (!row?.recommendedAt || row.recUnavailable || !row.recVerdict || row.recConfidence === null || !row.recRationale || !row.overrideDeadline) return
-  if (!arbiter) return
-  if (!rulable.has(agentEcoFor(escrow.id).toLowerCase())) {
-    logOnce(id, 'not-rulable', `[arbiter] escrow #${id}: this key is not the arbiter of ${agentEcoFor(escrow.id)} — left to its arbiter or the timeout.`)
+  const arbiter = arbiters?.get(chainId)
+  if (!arbiter?.signer) return
+  const eco = chain.agentEcoFor(escrow.id)
+  if (!arbiter.rulable.has(eco.toLowerCase())) {
+    logOnce(chainId, id, 'not-rulable', `[arbiter] ${chainId} escrow #${id}: this key is not the arbiter of ${eco} — left to its arbiter or the timeout.`)
     return
   }
 
@@ -179,8 +199,10 @@ async function autoResolve(escrow: EscrowBasic, disputeDeadline: number): Promis
     disputeDeadlineSec: disputeDeadline,
   })
   if (!decision.ok) {
-    if (decision.reason === 'low-confidence') logOnce(id, 'low-confidence', `[arbiter] escrow #${id}: confidence ${row.recConfidence}% is below ${ARBITER_AUTO_MIN_CONFIDENCE}% — left to the arbiter or the timeout.`)
-    if (decision.reason === 'too-late') logOnce(id, 'too-late', `[arbiter] escrow #${id}: too close to the dispute deadline to rule — the timeout refunds the buyer.`)
+    if (decision.reason === 'low-confidence')
+      logOnce(chainId, id, 'low-confidence', `[arbiter] ${chainId} escrow #${id}: confidence ${row.recConfidence}% is below ${ARBITER_AUTO_MIN_CONFIDENCE}% — left to the arbiter or the timeout.`)
+    if (decision.reason === 'too-late')
+      logOnce(chainId, id, 'too-late', `[arbiter] ${chainId} escrow #${id}: too close to the dispute deadline to rule — the timeout refunds the buyer.`)
     return
   }
 
@@ -192,16 +214,21 @@ async function autoResolve(escrow: EscrowBasic, disputeDeadline: number): Promis
   }
   const preimage = buildRationalePreimage(rationale)
   const toSeller = rationale.verdict === 'seller'
-  log(`[arbiter] escrow #${id}: executing the AI ruling for the ${rationale.verdict}…`)
-  const outcome = await ruleDispute(arbiter, escrow.id, toSeller, hashPreimage(preimage))
+  log(`[arbiter] ${chainId} escrow #${id}: executing the AI ruling for the ${rationale.verdict}…`)
+  const outcome = await arbiter.signer.ruleDispute(escrow.id, toSeller, hashPreimage(preimage))
   if (outcome.kind !== 'executed') {
     // Council with a ruling threshold above 1: the AI's vote waits for a human's.
-    logOnce(id, 'council-vote', `[arbiter] escrow #${id}: AI voted ${rationale.verdict} in the arbiter council (${outcome.votes}/${outcome.needed}) — waiting for another member.`)
+    logOnce(
+      chainId,
+      id,
+      'council-vote',
+      `[arbiter] ${chainId} escrow #${id}: AI voted ${rationale.verdict} in the arbiter council (${outcome.votes}/${outcome.needed}) — waiting for another member.`
+    )
     return
   }
   const tx = outcome.hash
   await prisma.dispute.update({
-    where: { escrowId: id },
+    where: where(chainId, id),
     data: {
       resolution: 'ai-auto',
       releasedToSeller: toSeller,
@@ -211,22 +238,23 @@ async function autoResolve(escrow: EscrowBasic, disputeDeadline: number): Promis
       resolvedAt: new Date(),
     },
   })
-  log(`[arbiter] escrow #${id}: resolved for the ${rationale.verdict} (tx ${tx}).`)
+  log(`[arbiter] ${chainId} escrow #${id}: resolved for the ${rationale.verdict} (tx ${tx}).`)
 }
 
 /**
  * Records disputes that ended without us: the keeper's timeout refund, or a
  * manual ruling whose rationale text the browser never posted (hash only).
  */
-async function sweepEnded(statusById: Map<string, number>): Promise<void> {
-  const open = await prisma.dispute.findMany({ where: { resolution: null } })
+async function sweepEnded(chain: EvmAdapter, statusById: Map<string, number>): Promise<void> {
+  const chainId = chain.chainId
+  const open = await prisma.dispute.findMany({ where: { chainId, resolution: null } })
   for (const row of open) {
     const status = statusById.get(row.escrowId)
     if (status !== SETTLED && status !== REFUNDED) continue
-    const { resolutionHash } = await getEscrowHashes(chain, BigInt(row.escrowId))
+    const { resolutionHash } = await chain.getEscrowHashes(BigInt(row.escrowId))
     const timedOut = resolutionHash === ZERO_HASH
     await prisma.dispute.update({
-      where: { escrowId: row.escrowId },
+      where: where(chainId, row.escrowId),
       data: {
         resolution: timedOut ? 'timeout' : 'arbiter-manual',
         releasedToSeller: status === SETTLED,
@@ -234,32 +262,44 @@ async function sweepEnded(statusById: Map<string, number>): Promise<void> {
         resolvedAt: new Date(),
       },
     })
-    log(`[arbiter] escrow #${row.escrowId}: dispute ended by ${timedOut ? 'timeout (buyer refunded)' : 'the arbiter'}.`)
+    log(`[arbiter] ${chainId} escrow #${row.escrowId}: dispute ended by ${timedOut ? 'timeout (buyer refunded)' : 'the arbiter'}.`)
   }
 }
 
-export async function runArbiterCycleOnce(): Promise<void> {
-  if (arbiter === undefined) await initArbiter()
-  const escrows = await readAllEscrows(chain.publicClient)
+async function runChain(chainId: ChainId): Promise<void> {
+  const chain = readChain(chainId)
+  const escrows = await chain.listEscrows()
   const statusById = new Map(escrows.map((e) => [e.id.toString(), e.status]))
 
   // Disputes on every deployment get a recommendation; autoResolve rules only where this key can.
   const disputed = escrows.filter((e) => e.status === DISPUTED)
-  if (disputed.length && arbiter) await warnIfLowGas(arbiter.publicClient, arbiter.account.address, 'arbiter')
+  const signer = arbiters?.get(chainId)?.signer
+  if (disputed.length && signer?.signer) await warnIfLowGas(signer, signer.signer as `0x${string}`, 'arbiter')
   for (const escrow of disputed) {
     try {
-      const info = await getEscrowDisputeInfo(chain, escrow.id)
-      const row = await prisma.dispute.findUnique({ where: { escrowId: escrow.id.toString() }, select: { recommendedAt: true } })
-      if (!row?.recommendedAt) await recommend(escrow, Number(info.disputedAt))
-      else await autoResolve(escrow, Number(info.disputeDeadline))
+      const info = await chain.getEscrowDisputeInfo(escrow.id)
+      const row = await prisma.dispute.findUnique({ where: where(chainId, escrow.id.toString()), select: { recommendedAt: true } })
+      if (!row?.recommendedAt) await recommend(chain, escrow, Number(info.disputedAt))
+      else await autoResolve(chain, escrow, Number(info.disputeDeadline))
     } catch (error) {
-      logError(`[arbiter] escrow #${escrow.id} failed this cycle`, error, 'HOST')
+      logError(`[arbiter] ${chainId} escrow #${escrow.id} failed this cycle`, error, 'HOST')
     }
   }
 
   try {
-    await sweepEnded(statusById)
+    await sweepEnded(chain, statusById)
   } catch (error) {
-    logError('[arbiter] sweep failed', error, 'HOST')
+    logError(`[arbiter] ${chainId}: sweep failed`, error, 'HOST')
+  }
+}
+
+export async function runArbiterCycleOnce(): Promise<void> {
+  if (arbiters === undefined) await initArbiter()
+  for (const chainId of servedChainIds()) {
+    try {
+      await runChain(chainId)
+    } catch (error) {
+      logError(`[arbiter] ${chainId}: cycle failed`, error, 'HOST')
+    }
   }
 }

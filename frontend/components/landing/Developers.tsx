@@ -5,7 +5,7 @@ import { motion, useReducedMotion, type Variants } from 'framer-motion'
 import { fadeUp, hiddenOffset, REVEAL_VIEWPORT } from './scrollReveal'
 import { SectionHeader, fragmentMono } from './ui'
 import { SectionGlow } from './cinema'
-import { TOKEN_SYMBOL } from '@/lib/web3/network'
+import { TOKEN_SYMBOL } from '@/lib/web3/landingNetwork'
 
 const EASE = [0.2, 0.8, 0.2, 1] as const
 

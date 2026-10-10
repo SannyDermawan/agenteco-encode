@@ -1,8 +1,7 @@
-import { createClients } from './clients.ts'
 import { loadConfig } from './config.ts'
-import { runKeeperCycle } from './keeper/escrowKeeper.ts'
+import { runKeeperCycleOn } from './keeper/escrowKeeper.ts'
 import { log, logError } from './log.ts'
-import { assertRpcMatchesNetwork, appChain } from './network.ts'
+import { assertServedChainsMatchRpc, servedChainIds, signerChain } from './chains.ts'
 import { warnIfLowGas } from './gasWatch.ts'
 
 function sleep(ms: number): Promise<void> {
@@ -11,19 +10,18 @@ function sleep(ms: number): Promise<void> {
 
 async function main(): Promise<void> {
   const config = loadConfig()
-  const { account, publicClient, walletClient } = createClients(config)
+  // The same keeper wallet on every served chain (CHAINS; default: NETWORK alone).
+  const chains = servedChainIds().map((id) => signerChain(id, config.keeperPrivateKey))
+  const wallet = chains[0].signer as `0x${string}`
 
   log('Started')
-  log(`Wallet: ${account.address}`)
-  log(`Network: ${appChain.name} (chain id ${appChain.id})`)
-  log(`Contract: ${config.agentEcoAddress}`)
+  log(`Wallet: ${wallet}`)
+  for (const chain of chains) log(`Chain: ${chain.config.chain.name} (${chain.chainId}) — contract ${chain.config.agentEco}`)
   log(`Polling interval: ${config.keeperIntervalMs}ms`)
   log(`Dry run: ${config.dryRun}`)
 
-  await assertRpcMatchesNetwork(() => publicClient.getChainId())
-  log(`Chain ID verified: ${appChain.id}`)
-
-  const clients = { account, publicClient, walletClient }
+  await assertServedChainsMatchRpc()
+  log(`Chain IDs verified: ${chains.map((c) => c.chainId).join(', ')}`)
 
   let running = true
   const shutdown = (signal: string) => {
@@ -34,13 +32,16 @@ async function main(): Promise<void> {
   process.on('SIGTERM', () => shutdown('SIGTERM'))
 
   // Sequential while-loop (not setInterval) so a slow cycle can never
-  // overlap with the next one.
+  // overlap with the next one. One chain failing never stops the others.
   while (running) {
-    try {
-      await warnIfLowGas(publicClient, account.address, 'keeper')
-      await runKeeperCycle(clients, config)
-    } catch (error) {
-      logError('Keeper cycle failed', error)
+    for (const chain of chains) {
+      const label = chains.length > 1 ? `[${chain.chainId}] ` : ''
+      try {
+        await warnIfLowGas(chain, wallet, 'keeper')
+        await runKeeperCycleOn(chain, config, label)
+      } catch (error) {
+        logError(`${label}Keeper cycle failed`, error)
+      }
     }
     if (running) await sleep(config.keeperIntervalMs)
   }

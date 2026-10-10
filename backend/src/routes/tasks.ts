@@ -1,13 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { Router } from 'express'
-import { createPublicClient, parseUnits } from 'viem'
+import { parseUnits } from 'viem'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../db.ts'
 import { verifyOwnerAuth } from '../auth.ts'
 import { UUID_REGEX, canViewParties, guardEscrow, requireViewer } from '../access.ts'
-import { AGENT_ECO_ABI } from '../abi/agentEcoAbi.ts'
-import { ERC20_ABI } from '../../../agent-runtime/src/onchain/abi.ts'
-import { agentEcoFor, USDT_ADDRESS, appChain, appTransport } from '../network.ts'
+import { readChain, requestChain } from '../chains.ts'
 import { buildTaskPreimage, canonicalize, hashPreimage, normalizePrice } from '../../../agent-runtime/src/shared/hashes.ts'
 import { CAPABILITIES, isCapabilityId } from '../../../agent-runtime/src/shared/capabilities/definitions.ts'
 import { validateWithSchema } from '../../../agent-runtime/src/shared/capabilities/custom.ts'
@@ -16,17 +14,18 @@ import { createTaskSchema, linkTaskEscrowSchema } from '../schemas/task.ts'
 
 export const tasksRouter = Router()
 
-const publicClient = createPublicClient({ chain: appChain, transport: appTransport() })
-
 /**
  * Step 1 of every hire (spec §5): store the task before createEscrow. The
  * server builds the preimage itself with the shared helper — the buyer is the
  * signed-in wallet, never a body field — and returns the taskHash the buyer
- * must pass to createEscrow.
+ * must pass to createEscrow. The task belongs to one chain (body chainId,
+ * default: the default chain); its escrow must be created there.
  */
 tasksRouter.post('/', async (req, res) => {
   const auth = await verifyOwnerAuth(req)
   if (!auth.ok) return res.status(401).json({ error: auth.error })
+  const chainId = requestChain(req, res)
+  if (!chainId) return
 
   const parsed = createTaskSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
@@ -69,6 +68,7 @@ tasksRouter.post('/', async (req, res) => {
 
   const task = await prisma.task.create({
     data: {
+      chainId,
       capability,
       brief: canonicalize(brief.data) as Prisma.InputJsonValue,
       criteria: input.criteria,
@@ -84,7 +84,7 @@ tasksRouter.post('/', async (req, res) => {
 })
 
 /**
- * Step 2, after createEscrow: link the escrow. Accepted only when the chain
+ * Step 2, after createEscrow: link the escrow on the task's own chain. Accepted only when the chain
  * agrees — same taskHash, buyer, seller and amount — so a task can never be
  * attached to someone else's escrow or a different price. That on-chain
  * check is the proof, so no signature is needed: the buyer's browser saves a
@@ -102,18 +102,16 @@ tasksRouter.post('/:id/escrow', async (req, res) => {
   }
 
   const escrowId = BigInt(parsed.data.escrowId)
+  const chain = readChain(task.chainId)
   let onchain: { buyer: string; seller: string; amount: bigint; taskHash: string }
   try {
-    const [[buyer, seller, amount], [taskHash]] = await Promise.all([
-      publicClient.readContract({ address: agentEcoFor(escrowId), abi: AGENT_ECO_ABI, functionName: 'getEscrowBasic', args: [escrowId] }),
-      publicClient.readContract({ address: agentEcoFor(escrowId), abi: AGENT_ECO_ABI, functionName: 'getEscrowHashes', args: [escrowId] }),
-    ])
+    const [{ buyer, seller, amount }, { taskHash }] = await Promise.all([chain.getEscrowBasic(escrowId), chain.getEscrowHashes(escrowId)])
     onchain = { buyer, seller, amount, taskHash }
   } catch {
     return res.status(400).json({ error: 'Could not read this escrow on-chain — is the id correct?' })
   }
 
-  const decimals = await publicClient.readContract({ address: USDT_ADDRESS, abi: ERC20_ABI, functionName: 'decimals' })
+  const { decimals } = await chain.token()
   const problems = [
     onchain.taskHash.toLowerCase() !== task.taskHash.toLowerCase() && 'taskHash',
     onchain.buyer.toLowerCase() !== task.buyer && 'buyer',
@@ -129,16 +127,16 @@ tasksRouter.post('/:id/escrow', async (req, res) => {
 })
 
 /** What an unsigned link call gets back: never the brief itself. */
-function linkReceipt(task: { id: string; escrowId: string | null; taskHash: string; verified: boolean }) {
-  return { id: task.id, escrowId: task.escrowId, taskHash: task.taskHash, verified: task.verified }
+function linkReceipt(task: { id: string; chainId: string; escrowId: string | null; taskHash: string; verified: boolean }) {
+  return { id: task.id, chainId: task.chainId, escrowId: task.escrowId, taskHash: task.taskHash, verified: task.verified }
 }
 
 // The brief and its preimage — only for the escrow's buyer, seller and the
 // arbiter, who can re-hash it against the chain.
 tasksRouter.get('/by-escrow/:escrowId', async (req, res) => {
-  const viewer = await guardEscrow(req, res, req.params.escrowId)
-  if (!viewer) return
-  const task = await prisma.task.findUnique({ where: { escrowId: req.params.escrowId } })
+  const access = await guardEscrow(req, res, req.params.escrowId)
+  if (!access) return
+  const task = await prisma.task.findUnique({ where: { chainId_escrowId: { chainId: access.chainId, escrowId: req.params.escrowId } } })
   if (!task) return res.status(404).json({ error: 'No task linked to this escrow' })
   res.json(task)
 })
@@ -149,7 +147,7 @@ tasksRouter.get('/:id', async (req, res) => {
   if (!UUID_REGEX.test(req.params.id)) return res.status(404).json({ error: 'Task not found' })
   const task = await prisma.task.findUnique({ where: { id: req.params.id } })
   if (!task) return res.status(404).json({ error: 'Task not found' })
-  if (!(await canViewParties(viewer, { buyer: task.buyer, seller: task.seller }))) {
+  if (!(await canViewParties(viewer, { buyer: task.buyer, seller: task.seller }, task.chainId))) {
     return res.status(403).json({ error: 'This task is private — only its buyer, seller and the arbiter can see it.' })
   }
   res.json(task)

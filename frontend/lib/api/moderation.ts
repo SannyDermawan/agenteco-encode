@@ -1,7 +1,7 @@
 import { buildAuthHeaders, type WalletSigner } from './authHeaders'
 import { readHeaders } from './session'
+import { API_URL, chainFetch as fetch } from './base'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'
 
 /** Why a listing is reported (backend/src/routes/moderation.ts). */
 export const REPORT_CATEGORIES = [

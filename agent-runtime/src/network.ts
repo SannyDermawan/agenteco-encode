@@ -5,17 +5,19 @@ import { defineChain, fallback, http, isAddress, type Address, type Transport } 
  * buyer/seller agents) learns which network it's on and which AgentEco
  * deployment to talk to. Mirrors frontend/lib/web3/network.ts.
  *
- * Pick the network with NETWORK=bsc-testnet|bot-testnet|bot-mainnet (default
- * bsc-testnet; "testnet"/"mainnet" still mean the BOT Chain presets). Chain
+ * Pick the network with NETWORK=bsc-testnet|bot-testnet|bot-mainnet|base-sepolia
+ * (default bsc-testnet; "testnet"/"mainnet" still mean the BOT Chain presets).
+ * This is the process's primary chain; ./chain/registry.ts serves several
+ * chains at once (CHAINS) from the same presets. Chain
  * params come from the presets below; the deployment — contract, token, deploy
  * block — comes from env, with working defaults where this repo has deployed.
  * A network without a default deployment refuses to start until
  * AGENT_ECO_ADDRESS is set, instead of quietly pointing at another chain.
  */
 
-export type NetworkName = 'bsc-testnet' | 'bot-testnet' | 'bot-mainnet'
+export type NetworkName = 'bsc-testnet' | 'bot-testnet' | 'bot-mainnet' | 'base-sepolia'
 
-interface NetworkPreset {
+export interface NetworkPreset {
   chainId: number
   name: string
   rpcUrl: string
@@ -25,7 +27,7 @@ interface NetworkPreset {
   explorerName: string
   nativeSymbol: string
   testnet: boolean
-  /** Settlement token for this network — MockUSDT on BSC Testnet, USDT on BOT Chain. */
+  /** Settlement token for this network — MockUSDT on BSC Testnet, USDT on BOT Chain, USDC on Base Sepolia. */
   usdtAddress: Address
   /** What logs and API messages call the settlement token. */
   tokenSymbol: string
@@ -41,7 +43,7 @@ interface NetworkPreset {
   deployment?: Deployment
 }
 
-interface Deployment {
+export interface Deployment {
   agentEcoAddress: Address
   deploymentBlock: bigint
   /** Where this deployment's escrow numbering starts. */
@@ -51,7 +53,7 @@ interface Deployment {
 }
 
 // Each preset verified against its RPC's eth_chainId.
-const PRESETS: Record<NetworkName, NetworkPreset> = {
+export const NETWORK_PRESETS: Record<NetworkName, NetworkPreset> = {
   'bsc-testnet': {
     chainId: 97,
     name: 'BSC Testnet',
@@ -114,10 +116,30 @@ const PRESETS: Record<NetworkName, NetworkPreset> = {
     lowGasWarn: '0.05',
     logRange: BigInt(5000),
   },
+  'base-sepolia': {
+    chainId: 84532,
+    name: 'Base Sepolia',
+    // PublicNode serves eth_getLogs over 50,000 blocks; the official sepolia.base.org caps
+    // it at 200 blocks, but reads and transactions work there, so it is the fallback.
+    rpcUrl: 'https://base-sepolia-rpc.publicnode.com',
+    fallbackRpcUrls: ['https://sepolia.base.org'],
+    explorerUrl: 'https://sepolia.basescan.org',
+    explorerName: 'BaseScan Sepolia',
+    nativeSymbol: 'ETH',
+    testnet: true,
+    // Circle's test USDC (6 decimals).
+    usdtAddress: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+    tokenSymbol: 'USDC',
+    hostedMinGas: '0.0005',
+    lowGasWarn: '0.002',
+    logRange: BigInt(45000),
+    multicall3: '0xcA11bde05977b3631167028862bE2a173976CA11',
+    // No AgentEco deployment yet: AGENT_ECO_ADDRESS (or AGENT_ECO_ADDRESS__eip155_84532) must be set.
+  },
 }
 
 // Names from before the BSC Testnet deployment.
-const ALIASES: Record<string, NetworkName> = { testnet: 'bot-testnet', mainnet: 'bot-mainnet' }
+export const NETWORK_ALIASES: Record<string, NetworkName> = { testnet: 'bot-testnet', mainnet: 'bot-mainnet' }
 
 function env(name: string): string | undefined {
   const value = process.env[name]?.trim()
@@ -126,9 +148,9 @@ function env(name: string): string | undefined {
 
 function readNetwork(): NetworkName {
   const raw = (env('NETWORK') ?? 'bsc-testnet').toLowerCase()
-  const name = ALIASES[raw] ?? raw
-  if (!(name in PRESETS)) {
-    throw new Error(`NETWORK must be one of ${Object.keys(PRESETS).join(', ')}, got: ${raw}`)
+  const name = NETWORK_ALIASES[raw] ?? raw
+  if (!(name in NETWORK_PRESETS)) {
+    throw new Error(`NETWORK must be one of ${Object.keys(NETWORK_PRESETS).join(', ')}, got: ${raw}`)
   }
   return name as NetworkName
 }
@@ -151,7 +173,7 @@ function readBlock(name: string, fallback: bigint | undefined): bigint | null {
 }
 
 export const NETWORK: NetworkName = readNetwork()
-const preset = PRESETS[NETWORK]
+const preset = NETWORK_PRESETS[NETWORK]
 
 /** Overridable (e.g. a private RPC provider); defaults to the network's public RPC. */
 export const RPC_URL = env('RPC_URL') ?? preset.rpcUrl

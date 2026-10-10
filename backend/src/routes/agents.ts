@@ -10,6 +10,9 @@ import { encryptAgentKey } from '../agentKeyCrypto.ts'
 import { findBlockingWork, withdrawHostedWallet } from '../agentDeletion.ts'
 import { createAgentSchema, heartbeatSchema, listAgentsQuerySchema, updateAgentSchema } from '../schemas/agent.ts'
 import { unknownCapabilities } from '../capabilityRegistry.ts'
+import { UnknownChainError, readChain, requestChain, resolveServedChainId } from '../chains.ts'
+import { registrationFileFor } from '../erc8004.ts'
+import { z } from 'zod'
 
 export const agentsRouter = Router()
 
@@ -28,7 +31,17 @@ agentsRouter.get('/', async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() })
   }
-  const { role, isOnline, capability, ownerWallet, taskStatus, q } = parsed.data
+  const { role, isOnline, capability, ownerWallet, taskStatus, q, chain, groupId } = parsed.data
+  // ?chain= narrows the listing to one chain's agents; without it, every served chain's.
+  let chainId: string | undefined
+  if (chain) {
+    try {
+      chainId = resolveServedChainId(chain)
+    } catch (error) {
+      if (error instanceof UnknownChainError) return res.status(400).json({ error: error.message })
+      throw error
+    }
+  }
 
   const agents = await prisma.agent.findMany({
     where: {
@@ -49,6 +62,8 @@ agentsRouter.get('/', async (req, res) => {
             ]
           : []),
       ],
+      ...(chainId && { chainId }),
+      ...(groupId && { groupId }),
       ...(role && { role }),
       ...(isOnline !== undefined && { isOnline }),
       ...(capability && { capabilities: { has: capability } }),
@@ -70,12 +85,65 @@ agentsRouter.get('/:id', async (req, res) => {
   res.json(agentView(agent, viewer))
 })
 
+/**
+ * The listing's ERC-8004 registration file — what its identity's URI points at
+ * (https://eips.ethereum.org/EIPS/eip-8004#registration-v1). Sellers only: buyer agents are private.
+ */
+agentsRouter.get('/:id/registration.json', async (req, res) => {
+  const agent = await prisma.agent.findUnique({ where: { id: req.params.id } })
+  if (!agent || agent.role !== 'seller') return res.status(404).json({ error: 'Agent not found' })
+  res.json(registrationFileFor(agent, `${req.protocol}://${req.get('host')}`))
+})
+
+/**
+ * Records the listing's ERC-8004 identity. Nothing is trusted but the transaction hash: the
+ * Registered event in its receipt (on the listing's chain, from that chain's Identity Registry)
+ * must name the agent's own wallet (or its owner) as the identity's owner, and point at this
+ * listing's registration file.
+ */
+agentsRouter.post('/:id/erc8004', async (req, res) => {
+  const auth = await verifyOwnerAuth(req)
+  if (!auth.ok) return res.status(401).json({ error: auth.error })
+  const parsed = z.object({ txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/) }).safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: 'txHash must be a transaction hash' })
+
+  const agent = await prisma.agent.findUnique({ where: { id: req.params.id } })
+  if (!agent || agent.deletedAt) return res.status(404).json({ error: 'Agent not found' })
+  if (!isAuthorizedForAgent(auth.wallet, agent)) return res.status(403).json({ error: "Only the agent's own wallet or its owner can record its identity" })
+  const chain = readChain(agent.chainId)
+  if (!chain.config.erc8004) return res.status(400).json({ error: `ERC-8004 is not configured on ${agent.chainId}` })
+
+  let registered: Awaited<ReturnType<typeof chain.erc8004Registration>>
+  try {
+    registered = await chain.erc8004Registration(parsed.data.txHash)
+  } catch {
+    return res.status(400).json({ error: 'Could not read that transaction — is it mined yet?' })
+  }
+  if (!registered) return res.status(400).json({ error: `That transaction registered no agent in the Identity Registry on ${agent.chainId}` })
+  const owner = registered.owner.toLowerCase()
+  if (owner !== agent.walletAddress?.toLowerCase() && owner !== agent.ownerWallet.toLowerCase()) {
+    return res.status(400).json({ error: "The registered identity is owned by neither the agent's wallet nor its owner" })
+  }
+  if (!registered.agentURI.endsWith(`/agents/${agent.id}/registration.json`)) {
+    return res.status(400).json({ error: "The registered identity does not point at this listing's registration file" })
+  }
+  const agentId = registered.agentId.toString()
+  if (agent.erc8004AgentId && agent.erc8004AgentId !== agentId) {
+    return res.status(409).json({ error: `This listing already has ERC-8004 identity #${agent.erc8004AgentId}` })
+  }
+  const updated = await prisma.agent.update({ where: { id: agent.id }, data: { erc8004AgentId: agentId }, select: { id: true, chainId: true, erc8004AgentId: true } })
+  res.json(updated)
+})
+
 // Creating an agent claims a wallet as its owner — that claim must be
 // backed by a signature, or anyone could register agents "owned by"
 // addresses they don't control.
 agentsRouter.post('/', async (req, res) => {
   const auth = await verifyOwnerAuth(req)
   if (!auth.ok) return res.status(401).json({ error: auth.error })
+  // The chain this listing trades on (body chainId, default: the default chain).
+  const chainId = requestChain(req, res)
+  if (!chainId) return
 
   const parsed = createAgentSchema.safeParse(req.body)
   if (!parsed.success) {
@@ -105,8 +173,7 @@ agentsRouter.post('/', async (req, res) => {
   if (agentData.role === 'seller' && hosted) {
     // Hidden from buyers until activated — nothing would answer them yet.
     hostedFields.isOnline = false
-    const { getChainHead } = await import('../hostedDeposit.ts')
-    hostedFields.escrowScanBlock = await getChainHead()
+    hostedFields.escrowScanBlock = await readChain(chainId).head()
   }
 
   // Store the brief as its schema normalised it (trimmed text, lowercase coin
@@ -117,7 +184,7 @@ agentsRouter.post('/', async (req, res) => {
   }
 
   const agent = await prisma.agent.create({
-    data: { ...agentData, ownerWallet: auth.wallet, ...hostedFields } as Prisma.AgentCreateInput,
+    data: { ...agentData, chainId, ownerWallet: auth.wallet, ...hostedFields } as Prisma.AgentCreateInput,
   })
   res.status(201).json(agent)
 })
@@ -175,7 +242,7 @@ agentsRouter.post('/:id/activate', async (req, res) => {
   const { checkHostedDeposit } = await import('../hostedDeposit.ts')
   const isSeller = agent.role === 'seller'
   const requiredUsdt = isSeller ? '0' : agent.maxBudget!.toString()
-  const check = await checkHostedDeposit(agent.walletAddress as `0x${string}`, requiredUsdt)
+  const check = await checkHostedDeposit(agent.chainId, agent.walletAddress as `0x${string}`, requiredUsdt)
   if (!check.ok) return res.status(400).json({ error: check.error })
 
   const updated = await prisma.agent.update({
@@ -254,7 +321,7 @@ agentsRouter.delete('/:id', async (req, res) => {
 
   if (agent.agentWalletKey && agent.depositorWallet) {
     try {
-      await withdrawHostedWallet(agent.agentWalletKey, agent.depositorWallet as `0x${string}`, agent.name)
+      await withdrawHostedWallet(agent.chainId, agent.agentWalletKey, agent.depositorWallet as `0x${string}`, agent.name)
     } catch (error) {
       const reason = error instanceof Error ? error.message.split('\n')[0] : 'unknown error'
       return res.status(502).json({ error: `Could not return the agent wallet's funds, so nothing was deleted: ${reason}` })

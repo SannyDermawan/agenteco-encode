@@ -1,9 +1,12 @@
 import type { LocalAccount } from 'viem'
 import type { AgentConfig } from './types.ts'
 import { buildAuthHeaders } from './authHeaders.ts'
+import { withChain } from './chainQuery.ts'
 
 export interface RegistryAgent {
   id: string
+  /** The chain this listing trades on (CAIP-2). */
+  chainId?: string
   ownerWallet: string
   isOnline: boolean
   role?: 'buyer' | 'seller'
@@ -21,6 +24,8 @@ export interface RegisterOptions {
    * stored task brief, and may buy community capabilities. Only sent on registration.
    */
   hosted?: boolean
+  /** The chain the agent trades on (CAIP-2). Default: the API's default chain. Only sent on registration. */
+  chainId?: string
 }
 
 async function parseOrThrow(res: Response, action: string): Promise<any> {
@@ -38,9 +43,9 @@ async function parseOrThrow(res: Response, action: string): Promise<any> {
 export async function findOwnAgent(
   apiUrl: string,
   owner: LocalAccount,
-  match: { role?: 'buyer' | 'seller'; name?: string } = {}
+  match: { role?: 'buyer' | 'seller'; name?: string; chainId?: string } = {}
 ): Promise<RegistryAgent | null> {
-  const res = await fetch(`${apiUrl}/agents?ownerWallet=${owner.address}`, { headers: await buildAuthHeaders(owner) })
+  const res = await fetch(withChain(`${apiUrl}/agents?ownerWallet=${owner.address}`, match.chainId), { headers: await buildAuthHeaders(owner) })
   const agents: RegistryAgent[] = (await parseOrThrow(res, 'Registry lookup')).filter(
     (a: RegistryAgent) => !match.role || !a.role || a.role === match.role
   )
@@ -54,6 +59,8 @@ export interface DiscoveredAgent extends RegistryAgent {
   capabilities: string[]
   price: string
   walletAddress: string | null
+  /** ERC-8004 identity on its chain, once registered. */
+  erc8004AgentId?: string | null
 }
 
 /**
@@ -63,9 +70,10 @@ export interface DiscoveredAgent extends RegistryAgent {
  */
 export async function discoverAgents(
   apiUrl: string,
-  filters: { role?: 'buyer' | 'seller'; capability?: string; q?: string; onlineOnly?: boolean } = {}
+  filters: { role?: 'buyer' | 'seller'; capability?: string; q?: string; onlineOnly?: boolean; chainId?: string } = {}
 ): Promise<DiscoveredAgent[]> {
   const query = new URLSearchParams()
+  if (filters.chainId) query.set('chain', filters.chainId)
   if (filters.role) query.set('role', filters.role)
   if (filters.capability) query.set('capability', filters.capability)
   if (filters.q) query.set('q', filters.q)
@@ -100,7 +108,7 @@ export async function registerOrSyncSelf(config: AgentConfig, options: RegisterO
     isOnline: true,
   }
 
-  const existing = await findOwnAgent(options.apiUrl, options.account, { role: config.role, name: config.name })
+  const existing = await findOwnAgent(options.apiUrl, options.account, { role: config.role, name: config.name, chainId: options.chainId })
   const authHeaders = await buildAuthHeaders(options.account)
 
   if (existing) {
@@ -115,7 +123,11 @@ export async function registerOrSyncSelf(config: AgentConfig, options: RegisterO
   const res = await fetch(`${options.apiUrl}/agents`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders },
-    body: JSON.stringify(options.hosted === undefined ? payload : { ...payload, hosted: options.hosted }),
+    body: JSON.stringify({
+      ...payload,
+      ...(options.hosted !== undefined && { hosted: options.hosted }),
+      ...(options.chainId && { chainId: options.chainId }),
+    }),
   })
   return parseOrThrow(res, 'Registry registration')
 }

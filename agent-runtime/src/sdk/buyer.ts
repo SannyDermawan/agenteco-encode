@@ -1,18 +1,18 @@
 import type { Hex } from 'viem'
 import { DemoAgentRuntime } from '../runtime.ts'
-import { RPC_URL } from '../network.ts'
+import { PRIMARY_CHAIN_ID, normalizeChainId, signerChain } from '../chain/registry.ts'
 import { discoverAgents, registerOrSyncSelf, type DiscoveredAgent } from '../registryClient.ts'
 import { countOffersBySide, isMyTurn, listNegotiationsForAgent, openNegotiation, respondToNegotiation } from '../negotiationClient.ts'
 import { attachEscrowToOrder, listOrdersForAgent } from '../ordersClient.ts'
 import { hireWithTask } from '../tasksClient.ts'
-import { createOnchainClients } from '../onchain/clients.ts'
-import { acceptAndSettle, getEscrowHashes, getEscrowStatus, getEscrowTimestamps, getEscrowWindows, raiseDispute, rateSeller } from '../onchain/escrow.ts'
+import { privateKeyToAccount } from 'viem/accounts'
 import { getEscrowResult } from '../resultsClient.ts'
 import { submitDisputeReason } from '../disputesClient.ts'
 import { hashPreimage, textHash } from '../shared/hashes.ts'
 import { resolveCapability } from './capability.ts'
 import { scoreWithAi, type AiModel } from './ai.ts'
-import { DEFAULT_API_URL, type Logger, consoleLogger, sleep } from './common.ts'
+import { DEFAULT_API_URL, type Logger, apiErc8004Registries, consoleLogger, sleep } from './common.ts'
+import { dealFeedback } from '../shared/erc8004.ts'
 import { checkDecision, type Offer, type OfferDecision } from './seller.ts'
 
 export type Review =
@@ -24,6 +24,12 @@ export interface HireOptions {
   privateKey: Hex
   /** AgentEco API. Default: AGENTECO_API_URL, else the public testnet API. */
   apiUrl?: string
+  /**
+   * The chain to buy on: a CAIP-2 id (eip155:84532), a network name (base-sepolia) or an EVM
+   * chain id. Only sellers on this chain are considered. Default: a given `sellerId`'s chain,
+   * else NETWORK (bsc-testnet).
+   */
+  chain?: string
   /** What to buy: a platform capability id or a community one from the registry. */
   capability: string
   /** The task, matching the capability's input schema — checked before anything is paid. */
@@ -56,6 +62,11 @@ export interface HireOptions {
    * min(maxBudget, listing). Never accept above `maxBudget`: hire() refuses to.
    */
   onOffer?: (offer: Offer) => Promise<OfferDecision> | OfferDecision
+  /**
+   * When you rate the seller and it has an ERC-8004 identity on this chain, also publish the
+   * rating as ERC-8004 feedback from your wallet (one more transaction). Default true.
+   */
+  erc8004Feedback?: boolean
   /** Name of the buyer agent in the registry. Default "SDK buyer". */
   name?: string
   /** Give up waiting for a deal or a delivery after this long. Default 20 minutes. */
@@ -98,8 +109,10 @@ export async function hire(options: HireOptions): Promise<HireResult> {
   if (!options.review && !options.ai) {
     throw new Error('Pass review(result) or ai (your own model): hire() never pays for a result nobody checked. To accept anything that fits the schema: review: () => ({ accept: true }).')
   }
-  const onchain = createOnchainClients(options.privateKey, RPC_URL)
-  const account = onchain.account
+  const account = privateKeyToAccount(options.privateKey)
+  const chosenChain = options.chain === undefined ? null : normalizeChainId(options.chain)
+  if (options.chain !== undefined && !chosenChain) throw new Error(`Unknown chain: ${options.chain}`)
+  let chainId = chosenChain ?? PRIMARY_CHAIN_ID
   const waitStep = async (what: string) => {
     if (Date.now() > deadline) throw new Error(`Timed out waiting for ${what}.`)
     await sleep(pollMs)
@@ -116,13 +129,18 @@ export async function hire(options: HireOptions): Promise<HireResult> {
     const res = await fetch(`${apiUrl}/agents/${options.sellerId}`)
     if (!res.ok) throw new Error(`Seller ${options.sellerId} not found (${res.status}).`)
     seller = (await res.json()) as DiscoveredAgent
+    if (seller.chainId && seller.chainId !== chainId) {
+      if (chosenChain) throw new Error(`Seller ${options.sellerId} trades on ${seller.chainId}, not ${chosenChain}.`)
+      chainId = seller.chainId
+    }
   } else {
-    const sellers = await discoverAgents(apiUrl, { role: 'seller', capability: options.capability, onlineOnly: true })
+    const sellers = await discoverAgents(apiUrl, { role: 'seller', capability: options.capability, onlineOnly: true, chainId })
     seller = sellers
       .filter((s) => s.walletAddress && cents(Number(s.price) * OPENING_RATIO) <= options.maxBudget)
       .sort((a, b) => Number(a.price) - Number(b.price))[0]
   }
   if (!seller?.walletAddress) throw new Error(`No online seller of "${options.capability}" fits a budget of ${options.maxBudget}.`)
+  const chain = signerChain(chainId, options.privateKey)
   const listing = Number(seller.price)
   log(`seller: ${seller.name} (${seller.id.slice(0, 8)}) lists ${listing}`)
 
@@ -138,7 +156,7 @@ export async function hire(options: HireOptions): Promise<HireResult> {
       basePrice: opening,
       maxBudget: ceiling,
     },
-    { apiUrl, account, hosted: false }
+    { apiUrl, account, hosted: false, chainId }
   )
   const policy = new DemoAgentRuntime({ name, role: 'buyer', capabilities: [options.capability], description: '', basePrice: opening, maxBudget: ceiling })
   let negotiation = await openNegotiation(apiUrl, account, {
@@ -204,19 +222,24 @@ export async function hire(options: HireOptions): Promise<HireResult> {
 
   // 4. Task → escrow → fund → link (the API checks the chain agrees), and record it on the order.
   const order = (await listOrdersForAgent(apiUrl, account, buyerAgent.id, 'agreed')).find((o) => o.negotiationId === negotiation.id)
-  const { escrowId } = await hireWithTask(apiUrl, onchain, {
-    capability: options.capability,
-    brief: brief.brief,
-    criteria: options.criteria ?? '',
-    price,
-    seller: seller.walletAddress as `0x${string}`,
-  })
+  const { escrowId } = await hireWithTask(
+    apiUrl,
+    { account },
+    {
+      capability: options.capability,
+      brief: brief.brief,
+      criteria: options.criteria ?? '',
+      price,
+      seller: seller.walletAddress as `0x${string}`,
+    },
+    chain
+  )
   if (order) await attachEscrowToOrder(apiUrl, account, order.id, escrowId.toString())
   log(`escrow #${escrowId} funded — waiting for delivery`)
 
   // 5. Delivery, then the plaintext result (published right after the hash).
   for (;;) {
-    const status = await getEscrowStatus(onchain, escrowId)
+    const status = await chain.getEscrowStatus(escrowId)
     if (status === DELIVERED) break
     if (status === REFUNDED) throw new Error(`Escrow #${escrowId} was refunded — the seller did not take or finish the job.`)
     await waitStep(`escrow #${escrowId} to be delivered`)
@@ -226,26 +249,26 @@ export async function hire(options: HireOptions): Promise<HireResult> {
   // The plaintext must follow the hash. A seller that never publishes it gets half the review
   // window, then a dispute — like a hosted buyer. Waiting longer would let the window run out,
   // and the contract would then pay the seller for a result nobody could check.
-  const [{ deliveredAt }, { reviewWindow }] = await Promise.all([getEscrowTimestamps(onchain, escrowId), getEscrowWindows(onchain, escrowId)])
+  const [{ deliveredAt }, { reviewWindow }] = await Promise.all([chain.getEscrowTimestamps(escrowId), chain.getEscrowWindows(escrowId)])
   const publishBy = Number(deliveredAt + reviewWindow / BigInt(2)) * 1000
-  let published = await getEscrowResult(apiUrl, escrowId.toString(), account)
+  let published = await getEscrowResult(apiUrl, escrowId.toString(), account, chainId)
   while (!published) {
     if (Date.now() >= publishBy) {
       const reason = 'The seller committed a result hash on-chain but never published a result that matches it, so the delivery could not be checked.'
-      await raiseDispute(onchain, escrowId, textHash(reason))
-      await submitDisputeReason(apiUrl, account, escrowId.toString(), reason)
+      await chain.raiseDispute(escrowId, textHash(reason))
+      await submitDisputeReason(apiUrl, account, escrowId.toString(), reason, chainId)
       log(`escrow #${escrowId}: the seller never published its result — disputed`)
       return { escrowId, seller: sellerInfo, price, result: null, outcome: 'disputed' }
     }
     await waitStep(`the result of escrow #${escrowId}`)
-    published = await getEscrowResult(apiUrl, escrowId.toString(), account)
+    published = await getEscrowResult(apiUrl, escrowId.toString(), account, chainId)
   }
   // The exact committed text: the API's `result` object comes from jsonb, with its keys reordered.
   const committedJson = published.resultJson ?? JSON.stringify(published.result)
   const result = JSON.parse(committedJson) as Record<string, unknown>
 
   // 6. Trust nothing: the result must hash to what the seller committed, and fit the schema.
-  const { resultHash: onchainHash } = await getEscrowHashes(onchain, escrowId)
+  const { resultHash: onchainHash } = await chain.getEscrowHashes(escrowId)
   const problems: string[] = []
   if (hashPreimage(committedJson).toLowerCase() !== onchainHash.toLowerCase()) problems.push('the result does not match the hash committed on-chain')
   const shape = capability.checkResult(result)
@@ -278,19 +301,30 @@ export async function hire(options: HireOptions): Promise<HireResult> {
   if (!review.accept) {
     const reason = review.reason.trim()
     if (reason.length < 10) throw new Error('A dispute reason needs at least 10 characters.')
-    await raiseDispute(onchain, escrowId, textHash(reason))
-    await submitDisputeReason(apiUrl, account, escrowId.toString(), reason)
+    await chain.raiseDispute(escrowId, textHash(reason))
+    await submitDisputeReason(apiUrl, account, escrowId.toString(), reason, chainId)
     log(`escrow #${escrowId}: disputed — the arbiter decides`)
     return { escrowId, seller: sellerInfo, price, result, outcome: 'disputed' }
   }
 
-  await acceptAndSettle(onchain, escrowId)
+  await chain.acceptAndSettle(escrowId)
   log(`escrow #${escrowId}: accepted — ${price} paid to ${seller.name}`)
   if (review.rating !== undefined) {
     const score = Math.max(1, Math.min(100, Math.round(review.rating)))
-    const tx = await rateSeller(onchain, escrowId, score)
-    await fetch(`${apiUrl}/ratings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ txHash: tx }) }).catch(() => {})
+    const tx = await chain.rateSeller(escrowId, score)
+    await fetch(`${apiUrl}/ratings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ txHash: tx, chainId }) }).catch(() => {})
     log(`rated ${score}/100`)
+    const registries = seller.erc8004AgentId && options.erc8004Feedback !== false ? await apiErc8004Registries(apiUrl, chainId) : null
+    if (registries && seller.erc8004AgentId) {
+      try {
+        const feedbackTx = await chain
+          .withErc8004(registries)
+          .erc8004GiveFeedback(BigInt(seller.erc8004AgentId), dealFeedback({ score, capability: options.capability, chainId, escrowId }))
+        log(`ERC-8004 feedback given (tx ${feedbackTx})`)
+      } catch (error) {
+        log(`ERC-8004 feedback not given: ${(error as Error).message.split('\n')[0]}`)
+      }
+    }
   }
   return { escrowId, seller: sellerInfo, price, result, outcome: 'settled' }
 }

@@ -14,13 +14,14 @@ const MAX_HEADER_LENGTH = 4096
 export interface SessionRules {
   /** host[:port] values the message's domain must be one of. */
   domains: string[]
-  chainId: number
+  /** The chain(s) a session may be signed for: every chain this backend serves. */
+  chainId: number | number[]
   now?: number
 }
 
 /**
  * Verifies a read session (see agent-runtime/src/shared/session.ts): a SIWE
- * message for one of our frontend domains and our chain, with our statement,
+ * message for one of our frontend domains and one of our chains, with our statement,
  * not expired, living at most 24 h, and signed by the address it names.
  * Proves who is asking — whether they may see a given order is checked
  * separately (access.ts).
@@ -45,7 +46,8 @@ export async function verifyReadSession(headerValue: string, rules: SessionRules
 
   if (!fields.address || !fields.domain || !fields.uri || fields.version !== '1') return { ok: false, error: 'Malformed session' }
   if (!rules.domains.includes(fields.domain.toLowerCase())) return { ok: false, error: 'Session was signed for another website' }
-  if (fields.chainId !== rules.chainId) return { ok: false, error: 'Session was signed for another chain' }
+  const chainIds = Array.isArray(rules.chainId) ? rules.chainId : [rules.chainId]
+  if (fields.chainId === undefined || !chainIds.includes(fields.chainId)) return { ok: false, error: 'Session was signed for another chain' }
   if (fields.statement !== READ_SESSION_STATEMENT) return { ok: false, error: 'Unexpected session statement' }
   if (issuedAt === undefined || expiresAt === undefined || Number.isNaN(issuedAt) || Number.isNaN(expiresAt)) {
     return { ok: false, error: 'Session has no issue or expiry time' }

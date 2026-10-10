@@ -1,5 +1,5 @@
 import { listCapabilities } from '@/lib/api/capabilities'
-import { TOKEN_SYMBOL } from '@/lib/web3/network'
+import { TOKEN_SYMBOL } from '@/lib/web3/landingNetwork'
 
 /**
  * What Eco, the landing page's guide, says outside its per-section lines: the opening greeting, the

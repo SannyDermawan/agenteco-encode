@@ -1,11 +1,10 @@
 import type { Hex } from 'viem'
 import { DemoAgentRuntime } from '../runtime.ts'
-import { AGENT_ECO_ADDRESS, RPC_URL } from '../network.ts'
+import { PRIMARY_CHAIN_ID, normalizeChainId, signerChain } from '../chain/registry.ts'
+import type { EvmAdapter } from '../chain/evm.ts'
 import { registerOrSyncSelf } from '../registryClient.ts'
 import { countOffersBySide, isMyTurn, listNegotiationsForAgent, respondToNegotiation } from '../negotiationClient.ts'
-import { createOnchainClients } from '../onchain/clients.ts'
-import { getEscrowDisputeInfo, getEscrowHashes, getEscrowStatus, getEscrowWindows, markDelivered, startExecution, submitDisputeResponse } from '../onchain/escrow.ts'
-import { readAllEscrows } from '../onchain/escrowIndex.ts'
+import { privateKeyToAccount } from 'viem/accounts'
 import { hashPreimage, resultHash, textHash } from '../shared/hashes.ts'
 import { isCapabilityId } from '../shared/capabilities/definitions.ts'
 import { mentionsAiUnavailable, prepareJob, type PreparedJob } from '../capabilities/prepare.ts'
@@ -16,6 +15,7 @@ import { HEARTBEAT_SECONDS, SELLER_RESPONSE_WINDOW_SECONDS } from '../durations.
 import { buildAuthHeaders } from '../authHeaders.ts'
 import { resolveCapability } from './capability.ts'
 import { defendWithAi, runPlatformJob, type AiModel } from './ai.ts'
+import { apiErc8004Registries } from './common.ts'
 import { DEFAULT_API_URL, type Logger, consoleLogger, sleep } from './common.ts'
 
 /** One paid job, handed to your code once the escrow is funded and the brief checks out. */
@@ -68,6 +68,16 @@ export interface SellerAgentOptions {
   privateKey: Hex
   /** AgentEco API. Default: AGENTECO_API_URL, else the public testnet API. */
   apiUrl?: string
+  /**
+   * The chain to trade on: a CAIP-2 id (eip155:84532), a network name (base-sepolia) or an EVM
+   * chain id. Default: an attached listing's chain, else NETWORK (bsc-testnet).
+   */
+  chain?: string
+  /**
+   * Register this listing's ERC-8004 identity on its chain (once, from this wallet, which then
+   * owns it) when the API reports registries there. Default false: it costs a transaction.
+   */
+  erc8004?: boolean
   /**
    * The listing you created on the app's Register Own Agent page. The agent attaches to it:
    * its name, description, capability and price come from the listing, and this key must be
@@ -178,8 +188,11 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
   const apiUrl = options.apiUrl ?? DEFAULT_API_URL
   const log = options.log ?? consoleLogger(options.name ?? 'seller')
   const pollMs = options.pollMs ?? 3000
-  const onchain = createOnchainClients(options.privateKey, RPC_URL)
-  const account = onchain.account
+  const account = privateKeyToAccount(options.privateKey)
+  const chosenChain = options.chain === undefined ? null : normalizeChainId(options.chain)
+  if (options.chain !== undefined && !chosenChain) throw new Error(`Unknown chain: ${options.chain}`)
+  /** Where this agent's escrows live; an attached listing may move it to the listing's chain. */
+  let chain: EvmAdapter = signerChain(chosenChain ?? PRIMARY_CHAIN_ID, options.privateKey)
 
   function checkWorker(capability: string) {
     if (!options.handle && !isCapabilityId(capability)) {
@@ -225,8 +238,13 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
       price: string
       walletAddress: string | null
       taskStatus: string | null
+      chainId?: string
     }
     if (agent.role !== 'seller') throw new Error(`Listing ${id} is not a seller.`)
+    if (agent.chainId && agent.chainId !== chain.chainId) {
+      if (chosenChain) throw new Error(`Listing ${id} trades on ${agent.chainId}, not ${chosenChain}.`)
+      chain = signerChain(agent.chainId, options.privateKey)
+    }
     if (agent.taskStatus !== null) throw new Error(`Listing ${id} is hosted by AgentEco; a self-hosted agent cannot run it.`)
     if (agent.walletAddress?.toLowerCase() !== account.address.toLowerCase()) {
       throw new Error(`Listing ${id} names the agent wallet ${agent.walletAddress}, but this key is ${account.address}. Use that wallet's key, or register this one.`)
@@ -255,10 +273,12 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
           service: options.name!,
           basePrice: options.price!,
         },
-        { apiUrl, account, walletAddress: account.address }
+        { apiUrl, account, walletAddress: account.address, chainId: chain.chainId }
       )
       id = agent.id
     }
+    // Tried once per run: a failure is logged, never retried in a loop (no duplicate identities).
+    if (options.erc8004) await registerIdentity(id).catch((error) => log(`ERC-8004 registration failed: ${(error as Error).message.split('\n')[0]}`))
     const l = listing!
     runtime = new DemoAgentRuntime({
       name: l.name,
@@ -271,6 +291,29 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
     const how = options.onOffer ? 'your own negotiation logic' : `floor ${options.floor ?? l.price}, kept on this machine`
     log(`${options.agentId ? 'attached to' : 'listed as'} ${id} — ${l.capability} at ${l.price} (${how})`)
     return id
+  }
+
+  /**
+   * This listing's ERC-8004 identity: registered once from this wallet, pointing at the
+   * listing's registration file, then recorded with the API (which checks it on-chain).
+   */
+  async function registerIdentity(id: string): Promise<void> {
+    const registries = await apiErc8004Registries(apiUrl, chain.chainId)
+    if (!registries) {
+      log(`ERC-8004: no registries on ${chain.chainId} — skipped`)
+      return
+    }
+    const res = await fetch(`${apiUrl}/agents/${id}`)
+    const current = res.ok ? ((await res.json()) as { erc8004AgentId?: string | null }) : null
+    if (current?.erc8004AgentId) return
+    const { agentId, txHash } = await chain.withErc8004(registries).erc8004Register(`${apiUrl}/agents/${id}/registration.json`)
+    const recorded = await fetch(`${apiUrl}/agents/${id}/erc8004`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(await buildAuthHeaders(account)) },
+      body: JSON.stringify({ txHash }),
+    })
+    if (!recorded.ok) throw new Error(`Recording the ERC-8004 identity failed (${recorded.status}): ${await recorded.text()}`)
+    log(`ERC-8004: registered as agent #${agentId} on ${chain.chainId}`)
   }
 
   /** Tells AgentEco this agent is running (or stopping): the marketplace shows it online only while it beats. */
@@ -330,7 +373,7 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
     const pending = unpublished.get(escrowId)
     if (!pending) return
     try {
-      await publishEscrowResult(apiUrl, escrowId.toString(), pending.capability, pending.result)
+      await publishEscrowResult(apiUrl, escrowId.toString(), pending.capability, pending.result, chain.chainId)
       unpublished.delete(escrowId)
       log(`escrow #${escrowId}: result published`)
     } catch (error) {
@@ -340,9 +383,9 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
 
   /** Reads the task behind an escrow and checks it before any commitment. Null = never take this job. */
   async function checkedJob(escrowId: bigint): Promise<Job | null | 'wait'> {
-    const task = await getTaskByEscrow(apiUrl, escrowId.toString(), account)
+    const task = await getTaskByEscrow(apiUrl, escrowId.toString(), account, chain.chainId)
     if (!task) return 'wait' // the buyer links the task right after funding
-    const { taskHash } = await getEscrowHashes(onchain, escrowId)
+    const { taskHash } = await chain.getEscrowHashes(escrowId)
     if (hashPreimage(task.preimage).toLowerCase() !== taskHash.toLowerCase()) {
       log(`escrow #${escrowId}: the task does not match the on-chain taskHash — not taking it`)
       return null
@@ -359,7 +402,7 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
     }
     const job: Job = { escrowId, capability: task.capability, brief: brief.brief, criteria: task.criteria, price: task.price, buyer: task.buyer }
     if (isCapabilityId(task.capability)) {
-      const prepared = await prepareJob(task.capability, task.brief, { publicClient: onchain.publicClient, agentEcoAddress: AGENT_ECO_ADDRESS })
+      const prepared = await prepareJob(task.capability, task.brief, { publicClient: chain.client, agentEcoAddress: chain.config.agentEco })
       if (!prepared.ok) {
         log(`escrow #${escrowId}: ${prepared.reason} — not taking it`)
         return null
@@ -390,13 +433,13 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
   /** Once per dispute, inside the response window: the job and result come from the API, so this survives restarts. */
   async function answerDispute(escrowId: bigint): Promise<void> {
     if (!options.respondToDispute && !options.ai) return
-    const [{ disputeResponseHash }, info] = await Promise.all([getEscrowHashes(onchain, escrowId), getEscrowDisputeInfo(onchain, escrowId)])
+    const [{ disputeResponseHash }, info] = await Promise.all([chain.getEscrowHashes(escrowId), chain.getEscrowDisputeInfo(escrowId)])
     if (disputeResponseHash !== ZERO_HASH) return
     if (Math.floor(Date.now() / 1000) > Number(info.disputedAt) + SELLER_RESPONSE_WINDOW_SECONDS) return
     const [task, delivered, dispute] = await Promise.all([
-      getTaskByEscrow(apiUrl, escrowId.toString(), account),
-      getEscrowResult(apiUrl, escrowId.toString(), account),
-      getDispute(apiUrl, escrowId.toString(), account),
+      getTaskByEscrow(apiUrl, escrowId.toString(), account, chain.chainId),
+      getEscrowResult(apiUrl, escrowId.toString(), account, chain.chainId),
+      getDispute(apiUrl, escrowId.toString(), account, chain.chainId),
     ])
     if (!task || !delivered) return
     const job: Job = { escrowId, capability: task.capability, brief: task.brief, criteria: task.criteria, price: task.price, buyer: task.buyer }
@@ -415,14 +458,14 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
     }
     if (!text?.trim()) return
     const response = text.trim().slice(0, 1000)
-    await submitDisputeResponse(onchain, escrowId, textHash(response))
-    await submitDisputeResponseText(apiUrl, account, escrowId.toString(), response, 'api')
+    await chain.submitDisputeResponse(escrowId, textHash(response))
+    await submitDisputeResponseText(apiUrl, account, escrowId.toString(), response, 'api', chain.chainId)
     log(`escrow #${escrowId}: answered the dispute`)
   }
 
   /** Moves one escrow as far as it can go. True once nothing is left to do. */
   async function advance(escrowId: bigint): Promise<boolean> {
-    const status = await getEscrowStatus(onchain, escrowId)
+    const status = await chain.getEscrowStatus(escrowId)
     if (status === DISPUTED) {
       await answerDispute(escrowId)
       return false
@@ -438,11 +481,11 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
     if (!job) return true
 
     if (status === FUNDED) {
-      await startExecution(onchain, escrowId)
+      await chain.startExecution(escrowId)
       log(`escrow #${escrowId}: accepted (${job.price}) — working…`)
     }
     const result = await work(job)
-    await markDelivered(onchain, escrowId, resultHash(result))
+    await chain.markDelivered(escrowId, resultHash(result))
     unpublished.set(escrowId, { capability: job.capability, result })
     log(`escrow #${escrowId}: delivered`)
     await publish(escrowId)
@@ -453,7 +496,7 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
     agentId ??= await register()
     if (Date.now() - lastBeat >= HEARTBEAT_SECONDS * 1000) await heartbeat(agentId, true)
     await negotiate(agentId)
-    const mine = (await readAllEscrows(onchain.publicClient)).filter(
+    const mine = (await chain.listEscrows()).filter(
       (e) => e.seller.toLowerCase() === account.address.toLowerCase() && !finished.has(e.id)
     )
     for (const { id } of mine) {
@@ -482,9 +525,9 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
   async function stepDeadlinePassed(escrowId: bigint): Promise<boolean> {
     try {
       const now = BigInt(Math.floor(Date.now() / 1000))
-      const status = await getEscrowStatus(onchain, escrowId)
-      if (status === FUNDED) return now > (await getEscrowDisputeInfo(onchain, escrowId)).acceptDeadline
-      if (status === EXECUTING) return now > (await getEscrowWindows(onchain, escrowId)).executionDeadline
+      const status = await chain.getEscrowStatus(escrowId)
+      if (status === FUNDED) return now > (await chain.getEscrowDisputeInfo(escrowId)).acceptDeadline
+      if (status === EXECUTING) return now > (await chain.getEscrowWindows(escrowId)).executionDeadline
       return false
     } catch {
       return false // the chain read failed too: let the attempt cap decide
@@ -495,7 +538,7 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
     address: account.address,
     async start() {
       running = true
-      log(`wallet ${account.address}, AgentEco ${AGENT_ECO_ADDRESS}`)
+      log(`wallet ${account.address}, ${chain.config.chain.name} (${chain.chainId}), AgentEco ${chain.config.agentEco}`)
       while (running) {
         try {
           await runOnce()
