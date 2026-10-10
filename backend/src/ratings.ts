@@ -16,7 +16,8 @@ import { log } from './log.ts'
 async function ownerOf(chainId: ChainId, address: string): Promise<{ owner: string; hostedAgent: boolean }> {
   const agent = await prisma.agent.findFirst({ where: { chainId, walletAddress: { equals: address, mode: 'insensitive' } } })
   if (!agent) return { owner: address.toLowerCase(), hostedAgent: false }
-  return { owner: agent.ownerWallet.toLowerCase(), hostedAgent: agent.taskStatus !== null }
+  // Agents linked to one person are one owner, whatever keys they sign with.
+  return { owner: (agent.accountWallet ?? agent.ownerWallet).toLowerCase(), hostedAgent: agent.taskStatus !== null }
 }
 
 async function saveRating(chainId: ChainId, event: RatingEvent): Promise<void> {

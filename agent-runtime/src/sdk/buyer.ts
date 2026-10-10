@@ -94,27 +94,102 @@ const REFUNDED = 6
 const OPENING_RATIO = 0.5
 const cents = (n: number) => Math.round(n * 100) / 100
 
+/** The reason sent when a seller commits a result hash but never publishes a result that matches it. */
+export const UNPUBLISHED_REASON =
+  'The seller committed a result hash on-chain but never published a result that matches it, so the delivery could not be checked.'
+
 /**
- * Hire an agent in one call: find a seller, negotiate within your budget,
- * store the task and lock the agreed price in escrow, wait for delivery,
- * check the result against the on-chain hash and the capability's output
- * schema, then settle (or dispute). Resolves with the result.
+ * A hire in progress, as plain data: it can be saved (every field is JSON) and resumed later by
+ * awaitDelivery / settleHire / disputeHire. The escrow id is a string for that reason.
  */
-export async function hire(options: HireOptions): Promise<HireResult> {
+export interface HireHandle {
+  version: 1
+  /** The chain the escrow lives on (CAIP-2). */
+  chainId: string
+  escrowId: string
+  seller: { id: string; name: string; wallet: string; erc8004AgentId: string | null }
+  capability: string
+  /** The agreed price, in token units. */
+  price: string
+  /** The brief as the capability's schema normalised it, and the criteria — for a verifier. */
+  brief: unknown
+  criteria: string
+}
+
+/** What every stage after openHire needs: the buyer's key and the API. */
+export interface HireContext {
+  privateKey: Hex
+  apiUrl?: string
+  /** How often to poll. Default 3000 ms. */
+  pollMs?: number
+  /** Give up waiting after this long (per stage). Default 20 minutes. */
+  timeoutMs?: number
+  log?: Logger
+}
+
+/** The delivery of a hire, after it was checked against the chain and the capability's schema. */
+export type Delivery =
+  /** `problems` lists every failed automatic check (hash, schema); empty means the result can be trusted as delivered. */
+  | { state: 'delivered'; result: Record<string, unknown>; problems: string[] }
+  /** The seller committed a hash but did not publish the result in time: dispute with UNPUBLISHED_REASON. */
+  | { state: 'unpublished' }
+  /** The escrow was refunded: the seller did not take or finish the job. */
+  | { state: 'refunded' }
+
+interface Stage {
+  apiUrl: string
+  account: ReturnType<typeof privateKeyToAccount>
+  chain: ReturnType<typeof signerChain>
+  chainId: string
+  log: Logger
+  pollMs: number
+  deadline: number
+  waitStep(what: string): Promise<void>
+}
+
+function stageFor(handle: Pick<HireHandle, 'chainId'>, ctx: HireContext, deadline?: number): Stage {
+  const apiUrl = ctx.apiUrl ?? DEFAULT_API_URL
+  const log = ctx.log ?? consoleLogger('SDK buyer')
+  const pollMs = ctx.pollMs ?? 3000
+  const until = deadline ?? Date.now() + (ctx.timeoutMs ?? 20 * 60_000)
+  return {
+    apiUrl,
+    account: privateKeyToAccount(ctx.privateKey),
+    chain: signerChain(handle.chainId, ctx.privateKey),
+    chainId: handle.chainId,
+    log,
+    pollMs,
+    deadline: until,
+    waitStep: async (what) => {
+      if (Date.now() > until) throw new Error(`Timed out waiting for ${what}.`)
+      await sleep(pollMs)
+    },
+  }
+}
+
+/** The options of the opening stages: everything of hire() except the decision about the result. */
+export type OpenHireOptions = Omit<HireOptions, 'review' | 'ai'>
+
+/**
+ * Stages 1–4 of a hire: check the brief, pick a seller, negotiate within the budget, then store the
+ * task and lock the agreed price in escrow. Resolves once the escrow is funded; nothing is delivered yet.
+ */
+export async function openHire(options: OpenHireOptions): Promise<HireHandle> {
+  return openStage(options, undefined)
+}
+
+async function openStage(options: OpenHireOptions, deadline: number | undefined): Promise<HireHandle> {
   const apiUrl = options.apiUrl ?? DEFAULT_API_URL
   const name = options.name ?? 'SDK buyer'
   const log = options.log ?? consoleLogger(name)
   const pollMs = options.pollMs ?? 3000
-  const deadline = Date.now() + (options.timeoutMs ?? 20 * 60_000)
-  if (!options.review && !options.ai) {
-    throw new Error('Pass review(result) or ai (your own model): hire() never pays for a result nobody checked. To accept anything that fits the schema: review: () => ({ accept: true }).')
-  }
+  const until = deadline ?? Date.now() + (options.timeoutMs ?? 20 * 60_000)
   const account = privateKeyToAccount(options.privateKey)
   const chosenChain = options.chain === undefined ? null : normalizeChainId(options.chain)
   if (options.chain !== undefined && !chosenChain) throw new Error(`Unknown chain: ${options.chain}`)
   let chainId = chosenChain ?? PRIMARY_CHAIN_ID
   const waitStep = async (what: string) => {
-    if (Date.now() > deadline) throw new Error(`Timed out waiting for ${what}.`)
+    if (Date.now() > until) throw new Error(`Timed out waiting for ${what}.`)
     await sleep(pollMs)
   }
 
@@ -237,59 +312,164 @@ export async function hire(options: HireOptions): Promise<HireResult> {
   if (order) await attachEscrowToOrder(apiUrl, account, order.id, escrowId.toString())
   log(`escrow #${escrowId} funded — waiting for delivery`)
 
-  // 5. Delivery, then the plaintext result (published right after the hash).
-  for (;;) {
-    const status = await chain.getEscrowStatus(escrowId)
-    if (status === DELIVERED) break
-    if (status === REFUNDED) throw new Error(`Escrow #${escrowId} was refunded — the seller did not take or finish the job.`)
-    await waitStep(`escrow #${escrowId} to be delivered`)
+  return {
+    version: 1,
+    chainId,
+    escrowId: escrowId.toString(),
+    seller: { id: seller.id, name: seller.name, wallet: seller.walletAddress, erc8004AgentId: seller.erc8004AgentId ?? null },
+    capability: options.capability,
+    price,
+    brief: brief.brief,
+    criteria: options.criteria ?? '',
   }
-  const sellerInfo = { id: seller.id, name: seller.name, wallet: seller.walletAddress }
+}
 
-  // The plaintext must follow the hash. A seller that never publishes it gets half the review
-  // window, then a dispute — like a hosted buyer. Waiting longer would let the window run out,
-  // and the contract would then pay the seller for a result nobody could check.
-  const [{ deliveredAt }, { reviewWindow }] = await Promise.all([chain.getEscrowTimestamps(escrowId), chain.getEscrowWindows(escrowId)])
+/**
+ * Waits for the seller's delivery and checks it: the result must hash to what the seller committed
+ * on-chain and fit the capability's output schema. Never pays or disputes by itself. A seller that
+ * committed a hash but has not published the result within half the review window comes back as
+ * `unpublished` — waiting longer would let the window run out, and the contract would then pay the
+ * seller for a result nobody could check.
+ */
+export async function awaitDelivery(handle: HireHandle, ctx: HireContext): Promise<Delivery> {
+  return deliveryStage(handle, stageFor(handle, ctx))
+}
+
+async function deliveryStage(handle: HireHandle, s: Stage): Promise<Delivery> {
+  const escrowId = BigInt(handle.escrowId)
+  for (;;) {
+    const status = await s.chain.getEscrowStatus(escrowId)
+    if (status === DELIVERED) break
+    if (status === REFUNDED) return { state: 'refunded' }
+    await s.waitStep(`escrow #${escrowId} to be delivered`)
+  }
+  const [{ deliveredAt }, { reviewWindow }] = await Promise.all([s.chain.getEscrowTimestamps(escrowId), s.chain.getEscrowWindows(escrowId)])
   const publishBy = Number(deliveredAt + reviewWindow / BigInt(2)) * 1000
-  let published = await getEscrowResult(apiUrl, escrowId.toString(), account, chainId)
+  let published = await getEscrowResult(s.apiUrl, handle.escrowId, s.account, s.chainId)
   while (!published) {
-    if (Date.now() >= publishBy) {
-      const reason = 'The seller committed a result hash on-chain but never published a result that matches it, so the delivery could not be checked.'
-      await chain.raiseDispute(escrowId, textHash(reason))
-      await submitDisputeReason(apiUrl, account, escrowId.toString(), reason, chainId)
-      log(`escrow #${escrowId}: the seller never published its result — disputed`)
-      return { escrowId, seller: sellerInfo, price, result: null, outcome: 'disputed' }
-    }
-    await waitStep(`the result of escrow #${escrowId}`)
-    published = await getEscrowResult(apiUrl, escrowId.toString(), account, chainId)
+    if (Date.now() >= publishBy) return { state: 'unpublished' }
+    await s.waitStep(`the result of escrow #${escrowId}`)
+    published = await getEscrowResult(s.apiUrl, handle.escrowId, s.account, s.chainId)
   }
   // The exact committed text: the API's `result` object comes from jsonb, with its keys reordered.
   const committedJson = published.resultJson ?? JSON.stringify(published.result)
   const result = JSON.parse(committedJson) as Record<string, unknown>
 
-  // 6. Trust nothing: the result must hash to what the seller committed, and fit the schema.
-  const { resultHash: onchainHash } = await chain.getEscrowHashes(escrowId)
+  // Trust nothing: the result must hash to what the seller committed, and fit the schema.
+  const { resultHash: onchainHash } = await s.chain.getEscrowHashes(escrowId)
   const problems: string[] = []
   if (hashPreimage(committedJson).toLowerCase() !== onchainHash.toLowerCase()) problems.push('the result does not match the hash committed on-chain')
+  const capability = await resolveCapability(s.apiUrl, handle.capability)
   const shape = capability.checkResult(result)
-  if (!shape.ok) problems.push(`the result does not match the ${options.capability} output schema (${shape.error})`)
+  if (!shape.ok) problems.push(`the result does not match the ${handle.capability} output schema (${shape.error})`)
+  return { state: 'delivered', result, problems }
+}
+
+/** What settling did. */
+export interface SettleOutcome {
+  /** The rating given to the seller (1–100), when one was. */
+  rated: number | null
+  /** The ERC-8004 feedback transaction, when the seller had an identity and one was given. */
+  erc8004FeedbackTx: string | null
+}
+
+/**
+ * Accepts the delivered result and pays the seller. With a `rating` (1–100) it also rates the seller on-chain
+ * and, when the seller has an ERC-8004 identity on the chain, publishes the rating as feedback
+ * (unless `erc8004Feedback` is false).
+ */
+export async function settleHire(handle: HireHandle, ctx: HireContext, opts: { rating?: number; erc8004Feedback?: boolean } = {}): Promise<SettleOutcome> {
+  return settleStage(handle, stageFor(handle, ctx), opts)
+}
+
+async function settleStage(handle: HireHandle, s: Stage, opts: { rating?: number; erc8004Feedback?: boolean }): Promise<SettleOutcome> {
+  const escrowId = BigInt(handle.escrowId)
+  await s.chain.acceptAndSettle(escrowId)
+  s.log(`escrow #${escrowId}: accepted — ${handle.price} paid to ${handle.seller.name}`)
+  const outcome: SettleOutcome = { rated: null, erc8004FeedbackTx: null }
+  if (opts.rating === undefined) return outcome
+  const score = Math.max(1, Math.min(100, Math.round(opts.rating)))
+  const tx = await s.chain.rateSeller(escrowId, score)
+  await fetch(`${s.apiUrl}/ratings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ txHash: tx, chainId: s.chainId }) }).catch(() => {})
+  s.log(`rated ${score}/100`)
+  outcome.rated = score
+  const registries = handle.seller.erc8004AgentId && opts.erc8004Feedback !== false ? await apiErc8004Registries(s.apiUrl, s.chainId) : null
+  if (registries && handle.seller.erc8004AgentId) {
+    try {
+      outcome.erc8004FeedbackTx = await s.chain
+        .withErc8004(registries)
+        .erc8004GiveFeedback(BigInt(handle.seller.erc8004AgentId), dealFeedback({ score, capability: handle.capability, chainId: s.chainId, escrowId }))
+      s.log(`ERC-8004 feedback given (tx ${outcome.erc8004FeedbackTx})`)
+    } catch (error) {
+      s.log(`ERC-8004 feedback not given: ${(error as Error).message.split('\n')[0]}`)
+    }
+  }
+  return outcome
+}
+
+/** Disputes the delivery: the reason (at least 10 characters) goes on-chain as a hash and to the API as text. */
+export async function disputeHire(handle: HireHandle, ctx: HireContext, reason: string): Promise<void> {
+  return disputeStage(handle, stageFor(handle, ctx), reason)
+}
+
+async function disputeStage(handle: HireHandle, s: Stage, reasonText: string): Promise<void> {
+  const reason = reasonText.trim()
+  if (reason.length < 10) throw new Error('A dispute reason needs at least 10 characters.')
+  const escrowId = BigInt(handle.escrowId)
+  await s.chain.raiseDispute(escrowId, textHash(reason))
+  await submitDisputeReason(s.apiUrl, s.account, handle.escrowId, reason, s.chainId)
+  s.log(`escrow #${escrowId}: disputed — the arbiter decides`)
+}
+
+/**
+ * Hire an agent in one call: find a seller, negotiate within your budget,
+ * store the task and lock the agreed price in escrow, wait for delivery,
+ * check the result against the on-chain hash and the capability's output
+ * schema, then settle (or dispute). Resolves with the result.
+ *
+ * It is the stages above in a row — openHire, awaitDelivery, then settleHire or disputeHire —
+ * with `review` / `ai` deciding between the last two. Use the stages to decide later, elsewhere,
+ * or from another process.
+ */
+export async function hire(options: HireOptions): Promise<HireResult> {
+  if (!options.review && !options.ai) {
+    throw new Error('Pass review(result) or ai (your own model): hire() never pays for a result nobody checked. To accept anything that fits the schema: review: () => ({ accept: true }).')
+  }
+  // One deadline for the whole deal, as before.
+  const deadline = Date.now() + (options.timeoutMs ?? 20 * 60_000)
+  const handle = await openStage(options, deadline)
+  const s = stageFor(handle, { ...options, log: options.log ?? consoleLogger(options.name ?? 'SDK buyer') }, deadline)
+  const escrowId = BigInt(handle.escrowId)
+  const sellerInfo = { id: handle.seller.id, name: handle.seller.name, wallet: handle.seller.wallet }
+  const base = { escrowId, seller: sellerInfo, price: handle.price }
+
+  const delivery = await deliveryStage(handle, s)
+  if (delivery.state === 'refunded') throw new Error(`Escrow #${escrowId} was refunded — the seller did not take or finish the job.`)
+  if (delivery.state === 'unpublished') {
+    await disputeStage(handle, s, UNPUBLISHED_REASON)
+    s.log(`escrow #${escrowId}: the seller never published its result — disputed`)
+    return { ...base, result: null, outcome: 'disputed' }
+  }
+  const { result, problems } = delivery
+
   let review: Review
   if (problems.length) {
     review = { accept: false, reason: `Automatic check failed: ${problems.join('; ')}.` }
   } else if (options.review) {
     review = await options.review(result)
   } else if (options.ai) {
+    const capability = await resolveCapability(s.apiUrl, handle.capability)
     const verdict = await scoreWithAi(
       options.ai,
-      { capability: options.capability, label: capability.name, rubric: capability.rubric, examples: capability.examples, brief: brief.brief, criteria: options.criteria ?? '', result },
-      { log }
+      { capability: handle.capability, label: capability.name, rubric: capability.rubric, examples: capability.examples, brief: handle.brief, criteria: handle.criteria, result },
+      { log: s.log }
     )
     if (!verdict) {
       // Like a hosted buyer without a model: accept, unscored, and don't rate.
-      log('the verifier model did not answer — accepting without a score')
+      s.log('the verifier model did not answer — accepting without a score')
       review = { accept: true }
     } else {
-      log(`verifier: ${verdict.score}/100 — ${verdict.rationale}`)
+      s.log(`verifier: ${verdict.score}/100 — ${verdict.rationale}`)
       review = verdict.accept
         ? { accept: true, rating: verdict.score }
         : { accept: false, reason: `AI verification scored ${verdict.score}/100 (accept threshold 60). ${verdict.rationale}`.slice(0, 1000) }
@@ -299,32 +479,9 @@ export async function hire(options: HireOptions): Promise<HireResult> {
   }
 
   if (!review.accept) {
-    const reason = review.reason.trim()
-    if (reason.length < 10) throw new Error('A dispute reason needs at least 10 characters.')
-    await chain.raiseDispute(escrowId, textHash(reason))
-    await submitDisputeReason(apiUrl, account, escrowId.toString(), reason, chainId)
-    log(`escrow #${escrowId}: disputed — the arbiter decides`)
-    return { escrowId, seller: sellerInfo, price, result, outcome: 'disputed' }
+    await disputeStage(handle, s, review.reason)
+    return { ...base, result, outcome: 'disputed' }
   }
-
-  await chain.acceptAndSettle(escrowId)
-  log(`escrow #${escrowId}: accepted — ${price} paid to ${seller.name}`)
-  if (review.rating !== undefined) {
-    const score = Math.max(1, Math.min(100, Math.round(review.rating)))
-    const tx = await chain.rateSeller(escrowId, score)
-    await fetch(`${apiUrl}/ratings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ txHash: tx, chainId }) }).catch(() => {})
-    log(`rated ${score}/100`)
-    const registries = seller.erc8004AgentId && options.erc8004Feedback !== false ? await apiErc8004Registries(apiUrl, chainId) : null
-    if (registries && seller.erc8004AgentId) {
-      try {
-        const feedbackTx = await chain
-          .withErc8004(registries)
-          .erc8004GiveFeedback(BigInt(seller.erc8004AgentId), dealFeedback({ score, capability: options.capability, chainId, escrowId }))
-        log(`ERC-8004 feedback given (tx ${feedbackTx})`)
-      } catch (error) {
-        log(`ERC-8004 feedback not given: ${(error as Error).message.split('\n')[0]}`)
-      }
-    }
-  }
-  return { escrowId, seller: sellerInfo, price, result, outcome: 'settled' }
+  await settleStage(handle, s, { rating: review.rating, erc8004Feedback: options.erc8004Feedback })
+  return { ...base, result, outcome: 'settled' }
 }

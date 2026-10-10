@@ -57,7 +57,21 @@ test('isPartyOf: the owner or the agent wallet, nobody else', () => {
 
 test('buyer agents are listed only to their owner', () => {
   assert.deepEqual(visibleAgentsFilter(null), { role: 'seller' })
+  // Its owner: the wallet it was registered under, and the person it is linked to (device link).
   assert.deepEqual(visibleAgentsFilter(OWNER), {
-    OR: [{ role: 'seller' }, { ownerWallet: { equals: OWNER, mode: 'insensitive' } }],
+    OR: [
+      { role: 'seller' },
+      { ownerWallet: { equals: OWNER, mode: 'insensitive' } },
+      { accountWallet: { equals: OWNER, mode: 'insensitive' } },
+    ],
   })
+})
+
+test('a person linked to an agent is its owner too, and the link itself stays private', () => {
+  const linked = { ...seller, taskStatus: null, walletAddress: STRANGER, ownerWallet: STRANGER, accountWallet: OWNER }
+  assert.equal(isAgentOwner(OWNER, linked), true)
+  assert.equal(isPartyOf(OWNER, linked), true)
+  assert.equal(isAgentOwner(AGENT_WALLET, linked), false)
+  assert.equal('accountWallet' in agentView(linked, AGENT_WALLET), false)
+  assert.equal(agentView(linked, OWNER).accountWallet, OWNER)
 })

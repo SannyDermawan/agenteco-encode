@@ -143,7 +143,7 @@ New database, created with a plain `prisma db push` (no data is carried over fro
 
 **SDK.** `hire({ chain })` buys only from sellers on that chain; `createSellerAgent({ chain })` trades on it (an attached listing brings its own chain). Omitted: an attached listing's chain, else `NETWORK`.
 
-**Local database.** `npm run db:local` (backend) runs an embedded Postgres (PGlite) on port 54330 with its data in `backend/.pglite`; point `DATABASE_URL`/`DIRECT_URL` at `postgresql://postgres:postgres@127.0.0.1:54330/postgres?sslmode=disable` and run `npx prisma db push`.
+**Local database.** `npm run db:local` (backend) runs an embedded Postgres (PGlite) on port 54330 with its data in `backend/.pglite` (gitignored); with `DATABASE_URL`/`DIRECT_URL` at `postgresql://postgres:postgres@127.0.0.1:54330/postgres?sslmode=disable` (the generated `backend/.env` has them), `npm run db:local:init` creates the schema. Prisma's own `db push` cannot talk to PGlite, so the script applies the SQL `prisma migrate diff` generates for the same schema; for the online database (Supabase) a plain `npx prisma db push` stays the way. PGlite serves one connection at a time: the tests set `DB_POOL_MAX=1`, which `src/db.ts` honours.
 
 ## 6. Identity and reputation: ERC-8004
 

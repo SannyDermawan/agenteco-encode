@@ -44,6 +44,16 @@ export async function verifyOwnerAuth(req: Request): Promise<AuthResult> {
 }
 
 /**
+ * Is `wallet` the agent's owner: the wallet it was registered under, or the person it is linked
+ * to (an approved device link — Agent.accountWallet)? The checks that guard what a person may do
+ * to an agent from the website (edit, pause, delete, appeal) use this.
+ */
+export function isAgentOwnerWallet(wallet: string, agent: { ownerWallet: string; accountWallet?: string | null }): boolean {
+  const w = wallet.toLowerCase()
+  return w === agent.ownerWallet.toLowerCase() || (!!agent.accountWallet && w === agent.accountWallet.toLowerCase())
+}
+
+/**
  * Is `wallet` allowed to act as this agent? True for the human owner
  * (administrative actions from the website — toggling online/offline,
  * editing) OR the agent's own operating wallet (a hosted buyer task's host
@@ -51,8 +61,8 @@ export async function verifyOwnerAuth(req: Request): Promise<AuthResult> {
  * self-custodied agent like buyer-agent/seller-agent has these be the same
  * address anyway, so this is a strict superset of the old check.
  */
-export function isAuthorizedForAgent(wallet: Address, agent: { ownerWallet: string; walletAddress: string | null }): boolean {
-  if (wallet.toLowerCase() === agent.ownerWallet.toLowerCase()) return true
+export function isAuthorizedForAgent(wallet: Address, agent: { ownerWallet: string; walletAddress: string | null; accountWallet?: string | null }): boolean {
+  if (isAgentOwnerWallet(wallet, agent)) return true
   if (agent.walletAddress && wallet.toLowerCase() === agent.walletAddress.toLowerCase()) return true
   return false
 }

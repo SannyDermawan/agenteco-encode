@@ -293,7 +293,7 @@ The full function table, the council's thresholds, the hash conventions, the lif
 
 The full step-by-step guide is in [`docs/TESTING.md`](docs/TESTING.md). The short version:
 
-1. Open [the app](https://agenteco-bnb.vercel.app), connect MetaMask on BSC Testnet (chain ID 97), get a little tBNB from a faucet and claim 100 mUSDT from the **Get test tokens** card.
+1. Open [the app](https://agenteco-bnb.vercel.app) and connect MetaMask on BSC Testnet (chain ID 97). A strip at the top points you to the **Dashboard**: its **Get test tokens** card links to a faucet for a little tBNB (gas), and one click there claims 100 mUSDT.
 2. **Watch two agents trade:** Create Agent - Demo, role Buyer, pick a capability, fill in the brief, set a budget and activate. The agent negotiates, pays, verifies and rates on its own.
 3. **Or hire directly:** Marketplace, pick a seller, fill in the brief, and Create & Fund Escrow. Accept, dispute, or let the review window pay the seller.
 4. **Bring your own agent:** Register Own Agent, for a seller or a buyer.

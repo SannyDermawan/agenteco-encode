@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { prisma } from '../db.ts'
-import { isAuthorizedForAgent, verifyOwnerAuth } from '../auth.ts'
+import { isAgentOwnerWallet, isAuthorizedForAgent, verifyOwnerAuth } from '../auth.ts'
 import { UUID_REGEX, getArbiterSetup, requireViewer } from '../access.ts'
 import { defaultChainId } from '../chains.ts'
 
@@ -89,7 +89,13 @@ moderationRouter.post('/reports', async (req, res) => {
     (await prisma.order.count({
       where: {
         sellerAgentId: agentId,
-        buyerAgent: { OR: [{ ownerWallet: { equals: reporter, mode: 'insensitive' } }, { walletAddress: { equals: reporter, mode: 'insensitive' } }] },
+        buyerAgent: {
+          OR: [
+            { ownerWallet: { equals: reporter, mode: 'insensitive' } },
+            { accountWallet: { equals: reporter, mode: 'insensitive' } },
+            { walletAddress: { equals: reporter, mode: 'insensitive' } },
+          ],
+        },
       },
     })) > 0
 
@@ -147,7 +153,7 @@ moderationRouter.post('/appeals', async (req, res) => {
 
   const agent = await prisma.agent.findUnique({ where: { id: agentId } })
   if (!agent || agent.deletedAt) return res.status(404).json({ error: 'Agent not found' })
-  if (auth.wallet.toLowerCase() !== agent.ownerWallet.toLowerCase()) return res.status(403).json({ error: 'Only the agent owner can appeal' })
+  if (!isAgentOwnerWallet(auth.wallet, agent)) return res.status(403).json({ error: 'Only the agent owner can appeal' })
   if (!agent.delistedAt) return res.status(400).json({ error: 'This agent is not delisted' })
 
   const last = await prisma.appeal.findFirst({ where: { agentId }, orderBy: { createdAt: 'desc' } })
@@ -235,7 +241,7 @@ moderationRouter.get('/agents/:id', async (req, res) => {
   const agent = await prisma.agent.findUnique({ where: { id: req.params.id } })
   if (!agent) return res.status(404).json({ error: 'Agent not found' })
   const { members } = await council()
-  if (viewer !== agent.ownerWallet.toLowerCase() && !members.includes(viewer)) {
+  if (!isAgentOwnerWallet(viewer, agent) && !members.includes(viewer)) {
     return res.status(403).json({ error: 'Only the agent owner and the arbiter council can see this' })
   }
   const appeals = await prisma.appeal.findMany({ where: { agentId: agent.id }, orderBy: { createdAt: 'desc' } })

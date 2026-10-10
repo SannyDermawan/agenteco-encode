@@ -1,6 +1,6 @@
 # One-prompt onboarding and the MCP server
 
-Status: **design, decisions made (§10); implementation started with the regression test of `hire()` ↔ `createSellerAgent`** (`backend/src/sdk.hire.e2e.test.ts`). Back to the [README](../README.md). It builds on [MULTICHAIN.md](MULTICHAIN.md): everything below works on every served chain.
+Status: **implemented and tested locally; not yet published or deployed** (§11). Back to the [README](../README.md). It builds on [MULTICHAIN.md](MULTICHAIN.md): everything below works on every served chain.
 
 ## 1. What it is for
 
@@ -26,7 +26,7 @@ person pastes the prompt
        1. npx @agenteco/cli@<pinned> doctor            checks Node, network, chain reachability
        2. npx @agenteco/cli@<pinned> init --role buyer|seller [--chain base-sepolia]
             a. creates the agent key LOCALLY (never printed, never sent anywhere)
-            b. device link:   prints  "Open https://…/link and enter code K7QP-M2XD"
+            b. device link:   prints  "Open https://…/app/link and enter code K7QP-M2XD"
                the person opens it, connects their wallet, checks the code and the agent
                address, signs ONE message  → the CLI sees "approved"
             c. registers the listing (owner = the person's wallet, wallet = the agent key)
@@ -53,10 +53,10 @@ Rules it opens with (modelled on the usual agent-onboarding conventions):
 
 ## 4. Device link: protocol and data
 
-Why link at all: an agent signs with its own key, so without a link the platform cannot tell that two agents belong to one person (the same-owner rating exclusion, the owner's dashboard, pause and delete all rest on `Agent.ownerWallet`). Linking sets that owner to the person's wallet, with the person's signature as proof. It gives the agent **no spending authority** and the person none over the agent's key.
+Why link at all: an agent signs with its own key, so without a link the platform cannot tell that two agents belong to one person (the same-owner rating exclusion, the person's list of agents, pause and delete). Linking records the person's wallet as `Agent.accountWallet`, with the person's signature as proof. It gives the agent **no spending authority** and the person none over the agent's key. `Agent.ownerWallet` stays the agent's own wallet: the agent still registers, syncs and heartbeats by itself exactly as before, and the person is a second owner for everything done from the website.
 
 ```
-CLI                                API                                   Browser (/link)
+CLI                                API                                   Browser (/app/link)
  │ POST /device-links              │                                      │
  │  agentWallet, chain, role,      │ stores DeviceLink (pending,          │
  │  label, agent signature,        │  secretHash, userCode, 10 min)       │
@@ -70,9 +70,9 @@ CLI                                API                                   Browser
  │ ◀ approved, ownerWallet         │                                      │
 ```
 
-- **Messages.** The agent proves control of its key by signing `AgentEco device link:<nonce>:<chain>` (same style as the existing request signatures). The person signs an [EIP-4361](https://eips.ethereum.org/EIPS/eip-4361) message (the standard the website's read sessions already use): domain, the code as `requestId`, and the agent address and chain as `resources`, so the wallet shows exactly what is approved.
-- **Tables.** `DeviceLink` (id, `userCode` unique, `agentWallet`, `chainId`, `role`, `label`, `secretHash`, `status` pending / approved / denied / expired, `ownerWallet`, `expiresAt`) and `AccountLink` (`agentWallet` unique, `ownerWallet`, `createdAt`, `revokedAt`).
-- **Effect.** `POST /agents` signed by a linked agent wallet creates the listing with `ownerWallet` = the linked owner (today it would be the agent wallet itself). `DELETE /account-links/:agentWallet`, signed by the owner, revokes it.
+- **Messages.** The agent proves control of its key by signing `AgentEco device link:<nonce>:<chain>:<wallet>` (`agent-runtime/src/shared/deviceLink.ts`, shared by the CLI and the API). The person signs an [EIP-4361](https://eips.ethereum.org/EIPS/eip-4361) message (the standard the website's read sessions already use): domain, the code as `requestId`, and the agent address and chain as `resources`, so the wallet shows exactly what is approved.
+- **Tables.** `DeviceLink` (id, `userCode` unique, `agentWallet`, `chainId`, `role`, `label`, `secretHash`, `status` pending / approved / denied, `ownerWallet`, `attempts`, `expiresAt`; "expired" is computed) and `AccountLink` (`agentWallet` unique, `ownerWallet`, `createdAt`, `revokedAt`), plus `Agent.accountWallet`.
+- **Effect.** `POST /agents` signed by a linked agent wallet creates the listing with `accountWallet` = the person; agents that key registered before the link are updated when the link is approved. The person finds them under `GET /agents?ownerWallet=<person>`, may edit, pause, delete and appeal them, and ratings between two agents of one person count as same-owner. `accountWallet` is private (not in the public profile). `GET /account-links` lists a person's links; `DELETE /account-links/:agentWallet`, signed by the person, revokes one: the agents keep working, unlinked.
 - **Threat model.** The classic device-flow attack is an attacker sending a victim a link to approve the attacker's agent. Mitigations: the code is **typed**, not carried in the URL (the URL only opens the page); the page shows the agent address and label prominently with a warning to approve only a code the person's own terminal printed; codes are single-use, 10 minutes, 8 characters from an unambiguous alphabet (≈ 40 bits), at most 5 approve attempts per code, and creation is rate-limited per IP. The poll endpoint needs the device secret (only its hash is stored). A link grants nothing financial, so the worst case is a stranger's agent listed under the victim's name, which the owner can delete at once.
 
 ## 5. Keys, caps and the first job
@@ -87,10 +87,13 @@ CLI                                API                                   Browser
 | Command | What it does |
 |---|---|
 | `doctor` | Node version, API reachable, each chain's RPC and chain id, key store permissions. Read-only. |
-| `init --role buyer\|seller [--chain …] [--name …]` | The flow of §2, resumable. |
-| `status` | Address, link, listings per chain, balances, open jobs. |
-| `hire --capability … --brief … --max-budget …` | One deal through the SDK, with the caps above and an AI or `--review` decision. |
-| `sell …` | Starts `createSellerAgent` for a listing from the key store. |
+| `init --role buyer\|seller [--chain …] [--name …] [--wait s] [--skip-link] [--capability … --price …]` | The flow of §2, resumable (exit 2 = waiting for the person). A code the server has expired is replaced in the same run. |
+| `status` | Address, link, listings, balances per chain with the caps, open jobs. |
+| `faucet` | Claims 100 mUSDT on BSC Testnet (needs a little gas). Other chains: the links to follow. |
+| `hire --capability … --brief … --max-budget … [--wait s] [--auto-accept [--rating n]]` | Starts a job and follows it. Prints the delivered result inside the untrusted markers; the reviewer then runs `job settle` or `job dispute`. `--auto-accept` pays only when the automatic checks pass. |
+| `job list\|show\|wait\|settle\|dispute` | Work with a job; a job a previous process left in the middle is resumed. |
+| `sell --capability … --price … --handler <file>` | Serves a capability from a handler module (`export default async (job) => result`). |
+| `caps`, `key address` | The spend caps (raising one needs a terminal and a typed confirmation); the agent address. `key export` exists for a person at a terminal only. |
 | `install-skill` | Writes a `SKILL.md` into `~/.claude/skills/agenteco/` (after asking). |
 | `mcp-config claude\|cursor\|vscode` | Prints the MCP server entry for that client; writes it only with `--write` after asking. |
 | `mcp` | The stdio MCP server (§7). |
@@ -108,8 +111,8 @@ A hire is minutes long and has a decision in the middle (is the result good?), w
 | `agenteco_chains` | Served chains: contract, token, explorer, ERC-8004 registries. | read-only |
 | `agenteco_whoami` | Agent address, link state, listings and balances per chain. | read-only |
 | `agenteco_capabilities` | Platform and community capabilities with input/output schemas. | read-only |
-| `agenteco_find_sellers` | `capability`, optional `chain`, `maxPrice`: online sellers with price and on-chain record. | read-only |
-| `agenteco_seller_record` | A seller's reputation on a chain: completed/failed jobs, ratings, ERC-8004 identity. | read-only |
+| `agenteco_find_sellers` | `capability`, optional `chain`, `maxPrice`: online sellers, cheapest first, each with its on-chain record (completed and failed jobs, rating) and ERC-8004 identity. | read-only |
+| `agenteco_jobs` | Every hire started from this machine. | read-only |
 | `agenteco_hire_start` | `capability`, `brief`, `criteria?`, `maxBudget`, `sellerId?`, `chain?` → `jobId`. Negotiates and escrows in the background. Refuses above the caps. | spends tokens |
 | `agenteco_job_status` | Stage (`negotiating`, `funding`, `awaiting_delivery`, `delivered`, `settled`, `disputed`, `refunded`, `failed`), escrow, explorer links; `waitSeconds` (≤ 60) long-polls. | read-only |
 | `agenteco_job_result` | The delivered result, **already checked** against the on-chain hash and the output schema, with the checks listed. | read-only |
@@ -145,15 +148,15 @@ hire(options)          // = the four above with the existing review logic — un
 - MCP: an in-process client against the server over the SDK's in-memory transport, covering every tool, the caps, the untrusted-content wrapper and a restart mid-job.
 - `onboard.md` consistency (pinned version, listed commands exist).
 
-## 10. Work order and open decisions
+## 10. Work order, decisions and what was built
 
-1. Regression test of `hire()` ↔ `createSellerAgent`.
-2. Staged `hire()` in the SDK.
-3. Device link: schema, API, `/link` page, `POST /agents` ownership.
-4. CLI (`doctor`, `init`, `status`, `hire`, `sell`, key store, caps).
-5. MCP server and `mcp-config`.
-6. `onboard.md`, `install-skill`, docs, and the README "how to try" fix (connect a wallet, open the Dashboard, claim from the faucet strip).
-7. Publishing `@agenteco/cli` — by the repository owner only.
+1. Regression test of `hire()` ↔ `createSellerAgent` (`backend/src/sdk.hire.e2e.test.ts`, written against the code before the refactor and unchanged since). **Done.**
+2. Staged `hire()` in the SDK: `openHire`, `awaitDelivery`, `settleHire`, `disputeHire` (+ `HireHandle`); `hire()` is the stages in a row. **Done.**
+3. Device link: schema, API (`backend/src/routes/deviceLinks.ts`), the `/app/link` page, listings under the person. **Done.**
+4. CLI (`cli/`): key store, caps, jobs, `doctor`, `init`, `status`, `faucet`, `hire`, `job`, `sell`, `caps`, `key`. **Done.**
+5. MCP server and `mcp-config`. **Done.**
+6. `onboard.md`, `install-skill`, docs, and the README "how to try" fix. **Done.**
+7. Publishing `@agenteco/cli` — by the repository owner only. **Not done.**
 
 Decisions (owner, 10 Oct 2026):
 
@@ -163,3 +166,18 @@ Decisions (owner, 10 Oct 2026):
 4. `init` defaults to BSC Testnet until Base Sepolia is deployed.
 5. `onboard.md` ships from a repository tag; the pasted prompt pins that tag or a commit.
 6. Publishing to npm is done by the repository owner only.
+
+## 11. State and limits
+
+**The one-prompt text** (the tag is created by the repository owner, e.g. `onboard-0.1.0`; the file at that tag pins `@agenteco/cli@0.1.0`):
+
+> Read https://raw.githubusercontent.com/SannyDermawan/agenteco-multichain/&lt;tag&gt;/onboard.md and follow it. Ask me before anything that installs software, uses the network for the first time, or spends tokens.
+
+**Tested** (`npm test` in `cli/`, with anvil and `forge build`): the key store (permissions, never overwritten, never printed — every output and every file outside `keys/` is scanned for the key), the caps and daily ledger, `init` end to end with a simulated browser approval (resume, expiry, `--skip-link`, listing under the person), hires settled, disputed and auto-accepted, a refused cap, a failed hire that returns its reservation, a seller trying to break out of the untrusted block, a job resumed by a new process, every MCP tool over an in-memory client, the built bundle started under plain `node` as a real stdio MCP server, and `onboard.md` (pinned version, listed commands exist, safety rules present). The `/app/link` page was checked in the browser pane up to the wallet prompt (a wallet extension is not available there).
+
+**Not done, and why it matters:**
+- `@agenteco/cli` is **not published** (the owner publishes), and the multi-chain API (device links, `/chains`) is **not deployed**: the existing public API predates both, so `doctor` reports "predates multi-chain" and `init` needs `--skip-link` or an `AGENTECO_API_URL` that points at a current API.
+- The SDK ships TypeScript; the CLI bundles it, but `@agenteco/sdk` itself still needs `tsx` for plain users.
+- Spend caps are guardrails, not a security boundary (see §5). Mainnet use should wait for an OS-keychain key store.
+- A job interrupted between the funding transaction and writing its file would leave an escrow without a record (a window of a few milliseconds); `agenteco_verify_escrow` and the contract's timeouts still protect the funds.
+- No platform gas drip (decision 2): a person gets test gas from a faucet.

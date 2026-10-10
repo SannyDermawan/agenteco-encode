@@ -2,7 +2,7 @@ import type { Request, Response } from 'express'
 import { zeroAddress, type Address } from 'viem'
 import type { Prisma } from '@prisma/client'
 import { READ_SESSION_HEADER } from '../../agent-runtime/src/shared/session.ts'
-import { verifyOwnerAuth, type AuthResult } from './auth.ts'
+import { isAgentOwnerWallet, verifyOwnerAuth, type AuthResult } from './auth.ts'
 import { prisma } from './db.ts'
 import { canRule, type ArbiterSetup } from '../../agent-runtime/src/chain/evm.ts'
 import { readChain, requestChain, servedChainIds, servedEvmChainIds, type ChainId } from './chains.ts'
@@ -196,11 +196,13 @@ export async function guardEscrow(req: Request, res: Response, escrowId: string)
 interface AgentParty {
   ownerWallet: string
   walletAddress: string | null
+  /** The person the agent is linked to, when it is. */
+  accountWallet?: string | null
 }
 
-/** A negotiation or order's side is the viewer's own: the agent's owner, or the agent's wallet itself. */
+/** A negotiation or order's side is the viewer's own: the agent's owner (or linked person), or the agent's wallet itself. */
 export function isPartyOf(viewer: string, agent: AgentParty): boolean {
-  return viewer === agent.ownerWallet.toLowerCase() || (!!agent.walletAddress && viewer === agent.walletAddress.toLowerCase())
+  return isAgentOwnerWallet(viewer, agent) || (!!agent.walletAddress && viewer === agent.walletAddress.toLowerCase())
 }
 
 /** Prisma filter: negotiations or orders one of whose agents belongs to the viewer. */
@@ -208,6 +210,7 @@ export function partyFilter(viewer: string) {
   const mine = {
     OR: [
       { ownerWallet: { equals: viewer, mode: 'insensitive' as const } },
+      { accountWallet: { equals: viewer, mode: 'insensitive' as const } },
       { walletAddress: { equals: viewer, mode: 'insensitive' as const } },
     ],
   }
@@ -225,6 +228,8 @@ const PRIVATE_AGENT_FIELDS = [
   'customInstructions',
   'taskBrief',
   'acceptanceCriteria',
+  // Which person an agent is linked to is the person's business, not the marketplace's.
+  'accountWallet',
 ] as const
 
 type AgentRow = AgentParty & { taskStatus: string | null } & Record<string, unknown>
@@ -232,7 +237,7 @@ type AgentRow = AgentParty & { taskStatus: string | null } & Record<string, unkn
 /** The owner, or a hosted agent's own wallet (the host acting for it). */
 export function isAgentOwner(viewer: string | null, agent: AgentRow): boolean {
   if (!viewer) return false
-  if (viewer === agent.ownerWallet.toLowerCase()) return true
+  if (isAgentOwnerWallet(viewer, agent)) return true
   return agent.taskStatus !== null && !!agent.walletAddress && viewer === agent.walletAddress.toLowerCase()
 }
 
@@ -247,7 +252,13 @@ export function agentView<T extends AgentRow>(agent: T, viewer: string | null): 
 /** Prisma filter: sellers are public; buyer agents are listed only to their owner. */
 export function visibleAgentsFilter(viewer: string | null): Prisma.AgentWhereInput {
   if (!viewer) return { role: 'seller' }
-  return { OR: [{ role: 'seller' }, { ownerWallet: { equals: viewer, mode: 'insensitive' } }] }
+  return {
+    OR: [
+      { role: 'seller' },
+      { ownerWallet: { equals: viewer, mode: 'insensitive' } },
+      { accountWallet: { equals: viewer, mode: 'insensitive' } },
+    ],
+  }
 }
 
 export const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

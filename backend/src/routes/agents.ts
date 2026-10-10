@@ -4,7 +4,7 @@ import { CAPABILITIES, isCapabilityId } from '../../../agent-runtime/src/shared/
 import { canonicalize } from '../../../agent-runtime/src/shared/hashes.ts'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { prisma, prismaWithAgentKey } from '../db.ts'
-import { isAuthorizedForAgent, verifyOwnerAuth } from '../auth.ts'
+import { isAgentOwnerWallet, isAuthorizedForAgent, verifyOwnerAuth } from '../auth.ts'
 import { UUID_REGEX, agentView, isAgentOwner, optionalViewer, visibleAgentsFilter } from '../access.ts'
 import { encryptAgentKey } from '../agentKeyCrypto.ts'
 import { findBlockingWork, withdrawHostedWallet } from '../agentDeletion.ts'
@@ -49,7 +49,15 @@ agentsRouter.get('/', async (req, res) => {
         { deletedAt: null },
         visibleAgentsFilter(viewer),
         // A delisted agent is gone from the marketplace and from discovery; its owner still sees it.
-        viewer ? { OR: [{ delistedAt: null }, { ownerWallet: { equals: viewer, mode: 'insensitive' as const } }] } : { delistedAt: null },
+        viewer
+          ? {
+              OR: [
+                { delistedAt: null },
+                { ownerWallet: { equals: viewer, mode: 'insensitive' as const } },
+                { accountWallet: { equals: viewer, mode: 'insensitive' as const } },
+              ],
+            }
+          : { delistedAt: null },
         ...(q
           ? [
               {
@@ -67,7 +75,10 @@ agentsRouter.get('/', async (req, res) => {
       ...(role && { role }),
       ...(isOnline !== undefined && { isOnline }),
       ...(capability && { capabilities: { has: capability } }),
-      ...(ownerWallet && { ownerWallet: { equals: ownerWallet, mode: 'insensitive' } }),
+      // A person's agents: those registered under their wallet and those linked to it.
+      ...(ownerWallet && {
+        OR: [{ ownerWallet: { equals: ownerWallet, mode: 'insensitive' } }, { accountWallet: { equals: ownerWallet, mode: 'insensitive' } }],
+      }),
       ...(taskStatus && { taskStatus }),
     },
     orderBy: { createdAt: 'desc' },
@@ -121,7 +132,7 @@ agentsRouter.post('/:id/erc8004', async (req, res) => {
   }
   if (!registered) return res.status(400).json({ error: `That transaction registered no agent in the Identity Registry on ${agent.chainId}` })
   const owner = registered.owner.toLowerCase()
-  if (owner !== agent.walletAddress?.toLowerCase() && owner !== agent.ownerWallet.toLowerCase()) {
+  if (owner !== agent.walletAddress?.toLowerCase() && !isAgentOwnerWallet(owner, agent)) {
     return res.status(400).json({ error: "The registered identity is owned by neither the agent's wallet nor its owner" })
   }
   if (!registered.agentURI.endsWith(`/agents/${agent.id}/registration.json`)) {
@@ -183,8 +194,11 @@ agentsRouter.post('/', async (req, res) => {
     agentData.taskBrief = canonicalize(CAPABILITIES[capability].input.parse(agentData.taskBrief))
   }
 
+  // An agent whose key was linked to a person (device link) is listed as that person's.
+  const link = await prisma.accountLink.findUnique({ where: { agentWallet: auth.wallet.toLowerCase() } })
+  const accountWallet = link && !link.revokedAt ? link.ownerWallet : null
   const agent = await prisma.agent.create({
-    data: { ...agentData, chainId, ownerWallet: auth.wallet, ...hostedFields } as Prisma.AgentCreateInput,
+    data: { ...agentData, chainId, ownerWallet: auth.wallet, ...(accountWallet && { accountWallet }), ...hostedFields } as Prisma.AgentCreateInput,
   })
   res.status(201).json(agent)
 })
@@ -232,7 +246,7 @@ agentsRouter.post('/:id/activate', async (req, res) => {
   if (!agent.walletAddress || agent.taskStatus === null) {
     return res.status(400).json({ error: 'This agent is not hosted by AgentEco' })
   }
-  if (auth.wallet.toLowerCase() !== agent.ownerWallet.toLowerCase()) {
+  if (!isAgentOwnerWallet(auth.wallet, agent)) {
     return res.status(403).json({ error: 'Only the agent owner can activate it' })
   }
   if (agent.taskStatus !== 'awaiting_deposit') {
@@ -264,7 +278,7 @@ agentsRouter.patch('/:id', async (req, res) => {
   const existing = await prisma.agent.findUnique({ where: { id: req.params.id } })
   if (!existing || existing.deletedAt) return res.status(404).json({ error: 'Agent not found' })
 
-  if (auth.wallet.toLowerCase() !== existing.ownerWallet.toLowerCase()) {
+  if (!isAgentOwnerWallet(auth.wallet, existing)) {
     return res.status(403).json({ error: 'Only the agent owner can update this agent' })
   }
   if (parsed.data.capabilities) {
@@ -312,7 +326,7 @@ agentsRouter.delete('/:id', async (req, res) => {
   // The only route allowed to read agentWalletKey — it has to sign the withdrawal.
   const agent = await prismaWithAgentKey.agent.findUnique({ where: { id: req.params.id } })
   if (!agent || agent.deletedAt) return res.status(404).json({ error: 'Agent not found' })
-  if (auth.wallet.toLowerCase() !== agent.ownerWallet.toLowerCase()) {
+  if (!isAgentOwnerWallet(auth.wallet, agent)) {
     return res.status(403).json({ error: 'Only the agent owner can delete this agent' })
   }
 

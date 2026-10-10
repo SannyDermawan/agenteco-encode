@@ -50,6 +50,9 @@ export interface TestDb {
 }
 
 export async function startTestDb(): Promise<TestDb> {
+  // PGlite behind a socket serves one connection at a time: concurrent prepared statements from a
+  // pool would be interleaved. A pool of one keeps every query in order.
+  process.env.DB_POOL_MAX ??= '1'
   const db = await PGlite.create()
   await db.exec(schemaSql())
   const port = await freePort()

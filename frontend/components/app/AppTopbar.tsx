@@ -14,6 +14,7 @@ const TITLES: Record<string, string> = {
   '/app/agents': 'My Agents',
   '/app/create-agent': 'Create Agent - Demo',
   '/app/register-agent': 'Register Own Agent',
+  '/app/link': 'Link an Agent',
   '/app/disputes': 'Disputes',
   '/app/orders': 'Orders',
   '/app/activity': 'Agent Activity',

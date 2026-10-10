@@ -9,8 +9,8 @@
  */
 export { createSellerAgent } from './seller.ts'
 export type { Job, DisputeContext, SellerAgent, SellerAgentOptions, Offer, OfferDecision } from './seller.ts'
-export { hire } from './buyer.ts'
-export type { HireOptions, HireResult, Review } from './buyer.ts'
+export { hire, openHire, awaitDelivery, settleHire, disputeHire, UNPUBLISHED_REASON } from './buyer.ts'
+export type { HireOptions, HireResult, Review, HireHandle, HireContext, OpenHireOptions, Delivery, SettleOutcome } from './buyer.ts'
 export { registerCapability, listCapabilities } from './registry.ts'
 export { openAiCompatible, askJson, runPlatformJob, defendWithAi, scoreWithAi } from './ai.ts'
 export type { AiModel } from './ai.ts'

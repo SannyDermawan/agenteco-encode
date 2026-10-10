@@ -53,7 +53,7 @@ describe('hire() against createSellerAgent', { skip }, () => {
     running.push(agent)
     void agent.start()
     const wallet = chain.addresses[role]
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 300; i++) {
       const listed = await prisma.agent.findFirst({ where: { walletAddress: { equals: wallet, mode: 'insensitive' }, isOnline: true, deletedAt: null } })
       if (listed) return { agent, listing: listed }
       await new Promise((r) => setTimeout(r, 100))
@@ -203,9 +203,9 @@ describe('hire() against createSellerAgent', { skip }, () => {
     // The buyer's reason reached the API (hash-checked against the chain); the seller answers on its own.
     const buyer = privateKeyToAccount(key('buyer'))
     let dispute: { reason: string; sellerResponse: string | null } | null = null
-    for (let i = 0; i < 100 && !dispute?.sellerResponse; i++) {
+    for (let i = 0; i < 300 && !dispute?.sellerResponse; i++) {
       const res = await fetch(`${api}/disputes/${result.escrowId}`, { headers: await buildAuthHeaders(buyer) })
-      dispute = res.ok ? await res.json() : null
+      dispute = res.ok ? ((await res.json()) as { reason: string; sellerResponse: string | null }) : null
       if (!dispute?.sellerResponse) await new Promise((r) => setTimeout(r, 100))
     }
     assert.equal(dispute?.reason, reason)
@@ -251,6 +251,65 @@ describe('hire() against createSellerAgent', { skip }, () => {
     assert.equal(done.outcome, 'settled')
     assert.equal(done.seller.name, 'Listed first')
     assert.equal(agent.address.toLowerCase(), chain.addresses.seller.toLowerCase())
+    await stopSellers()
+  })
+
+  test('the stages: open, save the handle, resume from it, settle', async () => {
+    const { listing } = await startSeller('seller')
+    const ctx = { privateKey: key('buyer'), apiUrl: api, pollMs: 100, log: quiet }
+    const before = await buyerBalance()
+
+    const opened = await sdk.openHire(hireOptions({ sellerId: listing.id }))
+    assert.equal(opened.version, 1)
+    assert.equal(opened.chainId, 'eip155:97')
+    assert.equal(opened.capability, 'translation')
+    assert.equal(opened.seller.id, listing.id)
+    assert.equal(typeof opened.escrowId, 'string')
+    assert.equal(await adapter('buyer').getEscrowStatus(BigInt(opened.escrowId)) >= 1, true, 'the escrow is funded')
+
+    // The handle is plain data: it survives being written to disk and read back by another process.
+    const handle = JSON.parse(JSON.stringify(opened)) as typeof opened
+    const delivery = await sdk.awaitDelivery(handle, ctx)
+    assert.equal(delivery.state, 'delivered')
+    if (delivery.state !== 'delivered') return
+    assert.deepEqual(delivery.result, RESULT)
+    assert.deepEqual(delivery.problems, [])
+
+    const outcome = await sdk.settleHire(handle, ctx, { rating: 77 })
+    assert.deepEqual(outcome, { rated: 77, erc8004FeedbackTx: null })
+    assert.equal(await adapter('buyer').getEscrowStatus(BigInt(handle.escrowId)), SETTLED)
+    assert.equal(before - (await buyerBalance()), parseUnits(handle.price, 18))
+    const rating = await prisma.rating.findUnique({ where: { chainId_escrowId: { chainId: 'eip155:97', escrowId: handle.escrowId } } })
+    assert.equal(rating?.score, 77)
+    await stopSellers()
+  })
+
+  test('the stages: a delivery can be disputed later, and a short reason is refused', async () => {
+    const { listing } = await startSeller('seller')
+    const ctx = { privateKey: key('buyer'), apiUrl: api, pollMs: 100, log: quiet }
+    const handle = await sdk.openHire(hireOptions({ sellerId: listing.id }))
+    const delivery = await sdk.awaitDelivery(handle, ctx)
+    assert.equal(delivery.state, 'delivered')
+
+    await assert.rejects(sdk.disputeHire(handle, ctx, 'too short'), /at least 10 characters/)
+    assert.equal(await adapter('buyer').getEscrowStatus(BigInt(handle.escrowId)), 3, 'a refused reason changes nothing on-chain')
+    await sdk.disputeHire(handle, ctx, 'The register is wrong: the brief asked for formal.')
+    assert.equal(await adapter('buyer').getEscrowStatus(BigInt(handle.escrowId)), DISPUTED)
+    const dispute = await prisma.dispute.findUnique({ where: { chainId_escrowId: { chainId: 'eip155:97', escrowId: handle.escrowId } } })
+    assert.equal(dispute?.reason, 'The register is wrong: the brief asked for formal.')
+    await stopSellers()
+  })
+
+  test('the stages: awaitDelivery reports a refund instead of throwing', async () => {
+    const { listing } = await startSeller('other', { handle: async () => new Promise<Record<string, unknown>>(() => {}) })
+    const ctx = { privateKey: key('buyer'), apiUrl: api, pollMs: 100, log: quiet }
+    const handle = await sdk.openHire(hireOptions({ sellerId: listing.id }))
+    // The seller started and never delivers; past the execution window anyone claims the timeout.
+    await new Promise((r) => setTimeout(r, 600))
+    await chain.advance(400)
+    const claim = await adapter('arbiter').claimTimeout(BigInt(handle.escrowId), 'claimExecutionTimeout')
+    assert.equal(claim.success, true)
+    assert.deepEqual(await sdk.awaitDelivery(handle, ctx), { state: 'refunded' })
     await stopSellers()
   })
 

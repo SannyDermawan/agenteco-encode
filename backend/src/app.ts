@@ -15,6 +15,7 @@ import { moderationRouter } from './routes/moderation.ts'
 import { ratingsRouter, verificationsRouter } from './routes/ratings.ts'
 import { aiCallsRouter } from './ai/aiCallLog.ts'
 import { chainsRouter } from './routes/chains.ts'
+import { accountLinksRouter, deviceLinksRouter } from './routes/deviceLinks.ts'
 import { logError } from './log.ts'
 import { FRONTEND_ORIGINS } from './origins.ts'
 
@@ -34,6 +35,9 @@ const chainLimiter = rateLimit({ ...limitOptions, windowMs: 60_000, limit: 120 }
 app.post('/agents', rateLimit({ ...limitOptions, windowMs: 10 * 60_000, limit: 30 }))
 app.post('/tasks', rateLimit({ ...limitOptions, windowMs: 10 * 60_000, limit: 300 }))
 app.post('/capabilities', rateLimit({ ...limitOptions, windowMs: 10 * 60_000, limit: 10 }))
+// A device link's code is 40 bits: creating links and guessing codes are both tightly limited per IP.
+app.post('/device-links', rateLimit({ ...limitOptions, windowMs: 60 * 60_000, limit: Number(process.env.DEVICE_LINK_CREATE_LIMIT ?? 10) }))
+app.use('/device-links/by-code', rateLimit({ ...limitOptions, windowMs: 10 * 60_000, limit: 40 }))
 app.post(['/moderation/reports', '/moderation/appeals'], rateLimit({ ...limitOptions, windowMs: 10 * 60_000, limit: 20 }))
 // Self-hosted agents beat about every 30 s each; several agents can share one IP.
 app.post('/agents/:id/heartbeat', rateLimit({ ...limitOptions, windowMs: 60_000, limit: 120 }))
@@ -49,6 +53,8 @@ app.get('/health', async (_req, res) => {
 })
 
 app.use('/chains', chainsRouter)
+app.use('/device-links', deviceLinksRouter)
+app.use('/account-links', accountLinksRouter)
 app.use('/agents', agentsRouter)
 app.use('/negotiations', negotiationsRouter)
 app.use('/orders', ordersRouter)

@@ -15,6 +15,10 @@ model Agent {
   // The chain this listing trades on (CAIP-2, e.g. eip155:97). One row per agent per chain:
   // its wallet, prices and escrows are that chain's.
   chainId        String   @map("chain_id")
+  // The person this agent is linked to (an approved device link, see DeviceLink): the wallet that
+  // may manage it from the website and whose agents count as "the same owner" in ratings. The
+  // agent's own wallet stays ownerWallet; null = not linked to anyone.
+  accountWallet  String?  @map("account_wallet")
   // Links the rows of one logical agent across chains (set by its owner; null = standalone).
   groupId        String?  @map("group_id") @db.Uuid
   // ERC-8004 identity on this chain (IdentityRegistry token id), once registered.
@@ -94,6 +98,7 @@ model Agent {
 
   @@index([chainId, role])
   @@index([groupId])
+  @@index([accountWallet])
   @@map("agents")
 }
 
@@ -331,6 +336,44 @@ model AiCall {
 
   @@index([createdAt])
   @@map("ai_calls")
+}
+
+// A person approving an agent's key as theirs, in a browser, with their own wallet (agent side:
+// `agenteco init`). Pending until approved or expired; only a hash of the device secret is kept.
+// The agent proves control of its key when it creates the link; the person proves theirs when
+// approving (an EIP-4361 message naming the code, the agent wallet and the chain).
+model DeviceLink {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// The short code the person types, "K7QP-M2XD".
+  userCode    String    @unique @map("user_code")
+  agentWallet String    @map("agent_wallet")
+  chainId     String    @map("chain_id")
+  role        String // buyer | seller
+  label       String
+  secretHash  String    @map("secret_hash")
+  status      String    @default("pending") // pending | approved | denied
+  ownerWallet String?   @map("owner_wallet")
+  /// Wrong approval attempts; the link is denied after a few.
+  attempts    Int       @default(0)
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
+  approvedAt  DateTime? @map("approved_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([agentWallet])
+  @@map("device_links")
+}
+
+// An approved link: this agent wallet belongs to this person. It carries no spending authority
+// either way. Revoked by the person (revokedAt); agents keep working, just unlinked.
+model AccountLink {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  agentWallet String    @unique @map("agent_wallet") // lowercase
+  ownerWallet String    @map("owner_wallet") // lowercase
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  @@index([ownerWallet])
+  @@map("account_links")
 }
 
 // Open capability registry: a capability a developer published, beyond the
