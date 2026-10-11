@@ -28,12 +28,11 @@ import {
   signTransactionMessageWithSigners,
   type Address,
 } from '@solana/kit'
-import { SPL_TOKEN_PROGRAM_ID, SOLANA_DEVNET_CHAIN_ID, buildInitializeInstruction } from '../src/chain/solana.ts'
+import { SPL_TOKEN_PROGRAM_ID, buildInitializeInstruction } from '../src/chain/solana.ts'
+import { assertTestCluster } from '../src/chain/solana-rpc.ts'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const LIB_RS = join(HERE, '../../solana/programs/agenteco_escrow/src/lib.rs')
-const DEVNET_GENESIS_PREFIX = SOLANA_DEVNET_CHAIN_ID.slice('solana:'.length)
-const TESTNET_GENESIS = '4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY'
 
 const { values: args } = parseArgs({
   options: {
@@ -94,12 +93,7 @@ async function main() {
   }
 
   const rpc = createSolanaRpc(args.rpc!)
-  const genesis = await rpc.getGenesisHash().send()
-  const local = ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(args.rpc!).hostname)
-  if (!genesis.startsWith(DEVNET_GENESIS_PREFIX) && genesis !== TESTNET_GENESIS && !local) {
-    console.error(`refusing: ${args.rpc} is not Solana devnet, testnet or a local validator (genesis ${genesis})`)
-    process.exit(1)
-  }
+  await assertTestCluster(args.rpc!)
   const mintAccount = await rpc.getAccountInfo(mint, { encoding: 'base64' }).send()
   if (!mintAccount.value || mintAccount.value.owner !== SPL_TOKEN_PROGRAM_ID) {
     console.error('refusing: the mint does not exist on this cluster or is not an SPL Token mint')

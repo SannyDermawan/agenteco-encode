@@ -211,6 +211,33 @@ fn setup(accept_timeout: i64, execution_window_min: i64, dispute_timeout: i64) -
     }
 }
 
+thread_local! {
+    static LAST_LOGS: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// (discriminator, payload) of every Anchor event the last transaction emitted.
+fn last_events() -> Vec<([u8; 8], Vec<u8>)> {
+    use base64::Engine;
+    LAST_LOGS.with(|l| {
+        l.borrow()
+            .iter()
+            .filter_map(|line| line.strip_prefix("Program data: "))
+            .filter_map(|b64| base64::engine::general_purpose::STANDARD.decode(b64.trim()).ok())
+            .filter(|d| d.len() >= 8)
+            .map(|d| (d[..8].try_into().unwrap(), d[8..].to_vec()))
+            .collect()
+    })
+}
+
+fn event_disc(name: &str) -> [u8; 8] {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(format!("event:{name}").as_bytes())[..8].try_into().unwrap()
+}
+
+fn emitted(name: &str) -> Option<Vec<u8>> {
+    last_events().into_iter().find(|(d, _)| *d == event_disc(name)).map(|(_, p)| p)
+}
+
 fn send(
     svm: &mut LiteSVM,
     ixs: &[Instruction],
@@ -223,10 +250,17 @@ fn send(
         signers,
         svm.latest_blockhash(),
     );
-    let result = svm
-        .send_transaction(tx)
-        .map(|_| ())
-        .map_err(|e| format!("{e:?}"));
+    let outcome = svm.send_transaction(tx);
+    let result = match outcome {
+        Ok(meta) => {
+            LAST_LOGS.with(|l| *l.borrow_mut() = meta.logs.clone());
+            Ok(())
+        }
+        Err(e) => {
+            LAST_LOGS.with(|l| l.borrow_mut().clear());
+            Err(format!("{e:?}"))
+        }
+    };
     // A retry of the same instruction must be a different transaction, or litesvm rejects
     // it as AlreadyProcessed and a "must fail" test would pass without ever reaching the
     // program's own checks.
@@ -989,4 +1023,111 @@ fn a_seller_cannot_start_after_the_accept_window() {
     let (_, escrow, _vault) = create_and_fund(&mut fx, AMOUNT, 60, 60, TASK_HASH);
     warp_seconds(&mut fx.svm, 10);
     fails_with(start_execution_result(&mut fx, escrow), 6007);
+}
+
+#[test]
+fn the_admin_role_moves_in_two_steps() {
+    let mut fx = setup(60, 1, 60);
+    let new_admin = Keypair::new();
+    fx.svm.airdrop(&new_admin.pubkey(), 1_000_000_000).unwrap();
+    let admin = fx.admin.insecure_clone();
+    let stranger = fx.seller.insecure_clone();
+    let arbiter = fx.arbiter.pubkey();
+
+    fails_with(admin_ix(&mut fx, &stranger, "transfer_admin", new_admin.pubkey().as_ref()), 6013);
+    admin_ix(&mut fx, &admin, "transfer_admin", new_admin.pubkey().as_ref()).expect("name the next admin");
+    assert!(emitted("AdminTransferStarted").is_some());
+
+    // Naming is not enough: nothing changes until the named address accepts.
+    fails_with(admin_ix(&mut fx, &new_admin, "set_arbiter", new_admin.pubkey().as_ref()), 6013);
+    fails_with(admin_ix(&mut fx, &stranger, "accept_admin", &[]), 6013);
+    admin_ix(&mut fx, &admin, "set_arbiter", arbiter.as_ref()).expect("the admin still rules until acceptance");
+
+    admin_ix(&mut fx, &new_admin, "accept_admin", &[]).expect("accept");
+    assert!(emitted("AdminUpdated").is_some());
+    fails_with(admin_ix(&mut fx, &admin, "set_arbiter", arbiter.as_ref()), 6013);
+    admin_ix(&mut fx, &new_admin, "set_arbiter", arbiter.as_ref()).expect("the new admin rules");
+    // The pending slot is cleared: the same call cannot be replayed.
+    fails_with(admin_ix(&mut fx, &new_admin, "accept_admin", &[]), 6013);
+
+    // Naming the zero address cancels a pending handover.
+    admin_ix(&mut fx, &new_admin, "transfer_admin", admin.pubkey().as_ref()).expect("name");
+    admin_ix(&mut fx, &new_admin, "transfer_admin", Pubkey::default().as_ref()).expect("cancel");
+    fails_with(admin_ix(&mut fx, &admin, "accept_admin", &[]), 6013);
+}
+
+#[test]
+fn every_state_change_emits_its_event_with_the_right_fields() {
+    let mut fx = setup(60, 1, 60);
+    let (id, escrow, vault) = create_and_fund(&mut fx, AMOUNT, 60, 60, TASK_HASH);
+    let funded = emitted("EscrowFunded").expect("EscrowFunded");
+    assert_eq!(u64::from_le_bytes(funded[..8].try_into().unwrap()), id);
+    assert_eq!(&funded[8..40], fx.buyer.pubkey().as_ref());
+    assert_eq!(&funded[40..72], fx.seller.pubkey().as_ref());
+    assert_eq!(&funded[72..104], fx.mint.as_ref());
+    assert_eq!(u64::from_le_bytes(funded[104..112].try_into().unwrap()), AMOUNT);
+    assert_eq!(&funded[112..144], &TASK_HASH);
+
+    start_execution(&mut fx, escrow);
+    assert!(emitted("ExecutionStarted").is_some());
+    mark_delivered(&mut fx, escrow, RESULT_HASH);
+    assert_eq!(&emitted("ResultDelivered").expect("ResultDelivered")[40..72], &RESULT_HASH);
+    raise_dispute(&mut fx, escrow, REASON_HASH).expect("dispute");
+    assert_eq!(&emitted("DisputeRaised").expect("DisputeRaised")[40..72], &REASON_HASH);
+    submit_dispute_response(&mut fx, escrow, RESPONSE_HASH).expect("respond");
+    assert_eq!(&emitted("DisputeResponseSubmitted").expect("DisputeResponseSubmitted")[40..72], &RESPONSE_HASH);
+
+    resolve_dispute(&mut fx, escrow, vault, false, RATIONALE_HASH).expect("rule for the buyer");
+    let ruled = emitted("DisputeResolved").expect("DisputeResolved");
+    assert_eq!(ruled[40], 0, "to_seller = false");
+    assert_eq!(&ruled[41..73], &RATIONALE_HASH);
+    let refunded = emitted("EscrowRefunded").expect("EscrowRefunded");
+    assert_eq!(u64::from_le_bytes(refunded[40..48].try_into().unwrap()), AMOUNT);
+    assert_eq!(refunded[48], 2, "REFUND_DISPUTE_RULING");
+    assert!(emitted("EscrowSettled").is_none(), "a refund is not a settlement");
+
+    rate_seller(&mut fx, escrow, 77).expect("rate");
+    let rated = emitted("SellerRated").expect("SellerRated");
+    assert_eq!(u64::from_le_bytes(rated[..8].try_into().unwrap()), id);
+    assert_eq!(&rated[8..40], fx.seller.pubkey().as_ref());
+    assert_eq!(&rated[40..72], fx.buyer.pubkey().as_ref());
+    assert_eq!(rated[72], 77);
+}
+
+#[test]
+fn a_settlement_event_carries_the_full_price_and_the_fee() {
+    let mut fx = setup(60, 1, 60);
+    let (_, escrow, vault) = create_and_fund(&mut fx, AMOUNT, 60, 60, TASK_HASH);
+    start_execution(&mut fx, escrow);
+    mark_delivered(&mut fx, escrow, RESULT_HASH);
+    accept_and_settle(&mut fx, escrow, vault).expect("settle");
+    let settled = emitted("EscrowSettled").expect("EscrowSettled");
+    assert_eq!(u64::from_le_bytes(settled[72..80].try_into().unwrap()), AMOUNT);
+    assert_eq!(u64::from_le_bytes(settled[80..88].try_into().unwrap()), FEE);
+}
+
+#[test]
+fn each_timeout_refund_names_its_reason() {
+    // accept timeout (0), execution timeout (1), dispute timeout (3)
+    let mut fx = setup(5, 1, 5);
+    let (_, escrow, vault) = create_and_fund(&mut fx, AMOUNT, 5, 60, TASK_HASH);
+    warp_seconds(&mut fx.svm, 10);
+    claim_accept_timeout(&mut fx, escrow, vault).expect("accept timeout");
+    assert_eq!(emitted("EscrowRefunded").unwrap()[48], 0);
+
+    fx.first_escrow_id = 2;
+    let (_, escrow, vault) = create_and_fund(&mut fx, AMOUNT, 5, 60, [3u8; 32]);
+    start_execution(&mut fx, escrow);
+    warp_seconds(&mut fx.svm, 10);
+    claim_execution_timeout(&mut fx, escrow, vault).expect("execution timeout");
+    assert_eq!(emitted("EscrowRefunded").unwrap()[48], 1);
+
+    fx.first_escrow_id = 3;
+    let (_, escrow, vault) = create_and_fund(&mut fx, AMOUNT, 60, 60, [4u8; 32]);
+    start_execution(&mut fx, escrow);
+    mark_delivered(&mut fx, escrow, RESULT_HASH);
+    raise_dispute(&mut fx, escrow, REASON_HASH).expect("dispute");
+    warp_seconds(&mut fx.svm, 10);
+    claim_dispute_timeout(&mut fx, escrow, vault).expect("dispute timeout");
+    assert_eq!(emitted("EscrowRefunded").unwrap()[48], 3);
 }

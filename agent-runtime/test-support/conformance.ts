@@ -28,15 +28,17 @@ export interface ConformanceRig {
   treasuryAddress: string
   feeBps: number
   decimals: number
-  /** Escrow windows the adapters were configured with, and the deployment's accept timeout (seconds). */
+  /** Escrow windows the adapters were configured with, and the deployment's timers (seconds). */
   executionWindow: number
   reviewWindow: number
   acceptTimeout: number
+  minWindow: number
+  disputeTimeout: number
   /** The buyer's signature of `message`, as the chain's wallets produce it. */
   signAsBuyer(message: string): Promise<string>
   /** Give the buyer settlement tokens (base units). */
   fundBuyer(amount: bigint): Promise<void>
-  /** Move the chain's clock forward. */
+  /** Move the chain's clock forward (a chain that cannot be warped waits). */
   advance(seconds: number): Promise<void>
 }
 
@@ -135,8 +137,15 @@ export async function runConformance(rig: ConformanceRig): Promise<void> {
   await assert.rejects(buyer.rateSeller(id1, 0), 'score 0')
   await assert.rejects(buyer.rateSeller(id1, 101), 'score 101')
   await assert.rejects(seller.rateSeller(id1, 100), 'only the buyer rates')
-  await buyer.rateSeller(id1, 90)
+  const headBeforeRating = await buyer.head()
+  const ratingTx = await buyer.rateSeller(id1, 90)
   assert.equal((await buyer.getEscrowDisputeInfo(id1)).rated, true)
+  // The rating is a recorded event: read back from its transaction, and from a block / slot range.
+  const expectedRating = { escrowId: id1, seller: buyer.normalizeAddress(sellerAddress), buyer: buyer.normalizeAddress(buyerAddress), score: 90, txHash: ratingTx }
+  const normalised = (events: Awaited<ReturnType<ChainAdapter['ratingsInTx']>>) =>
+    events.map((e) => ({ ...e, seller: buyer.normalizeAddress(e.seller), buyer: buyer.normalizeAddress(e.buyer) }))
+  assert.deepEqual(normalised(await buyer.ratingsInTx(ratingTx)), [expectedRating])
+  assert.deepEqual(normalised(await buyer.ratings(headBeforeRating, await buyer.head())), [expectedRating])
   await assert.rejects(buyer.rateSeller(id1, 90), 'one rating per escrow')
   assert.deepEqual(await buyer.getReputation(sellerAddress), { completedJobs: 1, failedJobs: 0, successRatePct: 100, ratingCount: 1, avgRatingScore: 90 })
 
@@ -145,11 +154,12 @@ export async function runConformance(rig: ConformanceRig): Promise<void> {
   await deliver(id2, 'task 2')
   await assert.rejects(buyer.raiseDispute(id2, `0x${'00'.repeat(32)}` as Hash32), 'a dispute needs a reason')
   await assert.rejects(seller.raiseDispute(id2, hash('reason 2')), 'only the buyer disputes')
-  await buyer.raiseDispute(id2, hash('reason 2'))
+  const disputeTx = await buyer.raiseDispute(id2, hash('reason 2'))
+  assert.deepEqual(await buyer.ratingsInTx(disputeTx), [], 'a transaction that rated nothing')
   assert.equal(await buyer.getEscrowStatus(id2), DISPUTED)
   const limits = await buyer.timerLimits()
-  assert.equal(limits.minWindow, BigInt(120))
-  assert.equal(limits.disputeTimeout, BigInt(900))
+  assert.equal(limits.minWindow, BigInt(rig.minWindow))
+  assert.equal(limits.disputeTimeout, BigInt(rig.disputeTimeout))
   assert.ok(limits.maxWindow > limits.minWindow)
   const info2 = await buyer.getEscrowDisputeInfo(id2)
   assert.ok(info2.disputedAt > BigInt(0))
