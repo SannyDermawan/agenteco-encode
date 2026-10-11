@@ -2,14 +2,86 @@ import assert from 'node:assert/strict'
 import type { Server } from 'node:http'
 import { after, before, describe, test } from 'node:test'
 import { solanaUnavailable, startSolanaTestChain, type SolanaTestChain } from '../../agent-runtime/test-support/litesvm.ts'
+import { localValidatorUnavailable, startLocalValidatorChain, VALIDATOR_TIMERS } from '../../agent-runtime/test-support/validator.ts'
 import { startTestDb, type TestDb } from '../test-support/db.ts'
 
 /**
  * The API serving a Solana chain as its DEFAULT chain next to an EVM one, in one process: the escrow
- * program runs in litesvm, the database is an in-memory Postgres. Wallets are base58 and sign with
- * ed25519; every escrow-keyed route reads the chain through the ChainAdapter interface.
+ * program runs in litesvm (default) or on a real solana-test-validator (SOLANA_LOCAL_VALIDATOR=1, ~2 min,
+ * and then the chain comes from the environment through SolanaRpcBackend, exactly as in production); the
+ * database is an in-memory Postgres. Wallets are base58 and sign with ed25519; every escrow-keyed route
+ * reads the chain through the ChainAdapter interface.
  */
-const skip = solanaUnavailable() ?? false
+const useValidator = process.env.SOLANA_LOCAL_VALIDATOR === '1'
+const skip = (useValidator ? localValidatorUnavailable() : solanaUnavailable()) ?? false
+
+/** What the tests need of a chain, whichever kind it is. */
+interface Rig {
+  signers: SolanaTestChain['signers']
+  programId: string
+  mint: string
+  /** Seconds a funded escrow waits for its seller before it can be refunded. */
+  acceptTimeout: number
+  mintTo(owner: string, amount: bigint): Promise<void>
+  advance(seconds: number): Promise<void>
+  /** Make the API's registry serve this chain (the settings an operator would set, or an in-process backend). */
+  configureApi(registry: typeof import('../../agent-runtime/src/chain/solana-registry.ts')): void
+  stop(): void
+}
+
+async function startRig(): Promise<Rig> {
+  if (useValidator) {
+    const v = await startLocalValidatorChain(250)
+    const suffix = SOL.replace(/[^A-Za-z0-9]/g, '_')
+    return {
+      signers: v.signers,
+      programId: v.programId,
+      mint: v.mint,
+      acceptTimeout: VALIDATOR_TIMERS.acceptTimeout,
+      mintTo: (owner, amount) => v.mintTo(owner as never, amount),
+      advance: (seconds) => new Promise((resolve) => setTimeout(resolve, (seconds + 1) * 1000)),
+      configureApi: () => {
+        Object.assign(process.env, {
+          [`RPC_URL__${suffix}`]: v.rpcUrl,
+          [`AGENT_ECO_PROGRAM__${suffix}`]: v.programId,
+          [`TOKEN_MINT__${suffix}`]: v.mint,
+        })
+      },
+      stop: v.stop,
+    }
+  }
+  const c = await startSolanaTestChain({ feeBps: 250 })
+  return {
+    signers: c.signers,
+    programId: c.programId,
+    mint: c.mint,
+    acceptTimeout: 120,
+    mintTo: (owner, amount) => c.mintTo(owner as never, amount),
+    advance: (seconds) => c.advance(seconds),
+    // The in-process chain stands in for the cluster: the config a preset would build, a litesvm backend.
+    configureApi: (registry) =>
+      registry.registerSolanaChain({
+        config: {
+          chainId: SOL,
+          programId: c.programId,
+          mint: c.mint,
+          tokenSymbol: 'USDC',
+          nativeSymbol: 'SOL',
+          explorerUrl: 'https://explorer.solana.com',
+          explorerName: 'Solana Explorer',
+          explorerQuery: '?cluster=devnet',
+          executionWindow: BigInt(300),
+          reviewWindow: BigInt(600),
+          firstEscrowId: BigInt(1),
+        },
+        rpcUrl: 'memory://litesvm',
+        testnet: true,
+        name: 'Solana Devnet (test)',
+        backend: c.backend,
+      }),
+    stop: () => {},
+  }
+}
 
 const SOL = 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1'
 const EVM = 'eip155:97'
@@ -17,7 +89,7 @@ const BRIEF = { text: 'Halo dunia', targetLanguage: 'en' }
 const RESULT = { translatedText: 'Hello world', targetLanguage: 'en' }
 
 describe('one API, a Solana chain first and an EVM chain second', { skip }, () => {
-  let chain: SolanaTestChain
+  let chain: Rig
   let db: TestDb
   let server: Server
   let api: string
@@ -26,9 +98,9 @@ describe('one API, a Solana chain first and an EVM chain second', { skip }, () =
   let registry: typeof import('../../agent-runtime/src/chain/solana-registry.ts')
   let hashes: typeof import('../../agent-runtime/src/shared/hashes.ts')
 
-  type Signer = SolanaTestChain['signers']['buyer']
-  const as = (role: keyof SolanaTestChain['signers']): Signer => chain.signers[role]
-  const adapter = (role: keyof SolanaTestChain['signers']) => registry.signerSolana(SOL, as(role))
+  type Signer = Rig['signers']['buyer']
+  const as = (role: keyof Rig['signers']): Signer => chain.signers[role]
+  const adapter = (role: keyof Rig['signers']) => registry.signerSolana(SOL, as(role))
 
   async function call(method: string, path: string, body?: unknown, signer?: Signer) {
     const res = await fetch(`${api}${path}`, {
@@ -58,33 +130,14 @@ describe('one API, a Solana chain first and an EVM chain second', { skip }, () =
   }
 
   before(async () => {
-    ;[chain, db] = await Promise.all([startSolanaTestChain({ feeBps: 250 }), startTestDb()])
+    ;[chain, db] = await Promise.all([startRig(), startTestDb()])
     Object.assign(process.env, { DATABASE_URL: db.url, CHAINS: 'solana-devnet,bsc-testnet', PUBLIC_API_URL: 'https://api.test' })
     ;[sol, registry, hashes] = await Promise.all([
       import('../../agent-runtime/src/chain/solana.ts'),
       import('../../agent-runtime/src/chain/solana-registry.ts'),
       import('../../agent-runtime/src/shared/hashes.ts'),
     ])
-    // The in-process chain stands in for the cluster: same config a preset would build, a litesvm backend.
-    registry.registerSolanaChain({
-      config: {
-        chainId: SOL,
-        programId: chain.programId,
-        mint: chain.mint,
-        tokenSymbol: 'USDC',
-        nativeSymbol: 'SOL',
-        explorerUrl: 'https://explorer.solana.com',
-        explorerName: 'Solana Explorer',
-        explorerQuery: '?cluster=devnet',
-        executionWindow: BigInt(300),
-        reviewWindow: BigInt(600),
-        firstEscrowId: BigInt(1),
-      },
-      rpcUrl: 'memory://litesvm',
-      testnet: true,
-      name: 'Solana Devnet (test)',
-      backend: chain.backend,
-    })
+    chain.configureApi(registry)
     const [{ app }, dbMod] = await Promise.all([import('./app.ts'), import('./db.ts')])
     prisma = dbMod.prisma
     await new Promise<void>((resolve) => {
@@ -98,6 +151,7 @@ describe('one API, a Solana chain first and an EVM chain second', { skip }, () =
     await new Promise((resolve) => server?.close(resolve))
     await prisma?.$disconnect()
     await db?.stop()
+    chain?.stop()
   })
 
   test('GET /chains lists the Solana chain first (the default) and the EVM chain second, each with its family', async () => {
@@ -270,7 +324,7 @@ describe('one API, a Solana chain first and an EVM chain second', { skip }, () =
 
     await runKeeperCycleOn(keeper, config)
     assert.equal(await keeper.getEscrowStatus(id), 1, 'not due yet: still FUNDED')
-    await chain.advance(121)
+    await chain.advance(chain.acceptTimeout + 1)
     await runKeeperCycleOn(keeper, config)
     assert.equal(await keeper.getEscrowStatus(id), 6, 'refunded after the accept timeout')
   })

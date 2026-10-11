@@ -61,7 +61,7 @@ export interface ValidatorChain {
   programId: Address
   mint: Address
   decimals: number
-  signers: Record<'deployer' | 'arbiter' | 'buyer' | 'seller' | 'keeper', KeyPairSigner>
+  signers: Record<'deployer' | 'arbiter' | 'buyer' | 'seller' | 'keeper' | 'other', KeyPairSigner>
   treasury: KeyPairSigner
   adapterFor(role: keyof ValidatorChain['signers'], overrides?: Partial<ConstructorParameters<typeof SolanaAdapter>[0]>): SolanaAdapter
   mintTo(owner: Address, amount: bigint): Promise<void>
@@ -95,7 +95,7 @@ export async function startLocalValidatorChain(feeBps = 250): Promise<ValidatorC
       }
     }
 
-    const roles = ['deployer', 'arbiter', 'buyer', 'seller', 'keeper'] as const
+    const roles = ['deployer', 'arbiter', 'buyer', 'seller', 'keeper', 'other'] as const
     const generated = await Promise.all([...roles, 'treasury' as const, 'mint' as const].map(() => generateKeyPairSigner()))
     const signers = Object.fromEntries(roles.map((r, i) => [r, generated[i]])) as ValidatorChain['signers']
     const treasury = generated[roles.length]
