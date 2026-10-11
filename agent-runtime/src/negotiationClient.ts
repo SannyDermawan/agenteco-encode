@@ -71,6 +71,16 @@ export async function respondToNegotiation(
   return parseOrThrow(res, 'Responding to negotiation')
 }
 
+/**
+ * Whether a failed response only means the other side moved first. The API reads a negotiation's
+ * status and its messages in separate queries, so a poll can see the other side's last answer
+ * while the status still says "open"; replying to it is then refused ("already accepted", "not your
+ * turn"). Reading the negotiation again settles it, so the caller does that instead of failing.
+ */
+export function isStaleNegotiationError(error: unknown): boolean {
+  return error instanceof Error && /Negotiation is already (accepted|rejected|expired)|It is not (buyer|seller)'s turn to respond|Negotiation expired:/.test(error.message)
+}
+
 export async function listNegotiationsForAgent(
   apiUrl: string,
   reader: WalletAccount,

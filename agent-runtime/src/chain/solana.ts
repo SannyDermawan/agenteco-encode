@@ -7,12 +7,11 @@
  * the API/SDK suites use. Chains are configured in ./solana-registry.ts. Nothing has run on devnet
  * yet: the program is not deployed (docs/SOLANA.md §9).
  */
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, createPrivateKey, createPublicKey, randomBytes } from 'node:crypto'
 import {
   AccountRole,
   address,
   createKeyPairSignerFromBytes,
-  createKeyPairSignerFromPrivateKeyBytes,
   createSignableMessage,
   getAddressDecoder,
   getAddressEncoder,
@@ -103,14 +102,25 @@ export function solanaAddressOfSecretKey(secretKey: Uint8Array): Address {
   return getAddressDecoder().decode(secretKey.slice(32))
 }
 
+// The fixed front of an ed25519 private key in PKCS#8 DER; the 32-byte seed follows.
+const ED25519_PKCS8_PREFIX = Buffer.from('302e020100300506032b657004220420', 'hex')
+
 /** A new random Solana secret key (64 bytes: seed, then public key), from the system's secure random source. */
-export async function generateSolanaSecretKey(): Promise<Uint8Array> {
-  const seed = new Uint8Array(randomBytes(32))
-  const signer = await createKeyPairSignerFromPrivateKeyBytes(seed)
-  const secret = new Uint8Array(64)
-  secret.set(seed)
-  secret.set(getAddressEncoder().encode(signer.address), 32)
-  return secret
+export function generateSolanaSecretKey(): Uint8Array {
+  const seed = randomBytes(32)
+  const privateKey = createPrivateKey({ key: Buffer.concat([ED25519_PKCS8_PREFIX, seed]), format: 'der', type: 'pkcs8' })
+  const spki = createPublicKey(privateKey).export({ format: 'der', type: 'spki' })
+  return new Uint8Array(Buffer.concat([seed, spki.subarray(spki.length - 32)]))
+}
+
+/** A Solana secret key as the base58 text wallets export (and `parseSolanaSecretKey` reads). */
+export function secretKeyToBase58(secretKey: Uint8Array): string {
+  return getBase58Decoder().decode(secretKey)
+}
+
+/** The bytes of a base58 secret key; no check that it is a consistent key (see parseSolanaSecretKey). */
+export function secretKeyFromBase58(text: string): Uint8Array {
+  return new Uint8Array(getBase58Encoder().encode(text))
 }
 
 /**
@@ -513,6 +523,7 @@ export class SolanaAdapter implements ChainAdapter {
   readonly chainId: ChainId
   readonly family = 'solana' as const
   readonly nativeSymbol: string
+  readonly nativeDecimals = 9 // lamports
   readonly explorer: ChainAdapter['explorer']
 
   private readonly backend: SolanaBackend

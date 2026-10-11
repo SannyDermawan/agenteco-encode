@@ -248,6 +248,33 @@ describe('hire() against createSellerAgent on Solana', { skip }, () => {
     await stopSellers()
   })
 
+  test('a community capability is published by a Solana wallet, sold by another, and hired on Solana', async () => {
+    const published = await sdk.registerCapability(
+      chain.secretKeys.other,
+      {
+        id: 'sentiment_sol',
+        name: 'Sentiment label',
+        description: 'Labels a short text as positive, negative or neutral.',
+        category: 'Data',
+        inputSchema: { type: 'object', properties: { text: { type: 'string', minLength: 1 } }, required: ['text'] },
+        outputSchema: { type: 'object', properties: { label: { type: 'string', enum: ['positive', 'negative', 'neutral'] } }, required: ['label'] },
+        rubric: 'The label must match the tone of the text.',
+        examples: [],
+      },
+      api
+    )
+    assert.equal(published.id, 'sentiment_sol')
+    const row = await prisma.capability.findUnique({ where: { id: 'sentiment_sol' } })
+    assert.equal(row?.ownerWallet, address('other'), 'the publisher is the Solana wallet, exactly as base58')
+
+    const { listing } = await startSeller('seller', { name: 'Sentiment seller', capability: 'sentiment_sol', handle: async () => ({ label: 'positive' }) })
+    const result = await sdk.hire(hireOptions({ capability: 'sentiment_sol', brief: { text: 'I love this' }, sellerId: listing.id, review: () => ({ accept: true }) }))
+    assert.equal(result.outcome, 'settled')
+    assert.deepEqual(result.result, { label: 'positive' })
+    assert.equal(await adapter('buyer').getEscrowStatus(result.escrowId), SETTLED)
+    await stopSellers()
+  })
+
   test('a seller that never delivers is refunded by the program, not paid', async () => {
     const { listing } = await startSeller('other', { handle: async () => new Promise<Record<string, unknown>>(() => {}) })
     const before = await balance('buyer')

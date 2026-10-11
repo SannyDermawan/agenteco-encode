@@ -1,7 +1,6 @@
-import { formatEther, formatUnits } from 'viem'
-import { privateKeyToAccount } from 'viem/accounts'
+import { formatUnits } from 'viem'
 import { buildAuthHeaders } from '../../../agent-runtime/src/authHeaders.ts'
-import { servedChainIds } from '../../../agent-runtime/src/chain/registry.ts'
+import { accountOf } from '../../../agent-runtime/src/sdk/wallet.ts'
 import type { Ctx } from '../ctx.ts'
 import { capsFor } from '../config.ts'
 import { hasKey } from '../keystore.ts'
@@ -22,41 +21,44 @@ interface Listing {
 /** `agenteco status`: who the agent is, whether it is linked, what it lists, what it holds, what it may spend. */
 export async function status(ctx: Ctx): Promise<number> {
   const { io } = ctx
-  if (!hasKey(io.home, ctx.keyName)) {
+  const keys = (['evm', 'solana'] as const).filter((family) => hasKey(io.home, ctx.keyName, family)).map((family) => ctx.key(family))
+  if (!keys.length) {
     io.out('No agent key yet. Run `agenteco init`.')
     return 1
   }
-  const { address, privateKey } = ctx.key()
-  io.out(`agent wallet: ${address}`)
+  for (const key of keys) io.out(`agent wallet${key.family === 'solana' ? ' (Solana)' : ''}: ${key.address}`)
   io.out(`home: ${io.home}`)
   io.out(`API: ${ctx.api}`)
 
   const link = loadState(io.home).link
   io.out(`account link: ${link?.status === 'approved' ? `linked to ${link.ownerWallet}` : link?.status === 'pending' ? `waiting for approval of code ${link.userCode}` : 'not linked'}`)
 
-  try {
-    const res = await fetch(`${ctx.api}/agents?ownerWallet=${address}`, { headers: await buildAuthHeaders(privateKeyToAccount(privateKey)) })
-    if (res.ok) {
-      const listings = (await res.json()) as Listing[]
-      if (!listings.length) io.out('listings: none')
-      for (const l of listings) {
-        io.out(`listing: "${l.name}" (${l.role}, ${l.chainId ?? 'default chain'}) ${l.isOnline ? 'online' : 'offline'}, ${l.price}, ${l.capabilities.join(',')}${l.erc8004AgentId ? `, ERC-8004 #${l.erc8004AgentId}` : ''}`)
+  for (const key of keys) {
+    try {
+      const res = await fetch(`${ctx.api}/agents?ownerWallet=${key.address}`, { headers: await buildAuthHeaders(await accountOf(key.privateKey)) })
+      if (res.ok) {
+        const listings = (await res.json()) as Listing[]
+        if (!listings.length) io.out(`listings${keys.length > 1 ? ` (${key.family})` : ''}: none`)
+        for (const l of listings) {
+          io.out(`listing: "${l.name}" (${l.role}, ${l.chainId ?? 'default chain'}) ${l.isOnline ? 'online' : 'offline'}, ${l.price}, ${l.capabilities.join(',')}${l.erc8004AgentId ? `, ERC-8004 #${l.erc8004AgentId}` : ''}`)
+        }
+      } else {
+        io.out(`listings: could not read (${res.status})`)
       }
-    } else {
-      io.out(`listings: could not read (${res.status})`)
+    } catch (error) {
+      io.out(`listings: could not read (${(error as Error).message.split('\n')[0]})`)
     }
-  } catch (error) {
-    io.out(`listings: could not read (${(error as Error).message.split('\n')[0]})`)
   }
 
-  for (const chainId of servedChainIds()) {
+  for (const chainId of ctx.knownChains()) {
     try {
-      const chain = ctx.adapter(chainId)
+      const chain = await ctx.adapter(chainId)
       const token = await chain.token()
+      const address = ctx.keyFor(chainId).address
       const [native, balance] = await Promise.all([chain.nativeBalance(address), chain.tokenBalance(address)])
       const caps = capsFor(ctx.config, chainId)
       io.out(
-        `${chainId}: ${formatEther(native)} ${chain.nativeSymbol}, ${formatUnits(balance, token.decimals)} ${token.symbol}; ` +
+        `${chainId}: ${formatUnits(native, chain.nativeDecimals)} ${chain.nativeSymbol}, ${formatUnits(balance, token.decimals)} ${token.symbol}; ` +
           `caps ${caps.maxPerJob}/job, ${caps.maxPerDay}/day (${spentToday(io.home, chainId)} reserved or spent today)`
       )
     } catch (error) {

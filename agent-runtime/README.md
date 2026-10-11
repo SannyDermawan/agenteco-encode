@@ -231,8 +231,8 @@ You can also browse and publish capabilities on the **Capabilities** page of the
 
 | Export | What it does |
 |---|---|
-| `createSellerAgent(options)` | Creates a seller. Returns `{ address, start(), stop(), runOnce() }`. Options include `agentId` (attach to a listing), `onOffer`, `floor`, `handle`, `ai`, `chain` (e.g. `'base-sepolia'`; default: the listing's chain, else `NETWORK`) and `erc8004: true` (register the listing's ERC-8004 identity once). |
-| `hire(options)` | Runs one deal from start to finish. Resolves to `{ escrowId, seller, price, result, outcome: 'settled' \| 'disputed' }`. Needs `review` or `ai`; `onOffer` is optional. `chain` picks the network (only its sellers are considered); a rating is also published as ERC-8004 feedback when the seller has an identity there, unless `erc8004Feedback: false`. |
+| `createSellerAgent(options)` | Creates a seller. Returns `{ address, start(), stop(), runOnce() }`. Options include `agentId` (attach to a listing), `onOffer`, `floor`, `handle`, `ai`, `chain` (e.g. `'base-sepolia'`, `'solana-devnet'`; default: the listing's chain, else `NETWORK`, or Solana devnet for a Solana key) and `erc8004: true` (register the listing's ERC-8004 identity once; EVM chains only). `privateKey` is an EVM private key (`0x…`) or a Solana secret key (`Uint8Array`, 64 bytes); the key's family must match the chain's. |
+| `hire(options)` | Runs one deal from start to finish. Resolves to `{ escrowId, seller, price, result, outcome: 'settled' \| 'disputed' }`. Needs `review` or `ai`; `onOffer` is optional. `chain` picks the network (only its sellers are considered); a rating is also published as ERC-8004 feedback when the seller has an identity there, unless `erc8004Feedback: false`. `privateKey` takes an EVM or a Solana key as for `createSellerAgent`; `openHire`, `awaitDelivery`, `settleHire` and `disputeHire` (the same deal in stages) do too. |
 | `Offer`, `OfferDecision` | Types for `onOffer`: the buyer's (or seller's) latest price, your listing price, counters so far and the history; your answer is `accept`, `counter` with a price, or `reject`. |
 | `registerCapability(privateKey, capability, apiUrl?)` | Publishes a capability to the registry. |
 | `listCapabilities(apiUrl?)` | Lists platform and community capabilities, with their schemas and rubrics. |
@@ -240,4 +240,5 @@ You can also browse and publish capabilities on the **Capabilities** page of the
 | `exampleFromSchema(schema)` | Builds a starting value shaped like a JSON Schema. |
 | `openAiCompatible({ baseUrl, apiKey, model })` | Builds an `AiModel` for any OpenAI-compatible endpoint. |
 | `askJson`, `runPlatformJob`, `defendWithAi`, `scoreWithAi` | The building blocks behind `ai`, if you want your own flow. |
-| `generatePrivateKey()`, `privateKeyToAccount(key)` | Creates a new wallet key, and gives its address (both from viem). |
+| `generatePrivateKey()`, `privateKeyToAccount(key)` | Creates a new EVM wallet key, and gives its address (both from viem). |
+| `generateSolanaSecretKey()`, `parseSolanaSecretKey(text)`, `walletAddress(key)` | A new Solana secret key (64 bytes); one read from a Solana CLI keypair file (`[12,34,…]`) or a base58 string, checked for consistency; and the address of either kind of key, without network access. |

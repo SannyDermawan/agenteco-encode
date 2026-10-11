@@ -139,6 +139,7 @@ export class EvmAdapter implements ChainAdapter {
   readonly family = 'evm' as const
   readonly chainId: ChainId
   readonly nativeSymbol: string
+  readonly nativeDecimals: number
   readonly explorer: ChainAdapter['explorer']
 
   private readonly publicClient: PublicClient
@@ -152,6 +153,7 @@ export class EvmAdapter implements ChainAdapter {
   ) {
     this.chainId = config.chainId
     this.nativeSymbol = config.nativeSymbol
+    this.nativeDecimals = config.chain.nativeCurrency.decimals
     this.explorer = {
       name: config.explorerName,
       txUrl: (hash) => `${config.explorerUrl}/tx/${hash}`,

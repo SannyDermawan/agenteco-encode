@@ -34,7 +34,7 @@ export async function sell(ctx: Ctx, args: string[]): Promise<number> {
   const price = Number(values.price)
   if (!(price > 0)) throw new CliError('--price must be above zero.', 64)
   const agent = createSellerAgent({
-    privateKey: ctx.key().privateKey,
+    privateKey: ctx.keyFor(chainId).privateKey,
     apiUrl: ctx.api,
     chain: chainId,
     name: values.name ?? `${values.capability} seller`,

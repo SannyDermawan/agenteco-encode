@@ -4,7 +4,7 @@ import type { EvmAdapter } from '../chain/evm.ts'
 import { PRIMARY_CHAIN_ID } from '../chain/registry.ts'
 import type { ChainAdapter } from '../chain/types.ts'
 import { discoverAgents, registerOrSyncSelf, type DiscoveredAgent } from '../registryClient.ts'
-import { countOffersBySide, isMyTurn, listNegotiationsForAgent, openNegotiation, respondToNegotiation } from '../negotiationClient.ts'
+import { countOffersBySide, isMyTurn, isStaleNegotiationError, listNegotiationsForAgent, openNegotiation, respondToNegotiation } from '../negotiationClient.ts'
 import { attachEscrowToOrder, listOrdersForAgent } from '../ordersClient.ts'
 import { hireWithTask } from '../tasksClient.ts'
 import { getEscrowResult } from '../resultsClient.ts'
@@ -287,13 +287,19 @@ async function openStage(options: OpenHireOptions, deadline: number | undefined)
       decision = policy.decideOnOffer(offered, countersSoFar)
     }
     log(`seller asks ${offered} → ${decision.action}${decision.action === 'counter' ? ` ${decision.price}` : ''}`)
-    negotiation = await respondToNegotiation(apiUrl, account, negotiation.id, {
-      side: 'buyer',
-      action: decision.action,
-      ...(decision.action === 'counter' ? { price: decision.price } : {}),
-      ...(decision.reason ? { reason: decision.reason } : {}),
-      source,
-    })
+    try {
+      negotiation = await respondToNegotiation(apiUrl, account, negotiation.id, {
+        side: 'buyer',
+        action: decision.action,
+        ...(decision.action === 'counter' ? { price: decision.price } : {}),
+        ...(decision.reason ? { reason: decision.reason } : {}),
+        source,
+      })
+    } catch (error) {
+      // The seller's answer landed between our read and our reply: read the negotiation again.
+      if (!isStaleNegotiationError(error)) throw error
+      log('the negotiation moved on while replying — reading it again')
+    }
   }
   if (negotiation.status === 'expired') throw new Error(`No deal with ${seller.name}: the negotiation expired (a side stayed silent too long).`)
   if (negotiation.status !== 'accepted') throw new Error(`No deal with ${seller.name}: the prices never met.`)

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
-import { chainConfig } from '../../../agent-runtime/src/chain/registry.ts'
+import { escrowContract } from '../chains.ts'
 import { CliError, type Ctx } from '../ctx.ts'
 import type { JobRecord } from '../jobs.ts'
 import { SpendCapError } from '../spend.ts'
@@ -21,8 +21,7 @@ export function printJob(ctx: Ctx, job: JobRecord, withResult = true): void {
   const { io } = ctx
   io.out(describe(job))
   if (job.handle) {
-    const cfg = chainConfig(job.chainId)
-    io.out(`contract: ${cfg.explorerUrl}/address/${cfg.agentEco}`)
+    io.out(`contract: ${escrowContract(job.chainId).url}`)
   }
   if (withResult && job.result && (job.stage === 'delivered' || job.stage === 'settled' || job.stage === 'disputed')) {
     io.out(job.problems?.length ? `automatic checks FAILED: ${job.problems.join('; ')}` : 'automatic checks passed (hash matches the chain, output fits the capability schema)')

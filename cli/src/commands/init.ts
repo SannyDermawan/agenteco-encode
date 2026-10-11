@@ -1,7 +1,8 @@
 import { parseArgs } from 'node:util'
-import { formatEther, formatUnits } from 'viem'
-import { privateKeyToAccount } from 'viem/accounts'
+import { formatUnits } from 'viem'
+import { chainFamily } from '../../../agent-runtime/src/chain/multi.ts'
 import { registerOrSyncSelf } from '../../../agent-runtime/src/index.ts'
+import { accountOf } from '../../../agent-runtime/src/sdk/wallet.ts'
 import { CliError, type Ctx } from '../ctx.ts'
 import { assertChainAllowed } from '../config.ts'
 import { faucetGuide } from '../faucets.ts'
@@ -37,25 +38,31 @@ export async function init(ctx: Ctx, args: string[]): Promise<number> {
   const { io } = ctx
   const chainId = ctx.chain(values.chain)
   assertChainAllowed(ctx.config, chainId)
+  const family = chainFamily(chainId)
   const label = values.name ?? (role === 'seller' ? 'AgentEco seller' : 'AgentEco buyer')
   const waitMs = Math.max(0, Number(values.wait) || 0) * 1000
 
   io.out(`AgentEco setup — ${chainId}, API ${ctx.api}`)
 
   // 1. The key.
-  if (hasKey(io.home, ctx.keyName)) {
-    io.out(`[1/4] key: using the existing agent wallet ${keyAddress(io.home, ctx.keyName)}`)
+  if (hasKey(io.home, ctx.keyName, family)) {
+    io.out(`[1/4] key: using the existing ${family === 'solana' ? 'Solana ' : ''}agent wallet ${keyAddress(io.home, ctx.keyName, family)}`)
   } else {
-    const address = createKey(io.home, ctx.keyName)
-    io.out(`[1/4] key: created the agent wallet ${address}`)
+    const address = createKey(io.home, ctx.keyName, family)
+    io.out(`[1/4] key: created the ${family === 'solana' ? 'Solana ' : ''}agent wallet ${address}`)
     io.out(`      It is stored in ${io.home}/keys with owner-only permissions. It is never printed or sent anywhere.`)
   }
-  const { privateKey, address } = ctx.key()
+  const key = ctx.key(family)
+  const { address } = key
 
   // 2. The account link.
-  if (values['skip-link']) {
+  if (family === 'solana') {
+    // The API links EVM agents to a person's account; it answers a Solana agent with a clear 400.
+    io.out('[2/4] account link: not available on Solana yet. The agent works under its own wallet; nothing is lost by skipping it.')
+  } else if (values['skip-link']) {
     io.out('[2/4] account link: skipped (--skip-link). The agent will be listed under its own key only.')
   } else {
+    const privateKey = ctx.key().privateKey
     const state = loadState(io.home)
     let link: LinkRecord | undefined = state.link
     const reusable = link && link.chainId === chainId && link.role === role && (link.status === 'approved' || (link.status === 'pending' && new Date(link.expiresAt) > io.now()))
@@ -123,7 +130,7 @@ export async function init(ctx: Ctx, args: string[]): Promise<number> {
         service: label,
         basePrice: price,
       },
-      { apiUrl: ctx.api, account: privateKeyToAccount(privateKey), walletAddress: address, hosted: false, chainId }
+      { apiUrl: ctx.api, account: await accountOf(key.privateKey), walletAddress: address, hosted: false, chainId }
     )
     io.out(`[3/4] listing: "${label}" is registered as a seller of ${values.capability} at ${price} (agent ${listing.id}). It goes online when \`agenteco sell\` runs.`)
   } else if (role === 'seller') {
@@ -136,9 +143,9 @@ export async function init(ctx: Ctx, args: string[]): Promise<number> {
   io.out('[4/4] funding:')
   io.out(`      agent wallet: ${address}`)
   try {
-    const chain = ctx.adapter(chainId)
+    const chain = await ctx.adapter(chainId)
     const [native, token] = await Promise.all([chain.nativeBalance(address), chain.token().then(async (t) => ({ ...t, balance: await chain.tokenBalance(address) }))])
-    io.out(`      balance: ${formatEther(native)} ${chain.nativeSymbol}, ${formatUnits(token.balance, token.decimals)} ${token.symbol}`)
+    io.out(`      balance: ${formatUnits(native, chain.nativeDecimals)} ${chain.nativeSymbol}, ${formatUnits(token.balance, token.decimals)} ${token.symbol}`)
   } catch (error) {
     io.out(`      (could not read balances: ${(error as Error).message.split('\n')[0]})`)
   }

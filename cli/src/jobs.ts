@@ -1,8 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Hex } from 'viem'
-import { chainConfig, signerChain } from '../../agent-runtime/src/chain/registry.ts'
+import { openWallet, type WalletKey } from '../../agent-runtime/src/sdk/wallet.ts'
 import {
   UNPUBLISHED_REASON,
   awaitDelivery,
@@ -64,7 +63,8 @@ export interface StartOptions {
 export interface JobsOptions {
   home: string
   config: Config
-  privateKey: Hex
+  /** The agent's key for a chain: an EVM private key or a Solana secret key, by the chain's family. */
+  keyFor(chainId: string): WalletKey
   apiUrl: string
   pollMs?: number
   log?: (message: string) => void
@@ -81,8 +81,8 @@ export class Jobs {
 
   constructor(private readonly o: JobsOptions) {}
 
-  private ctx(): HireContext {
-    return { privateKey: this.o.privateKey, apiUrl: this.o.apiUrl, pollMs: this.o.pollMs, timeoutMs: 24 * 60 * 60_000, log: this.o.log ?? (() => {}) }
+  private ctx(chainId: string): HireContext {
+    return { privateKey: this.o.keyFor(chainId), apiUrl: this.o.apiUrl, pollMs: this.o.pollMs, timeoutMs: 24 * 60 * 60_000, log: this.o.log ?? (() => {}) }
   }
 
   private save(job: JobRecord, patch: Partial<JobRecord>): JobRecord {
@@ -110,6 +110,11 @@ export class Jobs {
     if (!(opts.maxBudget > 0)) throw new JobError('maxBudget must be above zero.')
     const chainId = resolveChain(opts.chain ?? this.o.config.defaultChain ?? 'bsc-testnet')
     assertChainAllowed(this.o.config, chainId)
+    try {
+      this.o.keyFor(chainId) // no key for this chain's family yet: say so before a budget is reserved
+    } catch (error) {
+      throw new JobError((error as Error).message)
+    }
     const id = randomBytes(6).toString('hex')
     reserve(this.o.home, this.o.config, { jobId: id, chainId, amount: opts.maxBudget, symbol: tokenSymbolFor(chainId) })
     ensureDir(jobsDir(this.o.home))
@@ -124,7 +129,7 @@ export class Jobs {
     let current = job
     try {
       const handle = await openHire({
-        ...this.ctx(),
+        ...this.ctx(job.chainId),
         capability: opts.capability,
         brief: opts.brief,
         criteria: opts.criteria,
@@ -147,7 +152,7 @@ export class Jobs {
   private async follow(job: JobRecord): Promise<void> {
     if (!job.handle) return
     try {
-      const delivery = await awaitDelivery(job.handle, this.ctx())
+      const delivery = await awaitDelivery(job.handle, this.ctx(job.handle.chainId))
       if (delivery.state === 'refunded') this.save(job, { stage: 'refunded' })
       else if (delivery.state === 'unpublished') this.save(job, { stage: 'unpublished', reviewDeadline: await this.reviewDeadline(job.handle) })
       else this.save(job, { stage: 'delivered', result: delivery.result, problems: delivery.problems, reviewDeadline: await this.reviewDeadline(job.handle) })
@@ -158,7 +163,7 @@ export class Jobs {
   }
 
   private async reviewDeadline(handle: HireHandle): Promise<string> {
-    const chain = signerChain(handle.chainId, this.o.privateKey)
+    const chain = (await openWallet(handle.chainId, this.o.keyFor(handle.chainId))).adapter
     const id = BigInt(handle.escrowId)
     const [{ deliveredAt }, { reviewWindow }] = await Promise.all([chain.getEscrowTimestamps(id), chain.getEscrowWindows(id)])
     return new Date(Number(deliveredAt + reviewWindow) * 1000).toISOString()
@@ -211,7 +216,7 @@ export class Jobs {
   async settle(id: string, opts: { rating?: number } = {}): Promise<JobRecord> {
     const job = this.needDelivered(id, ['delivered'])
     if (job.problems?.length) throw new JobError(`Job ${id} failed automatic checks (${job.problems.join('; ')}), so it cannot be accepted. Dispute it.`)
-    const outcome = await settleHire(job.handle, this.ctx(), { rating: opts.rating })
+    const outcome = await settleHire(job.handle, this.ctx(job.handle.chainId), { rating: opts.rating })
     return this.save(job, { stage: 'settled', settle: outcome })
   }
 
@@ -220,7 +225,7 @@ export class Jobs {
     const job = this.needDelivered(id, ['delivered', 'unpublished'])
     const text = reason?.trim() || (job.stage === 'unpublished' ? UNPUBLISHED_REASON : '')
     if (!text) throw new JobError('A dispute needs a reason (at least 10 characters).')
-    await disputeHire(job.handle, this.ctx(), text)
+    await disputeHire(job.handle, this.ctx(job.handle.chainId), text)
     return this.save(job, { stage: 'disputed' })
   }
 }

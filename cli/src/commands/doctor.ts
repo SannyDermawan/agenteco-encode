@@ -1,9 +1,11 @@
 import { accessSync, constants, existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { readChain, servedChainIds } from '../../../agent-runtime/src/chain/registry.ts'
+import { chainFamily, readEvm, servedChainIds } from '../../../agent-runtime/src/chain/multi.ts'
+import { solanaEntry } from '../../../agent-runtime/src/chain/solana-registry.ts'
+import { SolanaRpcBackend } from '../../../agent-runtime/src/chain/solana-rpc.ts'
 import type { Ctx } from '../ctx.ts'
 import { ensureDir, isReadableByOthers } from '../home.ts'
-import { hasKey } from '../keystore.ts'
+import { hasKey, keyFile } from '../keystore.ts'
 
 /** `agenteco doctor`: read-only checks of the machine and the network. Exit 1 when something it needs is broken. */
 export async function doctor(ctx: Ctx): Promise<number> {
@@ -25,12 +27,13 @@ export async function doctor(ctx: Ctx): Promise<number> {
     line('FAIL', `cannot write to ${io.home}`)
   }
 
-  if (hasKey(io.home, ctx.keyName)) {
-    const path = join(io.home, 'keys', `${ctx.keyName}.json`)
-    line(isReadableByOthers(path) ? 'FAIL' : 'ok', isReadableByOthers(path) ? `${path} can be read by other users (chmod 600)` : 'the key file is private to this user')
-  } else {
-    line('warn', 'no agent key yet (`agenteco init` creates one)')
+  const families = (['evm', 'solana'] as const).filter((family) => hasKey(io.home, ctx.keyName, family))
+  for (const family of families) {
+    const path = keyFile(io.home, ctx.keyName, family)
+    const label = families.length > 1 ? `the ${family} key file` : 'the key file'
+    line(isReadableByOthers(path) ? 'FAIL' : 'ok', isReadableByOthers(path) ? `${path} can be read by other users (chmod 600)` : `${label} is private to this user`)
   }
+  if (!families.length) line('warn', 'no agent key yet (`agenteco init` creates one)')
   line(existsSync(join(io.home, 'config.json')) ? 'ok' : 'warn', existsSync(join(io.home, 'config.json')) ? 'config.json found' : 'no config.json: default spend caps apply (testnet 1/job and 5/day, mainnet 0)')
 
   io.out(`API ${ctx.api}`)
@@ -49,9 +52,16 @@ export async function doctor(ctx: Ctx): Promise<number> {
     // already reported above
   }
 
-  for (const chainId of servedChainIds()) {
+  for (const chainId of new Set([...servedChainIds(), ...ctx.knownChains()])) {
     try {
-      const chain = readChain(chainId)
+      if (chainFamily(chainId) === 'solana') {
+        const backend = solanaEntry(chainId).backend
+        if (!(backend instanceof SolanaRpcBackend)) continue
+        const genesis = await backend.getGenesisHash()
+        line(genesis.startsWith(chainId.slice('solana:'.length)) ? 'ok' : 'FAIL', `${chainId}: RPC answers with genesis ${genesis.slice(0, 8)}…`)
+        continue
+      }
+      const chain = readEvm(chainId)
       const actual = await chain.rpcChainId()
       line(actual === chain.config.chain.id ? 'ok' : 'FAIL', `${chainId}: RPC answers with chain id ${actual}`)
     } catch (error) {
