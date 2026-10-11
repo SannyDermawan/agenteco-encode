@@ -38,7 +38,6 @@ const LIB_RS = join(HERE, '../../solana/programs/agenteco_escrow/src/lib.rs')
 /** The id the program was compiled with: its `declare_id!`, so another program keypair needs no change here. */
 export const TEST_PROGRAM_ID = address(/declare_id!\("([1-9A-HJ-NP-Za-km-z]{32,44})"\)/.exec(readFileSync(LIB_RS, 'utf8'))![1])
 const ATA_PROGRAM_ID = address('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
-const START_TIME = 1_700_000_000n
 
 /** Why the Solana tests cannot run here, or null when they can. */
 export function solanaUnavailable(): string | null {
@@ -145,7 +144,8 @@ export async function startSolanaTestChain(opts: { decimals?: number; feeBps?: n
 
   // litesvm starts at unix time 0; the program (like AgentEco.sol) reads 0 as "never happened".
   const clock = svm.getClock()
-  clock.unixTimestamp = START_TIME
+  // The wall clock, as on anvil: code that compares chain deadlines with Date.now() (the SDK seller, the keeper) sees one time.
+  clock.unixTimestamp = BigInt(Math.floor(Date.now() / 1000))
   svm.setClock(clock)
 
   const roles = ['deployer', 'arbiter', 'buyer', 'seller', 'keeper', 'other'] as const
