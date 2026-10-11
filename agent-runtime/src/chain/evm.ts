@@ -15,6 +15,7 @@ import {
   type WalletClient,
 } from 'viem'
 import { AGENT_ECO_ABI, ARBITER_COUNCIL_ABI } from '../shared/abi.generated.ts'
+import { sameWallet } from '../shared/wallets.ts'
 import { IDENTITY_REGISTRY_ABI, REPUTATION_REGISTRY_ABI, type Erc8004Registries } from '../shared/erc8004.ts'
 import { ERC20_ABI } from '../onchain/abi.ts'
 import type {
@@ -791,7 +792,6 @@ const RESULT_HASH_ABI = [
 
 /** Whether `address` can rule: it is the arbiter wallet, or a member of the arbiter council. */
 export function canRule(setup: { arbiter: string; council: { members: string[] } | null }, address: string): boolean {
-  const a = address.toLowerCase()
-  if (setup.council) return setup.council.members.some((m) => m.toLowerCase() === a)
-  return setup.arbiter.toLowerCase() === a
+  if (setup.council) return setup.council.members.some((m) => sameWallet(m, address))
+  return sameWallet(setup.arbiter, address)
 }

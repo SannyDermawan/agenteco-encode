@@ -1,5 +1,5 @@
 import { evmAdapterFor } from '../../../agent-runtime/src/chain/default.ts'
-import type { EvmAdapter } from '../../../agent-runtime/src/chain/evm.ts'
+import type { ChainAdapter } from '../../../agent-runtime/src/chain/types.ts'
 import type { Clients } from '../clients.ts'
 import type { KeeperConfig } from '../config.ts'
 import { log, logError } from '../log.ts'
@@ -13,7 +13,7 @@ const ACTION_REASON: Record<NonNullable<KeeperAction>, string> = {
 }
 
 async function submitKeeperTx(
-  chain: EvmAdapter,
+  chain: ChainAdapter,
   config: KeeperConfig,
   escrowId: bigint,
   functionName: NonNullable<KeeperAction>
@@ -43,7 +43,7 @@ async function submitKeeperTx(
   }
 }
 
-async function processEscrow(chain: EvmAdapter, config: KeeperConfig, escrowId: bigint, status: number): Promise<void> {
+async function processEscrow(chain: ChainAdapter, config: KeeperConfig, escrowId: bigint, status: number): Promise<void> {
   try {
     // Only the flag that matters for this status is read (one RPC call, not four).
     const flag = FLAG_FOR_STATUS[status]
@@ -68,7 +68,7 @@ async function processEscrow(chain: EvmAdapter, config: KeeperConfig, escrowId: 
  * a slow or stuck transaction can't cause overlapping submissions. `chain` signs
  * with the keeper's wallet.
  */
-export async function runKeeperCycleOn(chain: EvmAdapter, config: KeeperConfig, label = ''): Promise<void> {
+export async function runKeeperCycleOn(chain: ChainAdapter, config: KeeperConfig, label = ''): Promise<void> {
   const escrows = await chain.listEscrows()
   const live = escrows.filter((e) => FLAG_FOR_STATUS[e.status] !== undefined)
   if (live.length) log(`${label}${escrows.length} escrows, ${live.length} live — checking timeouts`)

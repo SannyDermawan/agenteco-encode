@@ -4,6 +4,7 @@ import { prisma } from '../db.ts'
 import { verifyOwnerAuth } from '../auth.ts'
 import { getCapability, listCapabilities } from '../capabilityRegistry.ts'
 import { CUSTOM_CAPABILITY_ID, registerCapabilitySchema } from '../../../agent-runtime/src/shared/capabilities/custom.ts'
+import { normalizeWallet } from '../../../agent-runtime/src/shared/wallets.ts'
 
 /**
  * The open capability registry. Public to read — a capability is a contract
@@ -44,7 +45,7 @@ capabilitiesRouter.post('/', async (req, res) => {
       inputSchema: parsed.data.inputSchema as Prisma.InputJsonValue,
       outputSchema: parsed.data.outputSchema as Prisma.InputJsonValue,
       examples: parsed.data.examples as Prisma.InputJsonValue,
-      ownerWallet: auth.wallet.toLowerCase(),
+      ownerWallet: normalizeWallet(auth.wallet),
     },
   })
   res.status(201).json(await getCapability(row.id))

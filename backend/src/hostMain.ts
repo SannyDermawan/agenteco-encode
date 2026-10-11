@@ -4,7 +4,7 @@ import { runSellerHostCycleOnce } from './host/sellerTaskHost.ts'
 import { initArbiter, runArbiterCycleOnce } from './host/arbiter.ts'
 import { indexRecentRatings } from './ratings.ts'
 import { installAiCallLog } from './ai/aiCallLog.ts'
-import { assertServedChainsMatchRpc, readChain, servedChainIds } from './chains.ts'
+import { assertServedChainsMatchRpc, readAdapter, readChain, servedChainIds, servedChainIdsOf } from './chains.ts'
 import { EXECUTION_WINDOW_SECONDS, REVIEW_WINDOW_SECONDS, assertDurationsFit } from '../../agent-runtime/src/durations.ts'
 
 setLogTag('HOST')
@@ -28,7 +28,7 @@ function sleep(ms: number): Promise<void> {
  */
 async function main(): Promise<void> {
   log('Host runtime started', 'HOST')
-  for (const id of servedChainIds()) {
+  for (const id of servedChainIdsOf('evm')) {
     const { config } = readChain(id)
     log(`Chain: ${config.chain.name} (${id}) — contract ${config.agentEco}, ${config.tokenSymbol} ${config.usdt}`, 'HOST')
   }
@@ -37,7 +37,7 @@ async function main(): Promise<void> {
   // The host signs real transactions — never let it run against the wrong
   // chain, or with escrow windows a chain's contract would reject.
   await assertServedChainsMatchRpc()
-  for (const id of servedChainIds()) assertDurationsFit(await readChain(id).timerLimits())
+  for (const id of servedChainIds()) assertDurationsFit(await readAdapter(id).timerLimits())
   log(`Escrow windows: execution ${EXECUTION_WINDOW_SECONDS}s, review ${REVIEW_WINDOW_SECONDS}s`, 'HOST')
   await initArbiter()
 
@@ -73,7 +73,7 @@ async function main(): Promise<void> {
     loop('Arbiter', INTERVAL_MS, runArbiterCycleOnce),
     // Ratings made outside our own flows, about once a minute, on every served chain.
     loop('Rating index', RATING_SCAN_MS, async () => {
-      for (const id of servedChainIds()) {
+      for (const id of servedChainIdsOf('evm')) {
         try {
           await indexRecentRatings(id)
         } catch (error) {

@@ -1,8 +1,7 @@
 import { z } from 'zod'
 import { LIMITS } from '../../../agent-runtime/src/shared/capabilities/definitions.ts'
 import { CUSTOM_CAPABILITY_ID } from '../../../agent-runtime/src/shared/capabilities/custom.ts'
-
-const WALLET_REGEX = /^0x[a-fA-F0-9]{40}$/
+import { walletSchema } from './wallet.ts'
 
 /** The brief itself is validated against its capability's input schema in the route. */
 export const createTaskSchema = z.object({
@@ -11,7 +10,7 @@ export const createTaskSchema = z.object({
   brief: z.unknown(),
   criteria: z.string().max(LIMITS.textChars).optional(),
   price: z.union([z.string(), z.number()]),
-  seller: z.string().regex(WALLET_REGEX),
+  seller: walletSchema,
   /** Optional — the server generates a UUID when omitted. */
   nonce: z.string().uuid().optional(),
 })

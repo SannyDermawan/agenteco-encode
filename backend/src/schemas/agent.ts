@@ -1,9 +1,9 @@
 import { z } from 'zod'
 import { CAPABILITIES, LIMITS, isCapabilityId } from '../../../agent-runtime/src/shared/capabilities/definitions.ts'
 import { CUSTOM_CAPABILITY_ID } from '../../../agent-runtime/src/shared/capabilities/custom.ts'
+import { walletSchema } from './wallet.ts'
 
 const CATEGORIES = ['Research', 'Data', 'Content', 'Automation'] as const
-const WALLET_REGEX = /^0x[a-fA-F0-9]{40}$/
 
 const baseAgentSchema = z.object({
   name: z.string().trim().min(1).max(100),
@@ -20,7 +20,7 @@ const baseAgentSchema = z.object({
   price: z.number().nonnegative(),
   minimumPrice: z.number().nonnegative().optional(),
   maxBudget: z.number().nonnegative().optional(),
-  walletAddress: z.string().regex(WALLET_REGEX).optional(),
+  walletAddress: walletSchema.optional(),
   endpoint: z
     .string()
     .url()
@@ -112,7 +112,7 @@ export const listAgentsQuerySchema = z.object({
     .optional()
     .transform((v) => (v === undefined ? undefined : v === 'true')),
   capability: z.string().min(1).optional(),
-  ownerWallet: z.string().regex(WALLET_REGEX).optional(),
+  ownerWallet: walletSchema.optional(),
   taskStatus: z.enum(['awaiting_deposit', 'active', 'completed', 'refunded']).optional(),
   // Free-text keyword match across name/description/service — separate from
   // `capability`, which matches an exact capability tag. Per §10: "Mulai

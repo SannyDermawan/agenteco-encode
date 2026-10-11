@@ -38,13 +38,13 @@
     "test": "node --import tsx --test \"src/**/*.test.ts\""
   },
   "devDependencies": {
-    "@solana/kit": "^8.4.0",
     "@types/node": "^22",
     "litesvm": "^1.6.0",
     "tsx": "^4",
     "typescript": "^5"
   },
   "dependencies": {
+    "@solana/kit": "^8.4.0",
     "viem": "^2.56.8",
     "zod": "^4.6.5"
   }

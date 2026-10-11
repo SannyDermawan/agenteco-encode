@@ -5,12 +5,13 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '../db.ts'
 import { verifyOwnerAuth } from '../auth.ts'
 import { UUID_REGEX, canViewParties, guardEscrow, requireViewer } from '../access.ts'
-import { readChain, requestChain } from '../chains.ts'
+import { chainFamily, readAdapter, requestChain } from '../chains.ts'
 import { buildTaskPreimage, canonicalize, hashPreimage, normalizePrice } from '../../../agent-runtime/src/shared/hashes.ts'
 import { CAPABILITIES, isCapabilityId } from '../../../agent-runtime/src/shared/capabilities/definitions.ts'
 import { validateWithSchema } from '../../../agent-runtime/src/shared/capabilities/custom.ts'
 import { getCapability } from '../capabilityRegistry.ts'
 import { createTaskSchema, linkTaskEscrowSchema } from '../schemas/task.ts'
+import { normalizeWallet, walletFamily } from '../../../agent-runtime/src/shared/wallets.ts'
 
 export const tasksRouter = Router()
 
@@ -47,6 +48,12 @@ tasksRouter.post('/', async (req, res) => {
     brief = checked
   }
 
+  // Both parties must be wallets of the chain's family: an EVM address cannot be a party on a Solana chain, nor the reverse.
+  const family = chainFamily(chainId)
+  if (walletFamily(auth.wallet) !== family || walletFamily(seller) !== family) {
+    return res.status(400).json({ error: `On ${chainId} both the buyer and the seller must be ${family === 'solana' ? 'Solana' : 'EVM'} wallets` })
+  }
+
   let price: string
   try {
     price = normalizePrice(parsed.data.price)
@@ -73,8 +80,8 @@ tasksRouter.post('/', async (req, res) => {
       brief: canonicalize(brief.data) as Prisma.InputJsonValue,
       criteria: input.criteria,
       price,
-      buyer: auth.wallet.toLowerCase(),
-      seller: seller.toLowerCase(),
+      buyer: normalizeWallet(auth.wallet),
+      seller: normalizeWallet(seller),
       nonce: input.nonce,
       preimage,
       taskHash,
@@ -102,7 +109,7 @@ tasksRouter.post('/:id/escrow', async (req, res) => {
   }
 
   const escrowId = BigInt(parsed.data.escrowId)
-  const chain = readChain(task.chainId)
+  const chain = readAdapter(task.chainId)
   let onchain: { buyer: string; seller: string; amount: bigint; taskHash: string }
   try {
     const [{ buyer, seller, amount }, { taskHash }] = await Promise.all([chain.getEscrowBasic(escrowId), chain.getEscrowHashes(escrowId)])
@@ -114,8 +121,8 @@ tasksRouter.post('/:id/escrow', async (req, res) => {
   const { decimals } = await chain.token()
   const problems = [
     onchain.taskHash.toLowerCase() !== task.taskHash.toLowerCase() && 'taskHash',
-    onchain.buyer.toLowerCase() !== task.buyer && 'buyer',
-    onchain.seller.toLowerCase() !== task.seller && 'seller',
+    normalizeWallet(onchain.buyer) !== task.buyer && 'buyer',
+    normalizeWallet(onchain.seller) !== task.seller && 'seller',
     onchain.amount !== parseUnits(task.price, decimals) && 'amount',
   ].filter(Boolean)
   if (problems.length) {

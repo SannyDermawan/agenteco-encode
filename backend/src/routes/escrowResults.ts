@@ -2,7 +2,7 @@ import { Router } from 'express'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../db.ts'
 import { buildResultPreimage, hashPreimage } from '../../../agent-runtime/src/shared/hashes.ts'
-import { readChain, requestChain } from '../chains.ts'
+import { readAdapter, requestChain } from '../chains.ts'
 import { createEscrowResultSchema } from '../schemas/escrowResult.ts'
 import { guardEscrow } from '../access.ts'
 import { checkResultShape } from '../capabilityRegistry.ts'
@@ -47,7 +47,7 @@ escrowResultsRouter.post('/', async (req, res) => {
 
   let onChainHash: `0x${string}`
   try {
-    onChainHash = await readChain(chainId).getResultHash(BigInt(escrowId))
+    onChainHash = await readAdapter(chainId).getResultHash(BigInt(escrowId))
   } catch {
     return res.status(400).json({ error: 'Could not read this escrow on-chain — is the id correct?' })
   }

@@ -160,18 +160,24 @@ function entry(chainId: ChainId): ChainEntry {
   return e
 }
 
-/** The chains this process serves (CHAINS), the default one first. Each must be fully configured. */
+/** The EVM chains this process serves (CHAINS), the default one first; Solana ones are listed by ./multi.ts. Each must be fully configured. */
 export function servedChainIds(): ChainId[] {
   if (!served) {
     const raw = process.env.CHAINS?.trim()
     const list = raw ? raw.split(',').map((s) => s.trim()).filter(Boolean) : [PRIMARY_CHAIN_ID]
     const ids: ChainId[] = []
+    let hasSolana = false
     for (const item of list) {
+      // Solana chains are served by ./multi.ts; this registry is the EVM half and leaves them out.
+      if (/^solana([:-]|$)/i.test(item)) {
+        hasSolana = true
+        continue
+      }
       const id = normalizeChainId(item)
       if (!id) throw new Error(`CHAINS lists an unknown chain: ${item}`)
       if (!ids.includes(id)) ids.push(id)
     }
-    if (ids.length === 0) throw new Error('CHAINS is empty')
+    if (ids.length === 0 && !hasSolana) throw new Error('CHAINS is empty')
     for (const id of ids) entry(id) // fail at startup, not on the first request
     served = ids
   }
