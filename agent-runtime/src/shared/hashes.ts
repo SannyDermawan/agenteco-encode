@@ -1,4 +1,5 @@
 import { keccak256, toHex, type Hex } from 'viem'
+import { normalizeWallet } from './wallets.ts'
 
 /**
  * Hash conventions shared by the backend, the frontend and standalone agents
@@ -68,8 +69,8 @@ export function buildTaskPreimage(input: TaskPreimageInput): string {
     brief: canonicalize(input.brief),
     criteria: input.criteria ?? '',
     price: normalizePrice(input.price),
-    buyer: input.buyer.toLowerCase(),
-    seller: input.seller.toLowerCase(),
+    buyer: normalizeWallet(input.buyer),
+    seller: normalizeWallet(input.seller),
     nonce: input.nonce,
   })
 }

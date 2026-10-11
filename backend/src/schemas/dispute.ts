@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { LIMITS } from '../../../agent-runtime/src/shared/capabilities/definitions.ts'
+import { txRefSchema } from './wallet.ts'
 
 export const disputeReasonSchema = z.object({
   reason: z
@@ -19,5 +20,5 @@ export const disputeResolutionSchema = z.object({
   confidence: z.number().int().min(0).max(100),
   rationale: z.string().min(1).max(LIMITS.disputeReasonChars),
   decidedBy: z.enum(['ai-auto', 'arbiter-manual']),
-  txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/).optional(),
+  txHash: txRefSchema.optional(),
 })

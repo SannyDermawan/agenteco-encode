@@ -10,9 +10,10 @@ import { encryptAgentKey } from '../agentKeyCrypto.ts'
 import { findBlockingWork, withdrawHostedWallet } from '../agentDeletion.ts'
 import { createAgentSchema, heartbeatSchema, listAgentsQuerySchema, updateAgentSchema } from '../schemas/agent.ts'
 import { unknownCapabilities } from '../capabilityRegistry.ts'
-import { UnknownChainError, readChain, requestChain, resolveServedChainId } from '../chains.ts'
+import { UnknownChainError, chainFamily, readChain, requestChain, resolveServedChainId } from '../chains.ts'
 import { registrationFileFor } from '../erc8004.ts'
 import { z } from 'zod'
+import { normalizeWallet, sameWallet, walletFamily } from '../../../agent-runtime/src/shared/wallets.ts'
 
 export const agentsRouter = Router()
 
@@ -121,6 +122,7 @@ agentsRouter.post('/:id/erc8004', async (req, res) => {
   const agent = await prisma.agent.findUnique({ where: { id: req.params.id } })
   if (!agent || agent.deletedAt) return res.status(404).json({ error: 'Agent not found' })
   if (!isAuthorizedForAgent(auth.wallet, agent)) return res.status(403).json({ error: "Only the agent's own wallet or its owner can record its identity" })
+  if (chainFamily(agent.chainId) !== 'evm') return res.status(400).json({ error: `ERC-8004 is an EVM standard: ${agent.chainId} has no identity registry` })
   const chain = readChain(agent.chainId)
   if (!chain.config.erc8004) return res.status(400).json({ error: `ERC-8004 is not configured on ${agent.chainId}` })
 
@@ -162,6 +164,14 @@ agentsRouter.post('/', async (req, res) => {
   }
 
   const { hosted, ...agentData } = parsed.data
+  const family = chainFamily(chainId)
+  // Hosted agents are custodial wallets the server generates and signs with: EVM only for now.
+  if (family !== 'evm' && ((agentData.role === 'buyer' && hosted !== false) || hosted)) {
+    return res.status(400).json({ error: `Hosted agents are not available on ${chainId} yet: register a self-hosted agent (hosted: false) that signs with its own key` })
+  }
+  if (agentData.walletAddress && walletFamily(agentData.walletAddress) !== family) {
+    return res.status(400).json({ error: `walletAddress must be a ${family === 'solana' ? 'Solana' : 'EVM'} address, as ${chainId} is a ${family === 'solana' ? 'Solana' : 'EVM'} chain` })
+  }
   const unknown = await unknownCapabilities(agentData.capabilities)
   if (unknown.length) {
     return res.status(400).json({ error: `Unknown capability "${unknown[0]}" — publish it in the capability registry first.` })
@@ -195,7 +205,7 @@ agentsRouter.post('/', async (req, res) => {
   }
 
   // An agent whose key was linked to a person (device link) is listed as that person's.
-  const link = await prisma.accountLink.findUnique({ where: { agentWallet: auth.wallet.toLowerCase() } })
+  const link = await prisma.accountLink.findUnique({ where: { agentWallet: normalizeWallet(auth.wallet) } })
   const accountWallet = link && !link.revokedAt ? link.ownerWallet : null
   const agent = await prisma.agent.create({
     data: { ...agentData, chainId, ownerWallet: auth.wallet, ...(accountWallet && { accountWallet }), ...hostedFields } as Prisma.AgentCreateInput,
@@ -220,7 +230,7 @@ agentsRouter.post('/:id/heartbeat', async (req, res) => {
   }
   // Online means "the agent is running": only the process holding the agent's key can say so.
   // The owner may still take it offline (e.g. after stopping it elsewhere).
-  const fromAgent = !!agent.walletAddress && auth.wallet.toLowerCase() === agent.walletAddress.toLowerCase()
+  const fromAgent = !!agent.walletAddress && sameWallet(auth.wallet, agent.walletAddress)
   if (parsed.data.online && !fromAgent) {
     return res.status(403).json({ error: "Only the running agent, signing with its own wallet, can put it online" })
   }
@@ -295,7 +305,7 @@ agentsRouter.patch('/:id', async (req, res) => {
     return res.status(400).json({ error: 'Deposit gas and activate this agent before putting it online' })
   }
   // A self-hosted seller is online while its own process (signing with the agent's wallet) runs, not by a switch.
-  const fromAgent = !!existing.walletAddress && auth.wallet.toLowerCase() === existing.walletAddress.toLowerCase()
+  const fromAgent = !!existing.walletAddress && sameWallet(auth.wallet, existing.walletAddress)
   if (parsed.data.isOnline && existing.role === 'seller' && existing.taskStatus === null && !existing.isOnline && !fromAgent) {
     return res.status(400).json({ error: 'A self-hosted seller goes online by running it: its SDK reports it online with its heartbeat' })
   }
@@ -304,7 +314,7 @@ agentsRouter.patch('/:id', async (req, res) => {
   if (
     parsed.data.walletAddress !== undefined &&
     existing.taskStatus !== null &&
-    parsed.data.walletAddress.toLowerCase() !== existing.walletAddress?.toLowerCase()
+    (!existing.walletAddress || !sameWallet(parsed.data.walletAddress, existing.walletAddress))
   ) {
     return res.status(400).json({ error: "A hosted agent's wallet is managed by AgentEco and cannot be changed" })
   }

@@ -1,25 +1,39 @@
 import type { Request, Response } from 'express'
+import { signerChain, signerClients, chainConfig } from '../../agent-runtime/src/chain/registry.ts'
 import {
   UnknownChainError,
-  chainConfig,
+  UnsupportedOnChainError,
+  chainFamily,
   defaultChainId,
-  readChain,
+  readAdapter,
+  readEvm,
+  readSolanaAdapter,
   resolveServedChainId,
   servedChainIds,
-} from '../../agent-runtime/src/chain/registry.ts'
+  servedChainIdsOf,
+} from '../../agent-runtime/src/chain/multi.ts'
+import { solanaEntry } from '../../agent-runtime/src/chain/solana-registry.ts'
+import { SolanaRpcBackend } from '../../agent-runtime/src/chain/solana-rpc.ts'
 import type { ChainId } from '../../agent-runtime/src/chain/types.ts'
 
-// The chains this backend serves (CHAINS, default: NETWORK alone) — see agent-runtime/src/chain/registry.ts.
+// The chains this backend serves (CHAINS, default: NETWORK alone), of either family — see
+// agent-runtime/src/chain/multi.ts. `readAdapter` works on any of them; `readChain` is the EVM-only
+// adapter (hosted agents, ERC-8004, viem clients) and refuses a Solana chain.
 export {
   UnknownChainError,
+  UnsupportedOnChainError,
   chainConfig,
+  chainFamily,
   defaultChainId,
-  readChain,
+  readAdapter,
+  readSolanaAdapter,
   resolveServedChainId,
   servedChainIds,
+  servedChainIdsOf,
   signerChain,
   signerClients,
-} from '../../agent-runtime/src/chain/registry.ts'
+}
+export const readChain = readEvm
 export type { ChainId } from '../../agent-runtime/src/chain/types.ts'
 
 /**
@@ -43,17 +57,35 @@ export function requestChain(req: Request, res: Response): ChainId | undefined {
   }
 }
 
-/** EVM chain ids of every served chain — what a website sign-in may be signed for. */
+/** EVM chain ids of every served EVM chain — what a website sign-in may be signed for. */
 export function servedEvmChainIds(): number[] {
-  return servedChainIds().map((id) => chainConfig(id).chain.id)
+  return servedChainIdsOf('evm').map((id) => chainConfig(id).chain.id)
 }
 
-/** The served chains as the API describes them (GET /chains). */
+/** The served chains as the API describes them (GET /chains). `family` tells which kind of chain an entry is. */
 export function chainSummaries() {
   return servedChainIds().map((id) => {
+    if (chainFamily(id) === 'solana') {
+      const e = solanaEntry(id)
+      return {
+        chainId: id,
+        family: 'solana' as const,
+        evmChainId: null,
+        name: e.name,
+        default: id === defaultChainId(),
+        // The escrow program, under the name the EVM entries give their contract.
+        agentEco: e.config.programId,
+        token: { address: e.config.mint, symbol: e.config.tokenSymbol },
+        nativeSymbol: e.config.nativeSymbol,
+        explorerUrl: e.config.explorerUrl,
+        testnet: e.testnet,
+        erc8004: null,
+      }
+    }
     const c = chainConfig(id)
     return {
       chainId: id,
+      family: 'evm' as const,
       evmChainId: c.chain.id,
       name: c.chain.name,
       default: id === defaultChainId(),
@@ -74,7 +106,18 @@ export function chainSummaries() {
  */
 export async function assertServedChainsMatchRpc(): Promise<void> {
   for (const id of servedChainIds()) {
-    const chain = readChain(id)
+    if (chainFamily(id) === 'solana') {
+      const backend = solanaEntry(id).backend
+      // Only an RPC backend can be asked; an in-process one has no genesis to mismatch.
+      if (backend instanceof SolanaRpcBackend) {
+        const genesis = await backend.getGenesisHash()
+        if (!genesis.startsWith(id.slice('solana:'.length))) {
+          throw new Error(`The RPC for ${id} reports genesis ${genesis}, which is another cluster.`)
+        }
+      }
+      continue
+    }
+    const chain = readEvm(id)
     const actual = await chain.rpcChainId()
     if (actual !== chain.config.chain.id) {
       throw new Error(`The RPC for ${id} reports chain id ${actual}, but ${chain.config.chain.name} is ${chain.config.chain.id}.`)

@@ -4,11 +4,11 @@ import { prisma } from '../db.ts'
 import { requestChain } from '../chains.ts'
 import { ratingSummaries, recordRatingsFromTx } from '../ratings.ts'
 import { guardEscrow } from '../access.ts'
+import { isWalletAddress } from '../../../agent-runtime/src/shared/wallets.ts'
+import { txRefSchema } from '../schemas/wallet.ts'
 
 export const ratingsRouter = Router()
 export const verificationsRouter = Router()
-
-const ADDRESS = /^0x[0-9a-fA-F]{40}$/
 
 /**
  * Displayed ratings for a set of sellers on a chain: ?sellers=0xa,0xb[&chain=…]. Same-owner
@@ -20,7 +20,7 @@ ratingsRouter.get('/', async (req, res) => {
   const sellers = String(req.query.sellers ?? '')
     .split(',')
     .map((s) => s.trim())
-    .filter((s) => ADDRESS.test(s))
+    .filter((s) => isWalletAddress(s))
     .slice(0, 100)
   res.json(await ratingSummaries(sellers, chainId))
 })
@@ -39,7 +39,7 @@ ratingsRouter.get('/escrow/:escrowId', async (req, res) => {
  * buyer and seller are read from the SellerRated event in its receipt.
  */
 ratingsRouter.post('/', async (req, res) => {
-  const parsed = z.object({ txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/) }).safeParse(req.body)
+  const parsed = z.object({ txHash: txRefSchema }).safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: 'txHash must be a transaction hash' })
   const chainId = requestChain(req, res)
   if (!chainId) return

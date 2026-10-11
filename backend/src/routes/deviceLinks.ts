@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { prisma } from '../db.ts'
 import { isAgentOwnerWallet, verifyOwnerAuth } from '../auth.ts'
 import { requireViewer } from '../access.ts'
-import { UnknownChainError, chainConfig, resolveServedChainId } from '../chains.ts'
+import { UnknownChainError, chainConfig, chainFamily, resolveServedChainId } from '../chains.ts'
 import { FRONTEND_HOSTS, FRONTEND_ORIGINS } from '../origins.ts'
 import { agentProofMessage } from '../../../agent-runtime/src/shared/deviceLink.ts'
 
@@ -76,6 +76,8 @@ deviceLinksRouter.post('/', async (req, res) => {
     if (error instanceof UnknownChainError) return res.status(400).json({ error: error.message })
     throw error
   }
+  // The owner approves with an EIP-4361 message that names an EVM chain: not available for Solana agents yet.
+  if (chainFamily(chainId) !== 'evm') return res.status(400).json({ error: `Linking an agent to a person is not available on ${chainId} yet` })
 
   try {
     const recovered = await recoverMessageAddress({ message: agentProofMessage(nonce, chainId, agentWallet), signature: signature as `0x${string}` })

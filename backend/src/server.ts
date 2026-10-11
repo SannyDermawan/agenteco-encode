@@ -1,6 +1,6 @@
 import { app } from './app.ts'
 import { log, logError } from './log.ts'
-import { assertServedChainsMatchRpc, chainConfig, servedChainIds } from './chains.ts'
+import { assertServedChainsMatchRpc, chainSummaries } from './chains.ts'
 import { FRONTEND_ORIGINS } from './origins.ts'
 import { startMaintenance } from './maintenance.ts'
 
@@ -15,7 +15,7 @@ assertServedChainsMatchRpc().catch((error) => {
 
 app.listen(PORT, () => {
   log(`AgentEco API listening on http://localhost:${PORT}`, 'API')
-  for (const id of servedChainIds()) log(`Chain: ${chainConfig(id).chain.name} (${id}), contract ${chainConfig(id).agentEco}`, 'API')
+  for (const s of chainSummaries()) log(`Chain: ${s.name} (${s.chainId}), ${s.family === 'solana' ? 'program' : 'contract'} ${s.agentEco}`, 'API')
   log(`Allowed frontend origins: ${FRONTEND_ORIGINS.join(', ')}`, 'API')
   startMaintenance()
 })

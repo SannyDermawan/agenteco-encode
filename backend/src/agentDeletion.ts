@@ -2,7 +2,8 @@ import type { Address } from 'viem'
 import { decryptAgentKey } from './agentKeyCrypto.ts'
 import { prisma } from './db.ts'
 import { refundLeftover } from './host/buyerTaskHost.ts'
-import { readChain, signerChain, type ChainId } from './chains.ts'
+import { readAdapter, signerChain, type ChainId } from './chains.ts'
+import { normalizeWallet } from '../../agent-runtime/src/shared/wallets.ts'
 
 // AgentEco.sol OrderStatus: FUNDED, EXECUTING, DELIVERED, DISPUTED — money is
 // locked and someone still has to act. CREATED/SETTLED/REFUNDED are safe.
@@ -36,11 +37,11 @@ export async function findBlockingWork(agent: DeletableAgent): Promise<string | 
   // escrow naming its wallet (direct hires have no Order row). Read from contract
   // state — no event logs, so it works on RPCs that prune history.
   const orderEscrowIds = new Set(orders.filter((o) => o.escrowId).map((o) => o.escrowId!))
-  const wallet = agent.walletAddress?.toLowerCase()
-  for (const escrow of await readChain(agent.chainId).listEscrows()) {
+  const wallet = ((agent.walletAddress) ? normalizeWallet(agent.walletAddress) : undefined)
+  for (const escrow of await readAdapter(agent.chainId).listEscrows()) {
     const involved =
       orderEscrowIds.has(escrow.id.toString()) ||
-      (!!wallet && (escrow.seller.toLowerCase() === wallet || escrow.buyer.toLowerCase() === wallet))
+      (!!wallet && (normalizeWallet(escrow.seller) === wallet || normalizeWallet(escrow.buyer) === wallet))
     if (involved && IN_PROGRESS_STATUSES.has(escrow.status)) {
       return `On-chain order #${escrow.id} is still ${STATUS_LABEL[escrow.status]} — finish, settle, or refund it first.`
     }

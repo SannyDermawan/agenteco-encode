@@ -1,6 +1,7 @@
 import type { DiscoveredAgent } from '../../../agent-runtime/src/index.ts'
 import type { EvmAdapter } from '../../../agent-runtime/src/chain/evm.ts'
 import { ratingSummaries } from '../ratings.ts'
+import { normalizeWallet } from '../../../agent-runtime/src/shared/wallets.ts'
 
 export interface SellerFilters {
   minSuccessRate: number | null
@@ -41,7 +42,7 @@ export async function selectSeller(
         const okSuccess = filters.minSuccessRate === null || rep.successRatePct >= filters.minSuccessRate
         const okCompleted = filters.minCompletedJobs === null || rep.completedJobs >= filters.minCompletedJobs
         // A minimum rating excludes sellers nobody has rated yet.
-        const avgScore = ratings.get(candidate.walletAddress.toLowerCase()) ?? null
+        const avgScore = ratings.get(normalizeWallet(candidate.walletAddress)) ?? null
         const okRating = filters.minReputation === null || (avgScore !== null && avgScore >= filters.minReputation)
         return okSuccess && okCompleted && okRating ? candidate : null
       })

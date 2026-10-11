@@ -4,10 +4,13 @@ import type { Prisma } from '@prisma/client'
 import { READ_SESSION_HEADER } from '../../agent-runtime/src/shared/session.ts'
 import { isAgentOwnerWallet, verifyOwnerAuth, type AuthResult } from './auth.ts'
 import { prisma } from './db.ts'
-import { canRule, type ArbiterSetup } from '../../agent-runtime/src/chain/evm.ts'
-import { readChain, requestChain, servedChainIds, servedEvmChainIds, type ChainId } from './chains.ts'
+import { canRule } from '../../agent-runtime/src/chain/evm.ts'
+import type { ArbiterSetup } from '../../agent-runtime/src/chain/types.ts'
+import { chainFamily, readAdapter, readChain, requestChain, servedChainIds, servedEvmChainIds, type ChainId } from './chains.ts'
+import { EscrowNotFoundError } from '../../agent-runtime/src/chain/solana.ts'
 import { FRONTEND_HOSTS } from './origins.ts'
 import { verifyReadSession } from './session.ts'
+import { normalizeWallet } from '../../agent-runtime/src/shared/wallets.ts'
 
 /**
  * Who may read what. Everything behind an order — the task brief, the
@@ -36,7 +39,7 @@ export async function optionalViewer(req: Request, res: Response): Promise<strin
     res.status(401).json({ error: auth.error })
     return undefined
   }
-  return auth.wallet.toLowerCase()
+  return normalizeWallet(auth.wallet)
 }
 
 /** Like optionalViewer, but an anonymous request is answered with 401 too. Undefined = already answered. */
@@ -58,12 +61,13 @@ const ARBITER_TTL_MS = 60_000
  * The chain's current deployment by default. Cached for a minute.
  */
 export function getArbiterSetup(chainId: ChainId, agentEco?: Address): Promise<ArbiterSetup> {
-  const reader = readChain(chainId)
-  const eco = agentEco ?? reader.config.agentEco
-  const key = `${chainId}:${eco.toLowerCase()}`
+  // An EVM chain can hold several deployments (legacy ones); a Solana chain has its one program.
+  const evm = chainFamily(chainId) === 'evm' ? readChain(chainId) : null
+  const eco = evm ? (agentEco ?? evm.config.agentEco) : chainId
+  const key = `${chainId}:${normalizeWallet(eco)}`
   const cached = arbiterSetups.get(key)
   if (cached && Date.now() - cached.at <= ARBITER_TTL_MS) return cached.setup
-  const setup = reader.arbiterSetupAt(eco).catch((error) => {
+  const setup = (evm ? evm.arbiterSetupAt(eco as Address) : readAdapter(chainId).getArbiterSetup()).catch((error) => {
     arbiterSetups.delete(key) // retry on the next request
     throw error
   })
@@ -79,7 +83,7 @@ export function getArbiterSetup(chainId: ChainId, agentEco?: Address): Promise<A
 export async function isArbiter(viewer: string, chainId?: ChainId, escrowId?: string): Promise<boolean> {
   for (const chain of chainId ? [chainId] : servedChainIds()) {
     try {
-      const eco = escrowId !== undefined && isEscrowId(escrowId) ? readChain(chain).agentEcoFor(BigInt(escrowId)) : undefined
+      const eco = escrowId !== undefined && isEscrowId(escrowId) && chainFamily(chain) === 'evm' ? readChain(chain).agentEcoFor(BigInt(escrowId)) : undefined
       if (canRule(await getArbiterSetup(chain, eco), viewer)) return true
     } catch {
       // An unreadable chain grants nothing.
@@ -121,11 +125,18 @@ export async function escrowParties(chainId: ChainId, escrowId: string): Promise
   })
   let parties: EscrowParties
   if (task?.verified) {
-    parties = { buyer: task.buyer.toLowerCase(), seller: task.seller.toLowerCase() }
+    parties = { buyer: normalizeWallet(task.buyer), seller: normalizeWallet(task.seller) }
   } else {
-    const { buyer, seller } = await readChain(chainId).getEscrowBasic(BigInt(escrowId))
+    let basic
+    try {
+      basic = await readAdapter(chainId).getEscrowBasic(BigInt(escrowId))
+    } catch (error) {
+      if (error instanceof EscrowNotFoundError) return null
+      throw error
+    }
+    const { buyer, seller } = basic
     if (buyer === zeroAddress) return null
-    parties = { buyer: buyer.toLowerCase(), seller: seller.toLowerCase() }
+    parties = { buyer: normalizeWallet(buyer), seller: normalizeWallet(seller) }
   }
   if (partiesCache.size >= PARTIES_CACHE_LIMIT) partiesCache.clear()
   partiesCache.set(key, parties)
@@ -202,7 +213,7 @@ interface AgentParty {
 
 /** A negotiation or order's side is the viewer's own: the agent's owner (or linked person), or the agent's wallet itself. */
 export function isPartyOf(viewer: string, agent: AgentParty): boolean {
-  return isAgentOwnerWallet(viewer, agent) || (!!agent.walletAddress && viewer === agent.walletAddress.toLowerCase())
+  return isAgentOwnerWallet(viewer, agent) || (!!agent.walletAddress && viewer === normalizeWallet(agent.walletAddress))
 }
 
 /** Prisma filter: negotiations or orders one of whose agents belongs to the viewer. */
@@ -238,7 +249,7 @@ type AgentRow = AgentParty & { taskStatus: string | null } & Record<string, unkn
 export function isAgentOwner(viewer: string | null, agent: AgentRow): boolean {
   if (!viewer) return false
   if (isAgentOwnerWallet(viewer, agent)) return true
-  return agent.taskStatus !== null && !!agent.walletAddress && viewer === agent.walletAddress.toLowerCase()
+  return agent.taskStatus !== null && !!agent.walletAddress && viewer === normalizeWallet(agent.walletAddress)
 }
 
 /** An agent as this viewer may see it: everything for its owner, the public profile for everyone else. */

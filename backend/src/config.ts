@@ -1,10 +1,12 @@
 import { isHex, type Address, type Hex } from 'viem'
+import { servedChainIdsOf } from '../../agent-runtime/src/chain/multi.ts'
 import { AGENT_ECO_ADDRESS, DEPLOYMENT_BLOCK, RPC_URL } from './network.ts'
 
 export type KeeperConfig = {
   rpcUrl: string
   agentEcoAddress: Address
-  keeperPrivateKey: Hex
+  /** The EVM keeper wallet; null when only Solana chains are served (their keeper is a keypair file, SOLANA_KEEPER_KEYPAIR). */
+  keeperPrivateKey: Hex | null
   keeperIntervalMs: number
   dryRun: boolean
   deploymentBlock: bigint | null
@@ -42,9 +44,10 @@ function optionalBoolean(name: string, fallback: boolean): boolean {
  * with partial/invalid config.
  */
 export function loadConfig(): KeeperConfig {
-  const keeperPrivateKeyRaw = required('KEEPER_PRIVATE_KEY')
-  const normalizedKey = keeperPrivateKeyRaw.startsWith('0x') ? keeperPrivateKeyRaw : `0x${keeperPrivateKeyRaw}`
-  if (!isHex(normalizedKey) || normalizedKey.length !== 66) {
+  // An EVM keeper key is needed exactly when an EVM chain is served.
+  const keeperPrivateKeyRaw = servedChainIdsOf('evm').length > 0 ? required('KEEPER_PRIVATE_KEY') : (process.env.KEEPER_PRIVATE_KEY?.trim() ?? '')
+  const normalizedKey = keeperPrivateKeyRaw === '' || keeperPrivateKeyRaw.startsWith('0x') ? keeperPrivateKeyRaw : `0x${keeperPrivateKeyRaw}`
+  if (normalizedKey !== '' && (!isHex(normalizedKey) || normalizedKey.length !== 66)) {
     throw new Error('KEEPER_PRIVATE_KEY must be a 32-byte hex private key (0x followed by 64 hex characters).')
   }
 
@@ -52,7 +55,7 @@ export function loadConfig(): KeeperConfig {
     // Network + deployment come from ./network.ts (NETWORK + env), shared with the API and host.
     rpcUrl: RPC_URL,
     agentEcoAddress: AGENT_ECO_ADDRESS,
-    keeperPrivateKey: normalizedKey as Hex,
+    keeperPrivateKey: normalizedKey === '' ? null : (normalizedKey as Hex),
     // KEEPER_POLL_INTERVAL_MS (spec name); KEEPER_INTERVAL_MS still honored for existing deployments.
     keeperIntervalMs: optionalNumber(
       process.env.KEEPER_POLL_INTERVAL_MS?.trim() ? 'KEEPER_POLL_INTERVAL_MS' : 'KEEPER_INTERVAL_MS',

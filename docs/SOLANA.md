@@ -1,6 +1,6 @@
 # Solana (devnet)
 
-Status: **the escrow program and `SolanaAdapter` are written and tested locally (litesvm, and a local `solana-test-validator`). Nothing is deployed, and nothing in the backend, API, SDK, CLI or frontend uses Solana yet.** Back to [MULTICHAIN.md](MULTICHAIN.md) (§3 `ChainAdapter`, §9 item 6).
+Status: **the escrow program, `SolanaAdapter` and the backend's Solana support are written and tested locally (litesvm, and a local `solana-test-validator`). Nothing is deployed or run on devnet, and the SDK, CLI and frontend do not use Solana yet.** Back to [MULTICHAIN.md](MULTICHAIN.md) (§3 `ChainAdapter`, §9 item 6).
 
 Scope: the program covers the money and the dispute decision only — escrow, settlement with a fee, refund, timeouts, dispute ruling and seller rating, mirroring `contracts/AgentEco.sol`. Discovery, negotiation, listings and ranking stay off-chain in the existing backend, exactly as on the EVM chains.
 
@@ -13,6 +13,7 @@ Scope: the program covers the money and the dispute decision only — escrow, se
 | `SolanaRpcBackend` (JSON-RPC: devnet, testnet, local validator) | `agent-runtime/src/chain/solana-rpc.ts` | the same scenario on a local `solana-test-validator` (opt-in, §6) |
 | In-process chain for tests | `agent-runtime/test-support/litesvm.ts` | — |
 | A real local validator for tests | `agent-runtime/test-support/validator.ts` | — |
+| The backend serving a Solana chain | `agent-runtime/src/chain/multi.ts`, `solana-registry.ts`, `backend/src/chains.ts`, `auth.ts` and the routes | `backend/src/solana.e2e.test.ts` — on litesvm, and on a real validator (opt-in) |
 | One scenario for every adapter | `agent-runtime/test-support/conformance.ts` | runs on `EvmAdapter` (anvil), `SolanaAdapter` on litesvm, and on a validator |
 | Deploy and setup scripts (**not run against devnet by the author**) | `solana/scripts/deploy-devnet.sh`, `agent-runtime/scripts/solana-initialize.ts`, `agent-runtime/scripts/solana-token-account.ts` | rehearsed on a local validator, §10 |
 
@@ -75,7 +76,7 @@ What a ruling then looks like, from Squads v4's vault-transaction flow: a member
 `agent-runtime/src/chain/solana.ts`, built on `@solana/kit`. It implements the whole `ChainAdapter` interface.
 
 - **Backends.** The adapter talks to a `SolanaBackend` (read an account, read the clock, send and confirm a transaction, read a transaction's logs, list a program's transactions in a slot range). Two implementations: litesvm (`test-support/`, in-process) and `SolanaRpcBackend` (`solana-rpc.ts`, JSON-RPC at `confirmed` commitment; it sends with preflight, so a program rejection throws with its logs). `SolanaRpcBackend` has run against a local `solana-test-validator` only, **never on devnet**.
-- **Chain id.** `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` for devnet (CAIP-2: the first 32 characters of the genesis hash; checked against devnet on 11 Oct 2026). `isSolanaChainId` and `SOLANA_DEVNET_CHAIN_ID` are exported from `solana.ts`. **The chain registry (`registry.ts`, `normalizeChainId`, `CHAINS`) was not extended**: it is built around `EvmChainConfig`. Until it is, the backend cannot serve a Solana chain.
+- **Chain id.** `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` for devnet (CAIP-2: the first 32 characters of the genesis hash; checked against devnet on 11 Oct 2026). `isSolanaChainId` and `SOLANA_DEVNET_CHAIN_ID` are exported from `solana.ts`. `registry.ts` stays the EVM half; `multi.ts` serves both families (`CHAINS` may list either, the first is the default) and `solana-registry.ts` holds the Solana half (settings in MULTICHAIN.md §4).
 - **Addresses and signatures.** `normalizeAddress` is the identity (base58 is case-sensitive). The interface gained `isValidAddress` and `verifySignature({ address, message, signature })`: EVM recovers an EIP-191 signature (contract wallets are not supported, as in the backend today); Solana verifies ed25519 over the UTF-8 message, signature in base58. `TxHash` is now `string` (an EVM hash or a Solana signature). The backend's own sign-in code still calls viem directly and does not use the adapter.
 - **Amounts and ids.** `createAndFundEscrow` converts with the mint's real decimals (`parseUnits`, no floating point); ids are `u64`, carried as `bigint`; `readEscrowBasics`, `escrowIds` and `listEscrows` walk `firstEscrowId … next_escrow_id − 1`, which the adapter's config supplies like `EvmChainConfig` does.
 - **Status codes** map the program's `Funded…Refunded` to 1…6.
@@ -120,8 +121,8 @@ The scripts have not been run against devnet by their author; §10 records the r
 
 ## 9. Limits and what is not done
 
-- Nothing is deployed; the backend, API, SDK, CLI and frontend do not know the chain, and **the wiring is not started**. What it touches, as found in the code: the chain registry builds `EvmChainConfig`/`EvmAdapter` only (`readChain` returns an `EvmAdapter`); the backend's sign-in, session and device-link code call viem's `recoverMessageAddress` and `isAddress` directly, not the adapter; the keeper, host and API modules get their chain from that registry (about a dozen files in `backend/src` import `EvmAdapter` or `readChain`), so they receive EVM adapters; the keeper itself calls the adapter interface (`claimTimeout`), which `SolanaAdapter` implements. The database already keys everything by a CAIP-2 `chainId` string. It is a stage of its own, not an extension of this one.
-- `SolanaRpcBackend` has not run on devnet or testnet, and has not met a public RPC's rate limits, priority fees or compute-budget needs.
+- Nothing is deployed. **The backend serves a Solana chain** for self-hosted agents (MULTICHAIN.md §5): sign-in, agents, tasks, results, disputes, ratings, access and the keeper. **Not done on Solana**: the SDK (`hire`, `createSellerAgent`), the CLI and MCP server, the frontend (wallet connection, `GET /chains` consumers), hosted agents (custodial keys and the hosted hosts are EVM), the AI arbiter host, ERC-8004, and linking an agent to a person (the owner's approval is an EIP-4361 message on an EVM chain). The keeper reads every escrow account of a chain each cycle (one RPC read per escrow): fine on a testnet, to be batched with `getMultipleAccounts` before volume.
+- `SolanaRpcBackend` has run against a local validator only (the conformance scenario, and the whole API suite through the environment-built backend); never on devnet or testnet, and it has not met a public RPC's rate limits, priority fees or compute-budget needs.
 - No escrow-account closing (a finished escrow's rent stays locked, and its record stays readable), no Token-2022.
 - The Squads arbiter (§4) is a decision, not a tested path.
 - The program is unaudited. Account and signer checks are tested, not formally reviewed.
@@ -134,7 +135,8 @@ Run on 11 Oct 2026 with `solana-test-validator` 4.1.2 (all features on; the devn
 1. `deploy-devnet.sh` against `http://127.0.0.1:8899`: built v3, ran the 22 tests on that binary, deployed (a v0 binary was refused, see §6).
 2. `solana-initialize.ts` live: the `Config` account was created (202 bytes, owned by the program); running it again was refused ("already initialized").
 3. `solana-token-account.ts` live: the token account was created, a second run reported it as existing.
-4. The conformance scenario through `SolanaAdapter` + `SolanaRpcBackend` on a fresh validator (program preloaded, own mint): settle, both rulings, every timeout, ratings, access control, exact balances, with the real clock.
-5. A mainnet RPC was refused by the deploy script (a read-only `genesis-hash` call), and the TypeScript guard is covered by a unit test of `clusterAllowed`.
+4. The backend's API suite on the same kind of validator (`SOLANA_LOCAL_VALIDATOR=1 node --import tsx --test src/solana.e2e.test.ts` in `backend/`): the chain built from `RPC_URL__…`, `AGENT_ECO_PROGRAM__…`, `TOKEN_MINT__…`, ed25519 sign-in, tasks, results, disputes, the rating scan through `getSignaturesForAddress`, the keeper.
+5. The conformance scenario through `SolanaAdapter` + `SolanaRpcBackend` on a fresh validator (program preloaded, own mint): settle, both rulings, every timeout, ratings, access control, exact balances, with the real clock.
+6. A mainnet RPC was refused by the deploy script (a read-only `genesis-hash` call), and the TypeScript guard is covered by a unit test of `clusterAllowed`.
 
 This covers the scripts, the binary's deployability, the instruction encoding and the adapter on a real validator runtime. It does **not** cover devnet, a long-lived cluster, or Squads.

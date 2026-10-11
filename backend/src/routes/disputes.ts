@@ -1,10 +1,11 @@
 import { Router } from 'express'
 import { prisma } from '../db.ts'
-import { optionalChainFilter, readChain, requestChain, type ChainId } from '../chains.ts'
+import { optionalChainFilter, readAdapter, requestChain, type ChainId } from '../chains.ts'
 import { verifyOwnerAuth } from '../auth.ts'
 import { arbiterChains, guardEscrow, requireViewer } from '../access.ts'
 import { buildRationalePreimage, hashPreimage, textHash } from '../../../agent-runtime/src/shared/hashes.ts'
 import { disputeReasonSchema, disputeResolutionSchema, disputeResponseSchema } from '../schemas/dispute.ts'
+import { normalizeWallet, sameWallet } from '../../../agent-runtime/src/shared/wallets.ts'
 
 export const disputesRouter = Router()
 
@@ -15,7 +16,7 @@ const REFUNDED = 6
 
 async function readEscrow(chainId: ChainId, escrowId: string) {
   const id = BigInt(escrowId)
-  const chain = readChain(chainId)
+  const chain = readAdapter(chainId)
   const [basic, hashes] = await Promise.all([chain.getEscrowBasic(id), chain.getEscrowHashes(id)])
   return {
     buyer: basic.buyer,
@@ -73,7 +74,7 @@ disputesRouter.put('/:escrowId', async (req, res) => {
   } catch {
     return res.status(400).json({ error: 'Could not read this escrow on-chain — is the id correct?' })
   }
-  if (escrow.buyer.toLowerCase() !== auth.wallet.toLowerCase()) {
+  if (!sameWallet(escrow.buyer, auth.wallet)) {
     return res.status(403).json({ error: "Only this escrow's buyer can describe its dispute" })
   }
   const reasonHash = textHash(parsed.data.reason)
@@ -83,7 +84,7 @@ disputesRouter.put('/:escrowId', async (req, res) => {
 
   const saved = await prisma.dispute.upsert({
     where: { chainId_escrowId: { chainId, escrowId } },
-    create: { chainId, escrowId, buyerWallet: auth.wallet.toLowerCase(), reason: parsed.data.reason, reasonHash },
+    create: { chainId, escrowId, buyerWallet: normalizeWallet(auth.wallet), reason: parsed.data.reason, reasonHash },
     // Fills in a placeholder the arbiter made while the text was missing (same hash, so same text).
     update: { reason: parsed.data.reason, reasonHash },
   })
@@ -115,7 +116,7 @@ disputesRouter.post('/:escrowId/response', async (req, res) => {
   } catch {
     return res.status(400).json({ error: 'Could not read this escrow on-chain — is the id correct?' })
   }
-  if (escrow.seller.toLowerCase() !== auth.wallet.toLowerCase()) {
+  if (!sameWallet(escrow.seller, auth.wallet)) {
     return res.status(403).json({ error: "Only this escrow's seller can answer its dispute" })
   }
   const responseHash = textHash(parsed.data.response)

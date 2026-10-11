@@ -4,6 +4,7 @@ import { isAuthorizedForAgent, verifyOwnerAuth } from '../auth.ts'
 import { UUID_REGEX, agentView, isArbiter, isPartyOf, partyFilter, requireViewer } from '../access.ts'
 import { fundOrderSchema, listOrdersQuerySchema } from '../schemas/order.ts'
 import { optionalChainFilter } from '../chains.ts'
+import { normalizeWallet, sameWallet } from '../../../agent-runtime/src/shared/wallets.ts'
 
 export const ordersRouter = Router()
 
@@ -39,7 +40,7 @@ ordersRouter.get('/', async (req, res) => {
   const { agentId, ownerWallet, status } = parsed.data
   const chainId = optionalChainFilter(parsed.data.chain, res)
   if (chainId === null) return
-  if (ownerWallet && ownerWallet.toLowerCase() !== viewer) {
+  if (ownerWallet && normalizeWallet(ownerWallet) !== viewer) {
     return res.status(403).json({ error: 'You can only list your own orders' })
   }
 
@@ -98,7 +99,7 @@ ordersRouter.patch('/:id/escrow', async (req, res) => {
   if (!task?.verified) {
     return res.status(400).json({ error: `Escrow #${parsed.data.escrowId} has no task linked to it yet — link the task first.` })
   }
-  if (!isPartyOf(task.buyer.toLowerCase(), order.buyerAgent) || task.seller.toLowerCase() !== order.sellerAgent.walletAddress?.toLowerCase()) {
+  if (!isPartyOf(normalizeWallet(task.buyer), order.buyerAgent) || !order.sellerAgent.walletAddress || !sameWallet(task.seller, order.sellerAgent.walletAddress)) {
     return res.status(400).json({ error: `Escrow #${parsed.data.escrowId} belongs to a different buyer or seller than this order.` })
   }
 
@@ -107,5 +108,5 @@ ordersRouter.patch('/:id/escrow', async (req, res) => {
     data: { status: 'funded', escrowId: parsed.data.escrowId, taskId: task.id },
     include: fullInclude,
   })
-  res.json(orderView(updated, auth.wallet.toLowerCase()))
+  res.json(orderView(updated, normalizeWallet(auth.wallet)))
 })

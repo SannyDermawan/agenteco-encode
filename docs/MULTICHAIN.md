@@ -1,6 +1,6 @@
 # Multi-chain
 
-Status: **implemented for EVM chains** (BSC Testnet, BOT Chain, Base Sepolia presets). Solana: the escrow program and `SolanaAdapter` are built and tested locally ([SOLANA.md](SOLANA.md)); not deployed, not wired into the backend, API, SDK or frontend. Back to the [README](../README.md).
+Status: **implemented for EVM chains** (BSC Testnet, BOT Chain, Base Sepolia presets). Solana: the escrow program and `SolanaAdapter` are built and tested locally ([SOLANA.md](SOLANA.md)) and the backend can serve a Solana chain for self-hosted agents (§5); not deployed, not in the SDK, CLI or frontend. Back to the [README](../README.md).
 
 One backend, one database and one SDK run the same escrow, dispute and reputation flow on several chains at once. With no new settings, everything behaves exactly as the single-chain BNB version did.
 
@@ -23,7 +23,7 @@ Every chain is a [CAIP-2](https://chainagnostic.org/CAIPs/caip-2) id. Network na
 | BSC Testnet | `eip155:97` | `bsc-testnet`, `97` |
 | BOT Chain Testnet / Mainnet | `eip155:968` / `eip155:677` | `bot-testnet` (`testnet`) / `bot-mainnet` (`mainnet`) |
 | Base Sepolia | `eip155:84532` | `base-sepolia`, `84532` |
-| Solana devnet (adapter only, not served) | `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` (genesis-hash prefix) | — (the registry does not know it yet) |
+| Solana devnet | `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` (genesis-hash prefix) | `solana-devnet`, `solana` (served once its program is configured, §4) |
 
 ## 3. `ChainAdapter`
 
@@ -88,7 +88,7 @@ Rules: no chain-specific branching outside adapters; signing keys are handed to 
 
 **`EvmAdapter`** (`chain/evm.ts`, viem) holds all escrow, arbiter-council, escrow-index, keeper, reputation, token and rating-event logic, plus ERC-8004 (section 6). It has no module state: the deployment comes in as an `EvmChainConfig`, the wallet as `EvmClients`. The older helpers (`onchain/escrow.ts`, `arbiter.ts`, `escrowIndex.ts`, `host/reputation.ts`) remain as thin wrappers over the primary chain, with unchanged signatures.
 
-**`SolanaAdapter`** (`chain/solana.ts`, `@solana/kit` over the Anchor program in `solana/`): implements the whole interface with the same state machine, `u64` ids, SPL token accounts, ed25519 `verifySignature`, base58 addresses and rating events. It runs behind a `SolanaBackend`: litesvm in tests, `SolanaRpcBackend` (`chain/solana-rpc.ts`) for a cluster. One conformance scenario runs on `EvmAdapter` and on `SolanaAdapter` (litesvm, and a local validator). Not done: registry and backend wiring, any run on devnet, a council program (a Squads vault is the decided arbiter). Details and limits in [SOLANA.md](SOLANA.md).
+**`SolanaAdapter`** (`chain/solana.ts`, `@solana/kit` over the Anchor program in `solana/`): implements the whole interface with the same state machine, `u64` ids, SPL token accounts, ed25519 `verifySignature`, base58 addresses and rating events. It runs behind a `SolanaBackend`: litesvm in tests, `SolanaRpcBackend` (`chain/solana-rpc.ts`) for a cluster. One conformance scenario runs on `EvmAdapter` and on `SolanaAdapter` (litesvm, and a local validator). The backend serves it through `chain/multi.ts` (§5). Not done: any run on devnet, the SDK, CLI and frontend, a council program (a Squads vault is the decided arbiter). Details and limits in [SOLANA.md](SOLANA.md).
 
 ## 4. Configuration
 
@@ -103,7 +103,15 @@ DEPLOYMENT_BLOCK__eip155_84532=…
 # HOSTED_MIN_GAS__…, LOW_GAS_WARN__…, ERC8004_IDENTITY_REGISTRY__…, ERC8004_REPUTATION_REGISTRY__…
 ```
 
-The suffix is the CAIP-2 id with the colon as an underscore. A served chain without a deployment address, or an RPC that reports another chain id, stops the process at startup. Escrow timers (`EXECUTION_WINDOW_SECONDS`, …) are shared and checked against every chain's contract.
+A Solana chain is listed in `CHAINS` like any other (`CHAINS=solana-devnet,bsc-testnet`; the first is the default, of either family) and configured by the same suffix rule:
+
+```
+AGENT_ECO_PROGRAM__solana_EtWTRABZaYq6iMfeYKouRu166VU2xqa1=<program id>   # required: no default deployment
+# optional: RPC_URL__… (default the public devnet RPC), TOKEN_MINT__… (default devnet USDC), FIRST_ESCROW_ID__…
+SOLANA_KEEPER_KEYPAIR=/path/keypair.json                                   # the keeper's key for Solana chains (a Solana CLI keypair file)
+```
+
+`KEEPER_PRIVATE_KEY` is required only when an EVM chain is served. The suffix is the CAIP-2 id with the colon as an underscore. A served chain without a deployment address, or an RPC that reports another chain id (for Solana: another genesis hash), stops the process at startup. Escrow timers (`EXECUTION_WINDOW_SECONDS`, …) are shared and checked against every chain's contract.
 
 ### Frontend
 
@@ -145,6 +153,8 @@ New database, created with a plain `prisma db push` (no data is carried over fro
 
 **SDK.** `hire({ chain })` buys only from sellers on that chain; `createSellerAgent({ chain })` trades on it (an attached listing brings its own chain). Omitted: an attached listing's chain, else `NETWORK`.
 
+**Solana chains.** `GET /chains` carries a `family` (`evm` | `solana`) per chain; a Solana entry has `evmChainId: null`, the program under `agentEco` and `erc8004: null`. What works on a Solana chain: wallet sign-in with ed25519 (`x-owner-wallet` is a base58 address, `x-signature` a base58 signature of the same `AgentEco:<wallet>:<timestamp>` text), registering and listing self-hosted agents, tasks (the link to an escrow is checked against the program), results, disputes (the reason hash is checked against the one the buyer committed), ratings (read from the program's `SellerRated` event, reported by signature or found by the periodic scan), access rules, the arbiter list, and the keeper (`SOLANA_KEEPER_KEYPAIR`). Wallet addresses are stored and compared by family: EVM lowercase, Solana exactly as given (`shared/wallets.ts`), and `POST /tasks` refuses a buyer or seller of the wrong family for the chain. **Not available on a Solana chain** (each answers 400): hosted agents (custodial keys are EVM keys), ERC-8004, and device links. The hosted-agent hosts, the AI arbiter host and the gas watch run on the EVM chains only; a Solana dispute is ruled by the program's arbiter signer ([SOLANA.md](SOLANA.md) §4).
+
 **Local database.** `npm run db:local` (backend) runs an embedded Postgres (PGlite) on port 54330 with its data in `backend/.pglite` (gitignored); with `DATABASE_URL`/`DIRECT_URL` at `postgresql://postgres:postgres@127.0.0.1:54330/postgres?sslmode=disable` (the generated `backend/.env` has them), `npm run db:local:init` creates the schema. Prisma's own `db push` cannot talk to PGlite, so the script applies the SQL `prisma migrate diff` generates for the same schema; for the online database (Supabase) a plain `npx prisma db push` stays the way. PGlite serves one connection at a time: the tests set `DB_POOL_MAX=1`, which `src/db.ts` honours.
 
 ## 6. Identity and reputation: ERC-8004
@@ -185,6 +195,7 @@ All on-chain suites run on throwaway local chains (anvil) with the real contract
 - **Regression:** `agent-runtime/src/onchain/escrow.chain.test.ts` and `backend/src/keeper/escrowKeeper.chain.test.ts` were written against the single-chain code before any refactor and pass unchanged: the whole escrow lifecycle, wallet-arbiter and council rulings, the escrow index, every keeper timeout, on-chain reputation. The original suites (forge 97, backend 76, agent-runtime 53) are unchanged.
 - **Adapter and registry:** `chain/evm.test.ts` (explicit config, two deployments on one chain), `chain/default.test.ts` (the primary chain matches `network.ts`), `chain/registry.test.ts` (`CHAINS`, suffixes, aliases, fail-fast), `chain/erc8004.test.ts` (registration, feedback, owner refused).
 - **Schema:** `backend/src/db.schema.test.ts` — the same escrow id on two chains, every escrow-keyed table unique per `(chain_id, escrow_id)`.
+- **Solana:** `agent-runtime/src/chain/multi.test.ts` (names, environment settings, `CHAINS` across families, fail-fast), `agent-runtime/src/shared/wallets.test.ts`, and `backend/src/solana.e2e.test.ts` — the API with a Solana chain as its default next to an EVM one: ed25519 sign-in and its case sensitivity, agents, a deal, results, a dispute, ratings and the scanner, the keeper, and the refusals above. It runs on litesvm by default and on a real `solana-test-validator` with `SOLANA_LOCAL_VALIDATOR=1` (about 2 minutes; then the chain is built from the environment through `SolanaRpcBackend`, as in production). Details in [SOLANA.md](SOLANA.md) §6.
 - **End to end:** `backend/src/multichain.e2e.test.ts` — the API serving two local chains (chain id 97 with an 18-decimal token, 84532 with a 6-decimal token): escrow #1 on both without mixing, access per chain, disputes per chain arbiter, ratings read from the right chain, cross-chain negotiation refused, ERC-8004 registration checks and deal feedback.
 - Test-only ERC-8004 registries: `test/mocks/ERC8004Registries.sol` (implements just what AgentEco calls; not the reference implementation).
 
@@ -199,7 +210,8 @@ All on-chain suites run on throwaway local chains (anvil) with the real contract
 3. Chain registry in backend, runtime and frontend; chain picker; `chain` in the SDK. **Done.**
 4. ERC-8004 identity and feedback on EVM chains. **Done** (registries per chain by configuration).
 5. Base Sepolia: preset, 6-decimal handling, deploy command. **Done in code**; the contract is not deployed yet.
-6. `SolanaAdapter` and the Anchor program. **Built and tested locally** (litesvm and a local validator); **not deployed and not wired** ([SOLANA.md](SOLANA.md) §9).
+6. `SolanaAdapter` and the Anchor program. **Built and tested locally** (litesvm and a local validator); **not deployed** ([SOLANA.md](SOLANA.md) §9).
+7. The backend serves Solana chains next to EVM ones, for self-hosted agents. **Done** and tested, on litesvm and on a local validator; **not run against devnet**. SDK, CLI, frontend, hosted agents, ERC-8004 and device links on Solana: **not done**.
 
 ## 10. Open questions
 

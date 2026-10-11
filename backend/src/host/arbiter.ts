@@ -9,7 +9,7 @@ import { ARBITER_AUTO_MIN_CONFIDENCE } from '../ai/config.ts'
 import { prisma } from '../db.ts'
 import { log, logError } from '../log.ts'
 import { warnIfLowGas } from '../gasWatch.ts'
-import { readChain, servedChainIds, signerChain, type ChainId } from '../chains.ts'
+import { readChain, servedChainIdsOf, signerChain, type ChainId } from '../chains.ts'
 
 /**
  * The AI arbiter (spec §11 steps 3–5), run by the host process: it already has
@@ -62,13 +62,13 @@ export async function initArbiter(): Promise<void> {
   const key = arbiterKey()
   const next = new Map<ChainId, ChainArbiter>()
   if (!key) {
-    for (const chainId of servedChainIds()) next.set(chainId, { signer: null, rulable: new Set() })
+    for (const chainId of servedChainIdsOf('evm')) next.set(chainId, { signer: null, rulable: new Set() })
     arbiters = next
     log('Arbiter: no ARBITER_PRIVATE_KEY — AI recommendations only, no automatic rulings.', 'HOST')
     return
   }
   const account = privateKeyToAccount(key)
-  for (const chainId of servedChainIds()) {
+  for (const chainId of servedChainIdsOf('evm')) {
     const reader = readChain(chainId)
     const setup = await reader.arbiterSetupAt()
     if (!canRule(setup, account.address)) {
@@ -295,7 +295,7 @@ async function runChain(chainId: ChainId): Promise<void> {
 
 export async function runArbiterCycleOnce(): Promise<void> {
   if (arbiters === undefined) await initArbiter()
-  for (const chainId of servedChainIds()) {
+  for (const chainId of servedChainIdsOf('evm')) {
     try {
       await runChain(chainId)
     } catch (error) {

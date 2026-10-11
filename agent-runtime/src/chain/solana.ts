@@ -10,8 +10,10 @@ import { createHash } from 'node:crypto'
 import {
   AccountRole,
   address,
+  createSignableMessage,
   getAddressDecoder,
   getAddressEncoder,
+  getBase58Decoder,
   getBase58Encoder,
   getProgramDerivedAddress,
   getPublicKeyFromAddress,
@@ -19,6 +21,7 @@ import {
   verifySignature as verifyEd25519,
   type Address,
   type Instruction as IInstruction,
+  type MessagePartialSigner,
   type SignatureBytes,
   type TransactionSigner,
 } from '@solana/kit'
@@ -59,6 +62,32 @@ export function isSolanaChainId(chainId: string): boolean {
   return /^solana:[1-9A-HJ-NP-Za-km-z]{32}$/.test(chainId)
 }
 
+/** Whether `signature` (base58) is `address`'s ed25519 signature of the UTF-8 text `message`. Never throws: anything malformed is false. */
+export async function verifySolanaSignature(params: { address: string; message: string; signature: string }): Promise<boolean> {
+  try {
+    if (!isAddress(params.address)) return false
+    const key = await getPublicKeyFromAddress(address(params.address))
+    const sig = new Uint8Array(getBase58Encoder().encode(params.signature)) as SignatureBytes
+    return await verifyEd25519(key, sig, new TextEncoder().encode(params.message))
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The headers that prove a Solana wallet's identity to the API (see backend/src/auth.ts): the same
+ * `AgentEco:<wallet>:<timestamp>` text as for EVM wallets, signed with ed25519 and sent in base58.
+ */
+export async function buildSolanaAuthHeaders(signer: MessagePartialSigner): Promise<Record<string, string>> {
+  const timestamp = Date.now()
+  const [signatures] = await signer.signMessages([createSignableMessage(`AgentEco:${signer.address}:${timestamp}`)])
+  return {
+    'x-owner-wallet': signer.address,
+    'x-signature': getBase58Decoder().decode(signatures[signer.address]),
+    'x-timestamp': String(timestamp),
+  }
+}
+
 /** What SolanaAdapter needs from wherever the transactions actually run — litesvm today, a real RPC later. */
 export interface SolanaBackend {
   getAccount(addr: Address): Promise<{ data: Uint8Array; lamports: bigint; owner: Address } | null>
@@ -79,6 +108,8 @@ export interface SolanaChainConfig {
   nativeSymbol: string
   explorerUrl: string
   explorerName: string
+  /** Appended to every explorer link, e.g. `?cluster=devnet` (the Solana Explorer needs it off mainnet). */
+  explorerQuery?: string
   /** Negotiated off-chain, same as EvmChainConfig's fields of the same name. */
   executionWindow: bigint
   reviewWindow: bigint
@@ -385,6 +416,14 @@ function ratingEvents(events: Uint8Array[], txHash: string): RatingEvent[] {
 
 const ATA_PROGRAM_ID = address('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
 
+/** No escrow with this id on this chain (never created: ids are not reused, and nothing closes an escrow). */
+export class EscrowNotFoundError extends Error {
+  constructor(readonly chainId: string, readonly escrowId: bigint) {
+    super(`escrow ${escrowId} does not exist on ${chainId}`)
+    this.name = 'EscrowNotFoundError'
+  }
+}
+
 export interface InitializeParams {
   programId: Address
   /** Signs, pays for the Config account and becomes the program's admin (fee and arbiter changes). */
@@ -449,10 +488,11 @@ export class SolanaAdapter implements ChainAdapter {
     this.firstEscrowId = config.firstEscrowId
     this.backend = backend
     this.feePayer = feePayer
+    const query = config.explorerQuery ?? ''
     this.explorer = {
       name: config.explorerName,
-      txUrl: (hash: string) => `${config.explorerUrl}/tx/${hash}`,
-      addressUrl: (a: string) => `${config.explorerUrl}/address/${a}`,
+      txUrl: (hash: string) => `${config.explorerUrl}/tx/${hash}${query}`,
+      addressUrl: (a: string) => `${config.explorerUrl}/address/${a}${query}`,
     }
   }
 
@@ -468,15 +508,8 @@ export class SolanaAdapter implements ChainAdapter {
     return isAddress(a)
   }
 
-  async verifySignature(params: { address: string; message: string; signature: string }): Promise<boolean> {
-    try {
-      if (!isAddress(params.address)) return false
-      const key = await getPublicKeyFromAddress(address(params.address))
-      const sig = new Uint8Array(getBase58Encoder().encode(params.signature)) as SignatureBytes
-      return await verifyEd25519(key, sig, new TextEncoder().encode(params.message))
-    } catch {
-      return false
-    }
+  verifySignature(params: { address: string; message: string; signature: string }): Promise<boolean> {
+    return verifySolanaSignature(params)
   }
 
   private requireSigner(): TransactionSigner {
@@ -491,8 +524,8 @@ export class SolanaAdapter implements ChainAdapter {
   }
 
   private async decodedEscrow(id: EscrowId): Promise<DecodedEscrow> {
-    const pda = await escrowPda(this.programId, id)
-    const acc = await this.getAccountOrThrow(pda, `escrow ${id}`)
+    const acc = await this.backend.getAccount(await escrowPda(this.programId, id))
+    if (!acc) throw new EscrowNotFoundError(this.chainId, id)
     return decodeEscrow(acc.data)
   }
 

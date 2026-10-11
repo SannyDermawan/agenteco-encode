@@ -77,6 +77,11 @@ export class SolanaRpcBackend implements SolanaBackend {
     throw new Error(`transaction ${signature} was not ${this.commitment} after ${this.confirmTimeoutMs / 1000} s`)
   }
 
+  /** The cluster's genesis hash (a served chain's id is its first 32 characters). */
+  async getGenesisHash(): Promise<string> {
+    return this.rpc.getGenesisHash().send()
+  }
+
   async getTransactionLogs(signature: string) {
     const tx = await this.rpc.getTransaction(signature as Signature, { encoding: 'json', commitment: this.commitment, maxSupportedTransactionVersion: 0 }).send()
     if (!tx?.meta || tx.meta.err) return null

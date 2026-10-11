@@ -22,7 +22,7 @@ import { log, logError } from '../log.ts'
 import { selectSeller } from './selectSeller.ts'
 import { reviewEscrow } from './buyerReview.ts'
 import { warnIfLowGas } from '../gasWatch.ts'
-import { servedChainIds, signerChain } from '../chains.ts'
+import { servedChainIdsOf, signerChain } from '../chains.ts'
 
 // The host talks to the registry over HTTP like any other agent. Set
 // AGENTECO_API_URL when the API runs as a separate service (e.g. on Railway);
@@ -251,7 +251,7 @@ export async function processHostedBuyerTask(agentRow: HostedBuyerAgentRow): Pro
 
 export async function runHostCycleOnce(): Promise<void> {
   // The only place allowed to read agentWalletKey — see db.ts.
-  const served = servedChainIds()
+  const served = servedChainIdsOf('evm')
   // Buyers on a chain this host does not serve (CHAINS) wait until it does.
   const activeAgents = await prismaWithAgentKey.agent.findMany({
     where: { role: 'buyer', taskStatus: 'active', deletedAt: null, chainId: { in: served } },

@@ -4,6 +4,7 @@ import { prisma } from '../db.ts'
 import { isAgentOwnerWallet, isAuthorizedForAgent, verifyOwnerAuth } from '../auth.ts'
 import { UUID_REGEX, getArbiterSetup, requireViewer } from '../access.ts'
 import { defaultChainId } from '../chains.ts'
+import { normalizeWallet } from '../../../agent-runtime/src/shared/wallets.ts'
 
 /**
  * Listing moderation. Anyone signed in can report a seller; the arbiter
@@ -53,7 +54,7 @@ moderationRouter.param('id', (_req, res, next, id: string) => {
 async function council(): Promise<{ members: string[]; threshold: number }> {
   const setup = await getArbiterSetup(defaultChainId())
   if (setup.council) return { members: setup.council.members.map((m) => m.toLowerCase()), threshold: setup.council.adminThreshold }
-  return { members: [setup.arbiter.toLowerCase()], threshold: 1 }
+  return { members: [normalizeWallet(setup.arbiter)], threshold: 1 }
 }
 
 /** Votes on a case from current council members, counted by choice. */
@@ -72,7 +73,7 @@ moderationRouter.post('/reports', async (req, res) => {
   const parsed = reportSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { agentId, category, reason } = parsed.data
-  const reporter = auth.wallet.toLowerCase()
+  const reporter = normalizeWallet(auth.wallet)
 
   const agent = await prisma.agent.findUnique({ where: { id: agentId } })
   if (!agent || agent.deletedAt || agent.role !== 'seller') return res.status(404).json({ error: 'Seller not found' })
@@ -109,7 +110,7 @@ moderationRouter.post('/reports/:id/vote', async (req, res) => {
   const parsed = reportVoteSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { members, threshold } = await council()
-  const voter = auth.wallet.toLowerCase()
+  const voter = normalizeWallet(auth.wallet)
   if (!members.includes(voter)) return res.status(403).json({ error: 'Only members of the arbiter council can vote' })
 
   const report = await prisma.report.findUnique({ where: { id: req.params.id } })
@@ -162,7 +163,7 @@ moderationRouter.post('/appeals', async (req, res) => {
     return res.status(429).json({ error: 'You can appeal again 24 hours after the last decision' })
   }
 
-  const appeal = await prisma.appeal.create({ data: { agentId, ownerWallet: auth.wallet.toLowerCase(), reason } })
+  const appeal = await prisma.appeal.create({ data: { agentId, ownerWallet: normalizeWallet(auth.wallet), reason } })
   res.status(201).json({ id: appeal.id, status: appeal.status })
 })
 
@@ -172,7 +173,7 @@ moderationRouter.post('/appeals/:id/vote', async (req, res) => {
   const parsed = appealVoteSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { members, threshold } = await council()
-  const voter = auth.wallet.toLowerCase()
+  const voter = normalizeWallet(auth.wallet)
   if (!members.includes(voter)) return res.status(403).json({ error: 'Only members of the arbiter council can vote' })
 
   const appeal = await prisma.appeal.findUnique({ where: { id: req.params.id } })

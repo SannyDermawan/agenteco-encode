@@ -1,7 +1,10 @@
 import { loadConfig } from './config.ts'
 import { runKeeperCycleOn } from './keeper/escrowKeeper.ts'
 import { log, logError } from './log.ts'
-import { assertServedChainsMatchRpc, servedChainIds, signerChain } from './chains.ts'
+import type { EvmAdapter } from '../../agent-runtime/src/chain/evm.ts'
+import { solanaSignerFromFile, signerSolana } from '../../agent-runtime/src/chain/solana-registry.ts'
+import type { ChainAdapter } from '../../agent-runtime/src/chain/types.ts'
+import { assertServedChainsMatchRpc, chainFamily, servedChainIds, signerChain } from './chains.ts'
 import { warnIfLowGas } from './gasWatch.ts'
 
 function sleep(ms: number): Promise<void> {
@@ -10,13 +13,24 @@ function sleep(ms: number): Promise<void> {
 
 async function main(): Promise<void> {
   const config = loadConfig()
-  // The same keeper wallet on every served chain (CHAINS; default: NETWORK alone).
-  const chains = servedChainIds().map((id) => signerChain(id, config.keeperPrivateKey))
-  const wallet = chains[0].signer as `0x${string}`
+  // One keeper wallet per family on every served chain (CHAINS; default: NETWORK alone): the EVM key
+  // for EVM chains, a Solana keypair file for Solana chains.
+  const chains: ChainAdapter[] = []
+  for (const id of servedChainIds()) {
+    if (chainFamily(id) === 'solana') {
+      const file = process.env.SOLANA_KEEPER_KEYPAIR?.trim()
+      if (!file) throw new Error(`Missing required environment variable: SOLANA_KEEPER_KEYPAIR (a Solana keypair JSON file; ${id} is served)`)
+      chains.push(signerSolana(id, await solanaSignerFromFile(file)))
+    } else {
+      chains.push(signerChain(id, config.keeperPrivateKey!))
+    }
+  }
 
   log('Started')
-  log(`Wallet: ${wallet}`)
-  for (const chain of chains) log(`Chain: ${chain.config.chain.name} (${chain.chainId}) — contract ${chain.config.agentEco}`)
+  for (const chain of chains) {
+    log(`Chain: ${chain.chainId} — wallet ${chain.signer}`)
+    if (chain.family === 'evm') log(`Contract: ${(chain as EvmAdapter).config.agentEco}`)
+  }
   log(`Polling interval: ${config.keeperIntervalMs}ms`)
   log(`Dry run: ${config.dryRun}`)
 
@@ -37,7 +51,7 @@ async function main(): Promise<void> {
     for (const chain of chains) {
       const label = chains.length > 1 ? `[${chain.chainId}] ` : ''
       try {
-        await warnIfLowGas(chain, wallet, 'keeper')
+        if (chain.family === 'evm') await warnIfLowGas(chain as EvmAdapter, chain.signer as `0x${string}`, 'keeper')
         await runKeeperCycleOn(chain, config, label)
       } catch (error) {
         logError(`${label}Keeper cycle failed`, error)

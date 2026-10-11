@@ -27,7 +27,7 @@ import { prisma, prismaWithAgentKey } from '../db.ts'
 import { log, logError } from '../log.ts'
 import { warnIfLowGas } from '../gasWatch.ts'
 import { API_URL, refundLeftover } from './buyerTaskHost.ts'
-import { readChain, servedChainIds, signerChain } from '../chains.ts'
+import { readChain, servedChainIdsOf, signerChain } from '../chains.ts'
 import { registerHostedIdentity } from '../erc8004.ts'
 
 // AgentEco.sol OrderStatus enum ordering.
@@ -369,7 +369,7 @@ export async function runSellerHostCycleOnce(): Promise<void> {
   const activeSellers = await prismaWithAgentKey.agent.findMany({ where: { role: 'seller', taskStatus: 'active', deletedAt: null } })
   if (activeSellers.length === 0) return
 
-  const served = new Set(servedChainIds())
+  const served = new Set(servedChainIdsOf('evm'))
   for (const chainId of new Set(activeSellers.map((a) => a.chainId))) {
     const sellers = activeSellers.filter((a) => a.chainId === chainId)
     if (!served.has(chainId)) {
