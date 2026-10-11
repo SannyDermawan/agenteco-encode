@@ -32,3 +32,5 @@ broadcast/**/dry-run/
 # Python
 __pycache__/
 *.pyc
+# build output and the program keypair (a secret)
+solana/target/
