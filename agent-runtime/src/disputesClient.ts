@@ -1,5 +1,4 @@
-import type { LocalAccount } from 'viem'
-import { buildAuthHeaders } from './authHeaders.ts'
+import { buildAuthHeaders, type WalletAccount } from './authHeaders.ts'
 import { withChain } from './chainQuery.ts'
 
 /** A dispute's off-chain record (backend/prisma: Dispute). Every text re-hashes to its on-chain hash. */
@@ -34,14 +33,14 @@ async function parseOrThrow<T>(res: Response, action: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export async function getDispute(apiUrl: string, escrowId: string, reader: LocalAccount, chainId?: string): Promise<RegistryDispute | null> {
+export async function getDispute(apiUrl: string, escrowId: string, reader: WalletAccount, chainId?: string): Promise<RegistryDispute | null> {
   const res = await fetch(withChain(`${apiUrl}/disputes/${escrowId}`, chainId), { headers: await buildAuthHeaders(reader) })
   if (res.status === 404) return null
   return parseOrThrow(res, 'Reading dispute')
 }
 
 /** Buyer: the reason text behind raiseDispute's reasonHash — must be the exact hashed string. */
-export async function submitDisputeReason(apiUrl: string, buyer: LocalAccount, escrowId: string, reason: string, chainId?: string): Promise<RegistryDispute> {
+export async function submitDisputeReason(apiUrl: string, buyer: WalletAccount, escrowId: string, reason: string, chainId?: string): Promise<RegistryDispute> {
   const res = await fetch(withChain(`${apiUrl}/disputes/${escrowId}`, chainId), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...(await buildAuthHeaders(buyer)) },
@@ -53,7 +52,7 @@ export async function submitDisputeReason(apiUrl: string, buyer: LocalAccount, e
 /** Seller: the response text behind submitDisputeResponse's responseHash. */
 export async function submitDisputeResponseText(
   apiUrl: string,
-  seller: LocalAccount,
+  seller: WalletAccount,
   escrowId: string,
   response: string,
   source: 'ai' | 'manual' | 'api',

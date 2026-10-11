@@ -11,6 +11,6 @@ export default defineConfig({
   clean: true,
   sourcemap: false,
   splitting: false,
-  external: ['viem', 'zod', '@modelcontextprotocol/sdk'],
+  external: ['viem', 'zod', '@modelcontextprotocol/sdk', '@solana/kit'],
   noExternal: [/agent-runtime/],
 })

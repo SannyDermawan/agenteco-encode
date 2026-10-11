@@ -1,10 +1,10 @@
-import type { Hex } from 'viem'
 import { DemoAgentRuntime } from '../runtime.ts'
-import { PRIMARY_CHAIN_ID, normalizeChainId, signerChain } from '../chain/registry.ts'
+import { PRIMARY_CHAIN_ID } from '../chain/registry.ts'
+import { chainFamily } from '../chain/multi.ts'
 import type { EvmAdapter } from '../chain/evm.ts'
+import type { ChainAdapter, ChainId } from '../chain/types.ts'
 import { registerOrSyncSelf } from '../registryClient.ts'
 import { countOffersBySide, isMyTurn, listNegotiationsForAgent, respondToNegotiation } from '../negotiationClient.ts'
-import { privateKeyToAccount } from 'viem/accounts'
 import { hashPreimage, resultHash, textHash } from '../shared/hashes.ts'
 import { isCapabilityId } from '../shared/capabilities/definitions.ts'
 import { mentionsAiUnavailable, prepareJob, type PreparedJob } from '../capabilities/prepare.ts'
@@ -12,11 +12,13 @@ import { getTaskByEscrow } from '../tasksClient.ts'
 import { getEscrowResult, publishEscrowResult } from '../resultsClient.ts'
 import { getDispute, submitDisputeResponseText } from '../disputesClient.ts'
 import { HEARTBEAT_SECONDS, SELLER_RESPONSE_WINDOW_SECONDS } from '../durations.ts'
-import { buildAuthHeaders } from '../authHeaders.ts'
+import { buildAuthHeaders, type WalletAccount } from '../authHeaders.ts'
+import { sameWallet } from '../shared/wallets.ts'
 import { resolveCapability } from './capability.ts'
 import { defendWithAi, runPlatformJob, type AiModel } from './ai.ts'
 import { apiErc8004Registries } from './common.ts'
 import { DEFAULT_API_URL, type Logger, consoleLogger, sleep } from './common.ts'
+import { chainFor, openEvmWallet, openWallet, walletAddress, type Wallet, type WalletKey } from './wallet.ts'
 
 /** One paid job, handed to your code once the escrow is funded and the brief checks out. */
 export interface Job {
@@ -64,18 +66,22 @@ export type OfferDecision =
   | { action: 'reject'; reason?: string }
 
 export interface SellerAgentOptions {
-  /** The seller's own wallet: it signs registry writes and on-chain moves, and is paid. Needs a little native gas. */
-  privateKey: Hex
+  /**
+   * The seller's own wallet: it signs registry writes and on-chain moves, and is paid. Needs a little
+   * native gas. An EVM private key (0x…) for an EVM chain, a Solana secret key (64 bytes) for a Solana chain.
+   */
+  privateKey: WalletKey
   /** AgentEco API. Default: AGENTECO_API_URL, else the public testnet API. */
   apiUrl?: string
   /**
-   * The chain to trade on: a CAIP-2 id (eip155:84532), a network name (base-sepolia) or an EVM
-   * chain id. Default: an attached listing's chain, else NETWORK (bsc-testnet).
+   * The chain to trade on: a CAIP-2 id (eip155:84532, solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1), a
+   * network name (base-sepolia, solana-devnet) or an EVM chain id. Default: an attached listing's
+   * chain, else NETWORK (bsc-testnet) — or Solana devnet for a Solana key.
    */
   chain?: string
   /**
    * Register this listing's ERC-8004 identity on its chain (once, from this wallet, which then
-   * owns it) when the API reports registries there. Default false: it costs a transaction.
+   * owns it) when the API reports registries there (EVM chains only). Default false: it costs a transaction.
    */
   erc8004?: boolean
   /**
@@ -129,7 +135,7 @@ export interface SellerAgentOptions {
 
 export interface SellerAgent {
   /** The seller wallet's address. */
-  readonly address: `0x${string}`
+  readonly address: string
   /** Registers (or attaches to) the listing, then serves until stop(). */
   start(): Promise<void>
   /** Stops serving and tells AgentEco the agent is offline. */
@@ -188,15 +194,33 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
   const apiUrl = options.apiUrl ?? DEFAULT_API_URL
   const log = options.log ?? consoleLogger(options.name ?? 'seller')
   const pollMs = options.pollMs ?? 3000
-  const account = privateKeyToAccount(options.privateKey)
-  const chosenChain = options.chain === undefined ? null : normalizeChainId(options.chain)
-  if (options.chain !== undefined && !chosenChain) throw new Error(`Unknown chain: ${options.chain}`)
+  const address = walletAddress(options.privateKey)
+  const chosenChain = options.chain === undefined ? null : chainFor(options.privateKey, options.chain, PRIMARY_CHAIN_ID)
   /** Where this agent's escrows live; an attached listing may move it to the listing's chain. */
-  let chain: EvmAdapter = signerChain(chosenChain ?? PRIMARY_CHAIN_ID, options.privateKey)
+  let chainId: ChainId = chosenChain ?? chainFor(options.privateKey, undefined, PRIMARY_CHAIN_ID)
+  // Opened on first use: a Solana signer is derived asynchronously, and createSellerAgent is not.
+  let account!: WalletAccount
+  let chain!: ChainAdapter
+  let openedOn: ChainId | null = null
+  function use(wallet: Wallet): void {
+    account = wallet.account
+    chain = wallet.adapter
+    chainId = wallet.chainId
+    openedOn = wallet.chainId
+  }
+  async function openOn(id: ChainId): Promise<void> {
+    if (openedOn === id) return
+    use(typeof options.privateKey === 'string' ? openEvmWallet(id, options.privateKey) : await openWallet(id, options.privateKey))
+  }
+  // An EVM chain nobody configured fails here, as it always did; only a Solana signer must wait.
+  if (typeof options.privateKey === 'string') use(openEvmWallet(chainId, options.privateKey))
 
   function checkWorker(capability: string) {
     if (!options.handle && !isCapabilityId(capability)) {
       throw new Error(`"${capability}" is a community capability — pass a handle(job) that produces its result.`)
+    }
+    if (capability === 'tx_explainer' && chainFamily(chainId) !== 'evm') {
+      throw new Error('"tx_explainer" explains EVM transactions and cannot be sold on a Solana chain.')
     }
     // The four platform capabilities are written by an AI: bring one (or your own handler).
     if (!options.handle && !options.ai) {
@@ -241,13 +265,13 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
       chainId?: string
     }
     if (agent.role !== 'seller') throw new Error(`Listing ${id} is not a seller.`)
-    if (agent.chainId && agent.chainId !== chain.chainId) {
+    if (agent.chainId && agent.chainId !== chainId) {
       if (chosenChain) throw new Error(`Listing ${id} trades on ${agent.chainId}, not ${chosenChain}.`)
-      chain = signerChain(agent.chainId, options.privateKey)
+      await openOn(agent.chainId)
     }
     if (agent.taskStatus !== null) throw new Error(`Listing ${id} is hosted by AgentEco; a self-hosted agent cannot run it.`)
-    if (agent.walletAddress?.toLowerCase() !== account.address.toLowerCase()) {
-      throw new Error(`Listing ${id} names the agent wallet ${agent.walletAddress}, but this key is ${account.address}. Use that wallet's key, or register this one.`)
+    if (!agent.walletAddress || !sameWallet(agent.walletAddress, address)) {
+      throw new Error(`Listing ${id} names the agent wallet ${agent.walletAddress}, but this key is ${address}. Use that wallet's key, or register this one.`)
     }
     if (options.capability && options.capability !== agent.capabilities[0]) {
       throw new Error(`Listing ${id} sells "${agent.capabilities[0]}", not "${options.capability}".`)
@@ -273,7 +297,7 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
           service: options.name!,
           basePrice: options.price!,
         },
-        { apiUrl, account, walletAddress: account.address, chainId: chain.chainId }
+        { apiUrl, account, walletAddress: address, chainId: chain.chainId }
       )
       id = agent.id
     }
@@ -298,6 +322,10 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
    * listing's registration file, then recorded with the API (which checks it on-chain).
    */
   async function registerIdentity(id: string): Promise<void> {
+    if (chain.family !== 'evm') {
+      log(`ERC-8004: not available on ${chain.chainId} — skipped`)
+      return
+    }
     const registries = await apiErc8004Registries(apiUrl, chain.chainId)
     if (!registries) {
       log(`ERC-8004: no registries on ${chain.chainId} — skipped`)
@@ -306,7 +334,7 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
     const res = await fetch(`${apiUrl}/agents/${id}`)
     const current = res.ok ? ((await res.json()) as { erc8004AgentId?: string | null }) : null
     if (current?.erc8004AgentId) return
-    const { agentId, txHash } = await chain.withErc8004(registries).erc8004Register(`${apiUrl}/agents/${id}/registration.json`)
+    const { agentId, txHash } = await (chain as EvmAdapter).withErc8004(registries).erc8004Register(`${apiUrl}/agents/${id}/registration.json`)
     const recorded = await fetch(`${apiUrl}/agents/${id}/erc8004`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(await buildAuthHeaders(account)) },
@@ -390,7 +418,7 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
       log(`escrow #${escrowId}: the task does not match the on-chain taskHash — not taking it`)
       return null
     }
-    if (task.seller.toLowerCase() !== account.address.toLowerCase() || task.capability !== listing!.capability) {
+    if (!sameWallet(task.seller, address) || task.capability !== listing!.capability) {
       log(`escrow #${escrowId}: the task is for another seller or capability — not taking it`)
       return null
     }
@@ -402,7 +430,8 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
     }
     const job: Job = { escrowId, capability: task.capability, brief: brief.brief, criteria: task.criteria, price: task.price, buyer: task.buyer }
     if (isCapabilityId(task.capability)) {
-      const prepared = await prepareJob(task.capability, task.brief, { publicClient: chain.client, agentEcoAddress: chain.config.agentEco })
+      const evm = chain.family === 'evm' ? (chain as EvmAdapter) : null
+      const prepared = await prepareJob(task.capability, task.brief, { publicClient: evm?.client, agentEcoAddress: evm?.config.agentEco })
       if (!prepared.ok) {
         log(`escrow #${escrowId}: ${prepared.reason} — not taking it`)
         return null
@@ -493,11 +522,12 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
   }
 
   async function runOnce(): Promise<void> {
+    await openOn(chainId)
     agentId ??= await register()
     if (Date.now() - lastBeat >= HEARTBEAT_SECONDS * 1000) await heartbeat(agentId, true)
     await negotiate(agentId)
     const mine = (await chain.listEscrows()).filter(
-      (e) => e.seller.toLowerCase() === account.address.toLowerCase() && !finished.has(e.id)
+      (e) => sameWallet(e.seller, address) && !finished.has(e.id)
     )
     for (const { id } of mine) {
       const retry = retries.get(id)
@@ -535,10 +565,12 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
   }
 
   return {
-    address: account.address,
+    address,
     async start() {
       running = true
-      log(`wallet ${account.address}, ${chain.config.chain.name} (${chain.chainId}), AgentEco ${chain.config.agentEco}`)
+      await openOn(chainId)
+      const where = chain.family === 'evm' ? `${(chain as EvmAdapter).config.chain.name} (${chain.chainId}), AgentEco ${(chain as EvmAdapter).config.agentEco}` : `Solana (${chain.chainId})`
+      log(`wallet ${address}, ${where}`)
       while (running) {
         try {
           await runOnce()

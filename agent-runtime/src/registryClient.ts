@@ -1,6 +1,5 @@
-import type { LocalAccount } from 'viem'
 import type { AgentConfig } from './types.ts'
-import { buildAuthHeaders } from './authHeaders.ts'
+import { buildAuthHeaders, type WalletAccount } from './authHeaders.ts'
 import { withChain } from './chainQuery.ts'
 
 export interface RegistryAgent {
@@ -16,7 +15,7 @@ export interface RegistryAgent {
 export interface RegisterOptions {
   apiUrl: string
   /** This agent's own account — signs proof of ownership for the registry API. */
-  account: LocalAccount
+  account: WalletAccount
   /** On-chain payout wallet to advertise for this agent (sellers only, usually). */
   walletAddress?: string
   /**
@@ -42,7 +41,7 @@ async function parseOrThrow(res: Response, action: string): Promise<any> {
  */
 export async function findOwnAgent(
   apiUrl: string,
-  owner: LocalAccount,
+  owner: WalletAccount,
   match: { role?: 'buyer' | 'seller'; name?: string; chainId?: string } = {}
 ): Promise<RegistryAgent | null> {
   const res = await fetch(withChain(`${apiUrl}/agents?ownerWallet=${owner.address}`, match.chainId), { headers: await buildAuthHeaders(owner) })

@@ -1,11 +1,12 @@
-import type { Hex } from 'viem'
 import { DemoAgentRuntime } from '../runtime.ts'
-import { PRIMARY_CHAIN_ID, normalizeChainId, signerChain } from '../chain/registry.ts'
+import type { WalletAccount } from '../authHeaders.ts'
+import type { EvmAdapter } from '../chain/evm.ts'
+import { PRIMARY_CHAIN_ID } from '../chain/registry.ts'
+import type { ChainAdapter } from '../chain/types.ts'
 import { discoverAgents, registerOrSyncSelf, type DiscoveredAgent } from '../registryClient.ts'
-import { countOffersBySide, isMyTurn, listNegotiationsForAgent, openNegotiation, respondToNegotiation } from '../negotiationClient.ts'
+import { countOffersBySide, isMyTurn, isStaleNegotiationError, listNegotiationsForAgent, openNegotiation, respondToNegotiation } from '../negotiationClient.ts'
 import { attachEscrowToOrder, listOrdersForAgent } from '../ordersClient.ts'
 import { hireWithTask } from '../tasksClient.ts'
-import { privateKeyToAccount } from 'viem/accounts'
 import { getEscrowResult } from '../resultsClient.ts'
 import { submitDisputeReason } from '../disputesClient.ts'
 import { hashPreimage, textHash } from '../shared/hashes.ts'
@@ -14,20 +15,25 @@ import { scoreWithAi, type AiModel } from './ai.ts'
 import { DEFAULT_API_URL, type Logger, apiErc8004Registries, consoleLogger, sleep } from './common.ts'
 import { dealFeedback } from '../shared/erc8004.ts'
 import { checkDecision, type Offer, type OfferDecision } from './seller.ts'
+import { accountOf, chainFor, openWallet, type WalletKey } from './wallet.ts'
 
 export type Review =
   | { accept: true; /** Optional on-chain rating for the seller, 1–100. */ rating?: number }
   | { accept: false; /** Why — goes to the seller and the arbiter (≥ 10 characters). */ reason: string }
 
 export interface HireOptions {
-  /** The buyer's wallet: it pays into escrow (needs the token plus a little native gas). */
-  privateKey: Hex
+  /**
+   * The buyer's wallet: it pays into escrow (needs the token plus a little native gas). An EVM
+   * private key (0x…) for an EVM chain, a Solana secret key (64 bytes) for a Solana chain.
+   */
+  privateKey: WalletKey
   /** AgentEco API. Default: AGENTECO_API_URL, else the public testnet API. */
   apiUrl?: string
   /**
-   * The chain to buy on: a CAIP-2 id (eip155:84532), a network name (base-sepolia) or an EVM
-   * chain id. Only sellers on this chain are considered. Default: a given `sellerId`'s chain,
-   * else NETWORK (bsc-testnet).
+   * The chain to buy on: a CAIP-2 id (eip155:84532, solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1), a
+   * network name (base-sepolia, solana-devnet) or an EVM chain id. Only sellers on this chain are
+   * considered. Default: a given `sellerId`'s chain, else NETWORK (bsc-testnet) — or Solana devnet
+   * for a Solana key.
    */
   chain?: string
   /** What to buy: a platform capability id or a community one from the registry. */
@@ -118,7 +124,7 @@ export interface HireHandle {
 
 /** What every stage after openHire needs: the buyer's key and the API. */
 export interface HireContext {
-  privateKey: Hex
+  privateKey: WalletKey
   apiUrl?: string
   /** How often to poll. Default 3000 ms. */
   pollMs?: number
@@ -138,8 +144,8 @@ export type Delivery =
 
 interface Stage {
   apiUrl: string
-  account: ReturnType<typeof privateKeyToAccount>
-  chain: ReturnType<typeof signerChain>
+  account: WalletAccount
+  chain: ChainAdapter
   chainId: string
   log: Logger
   pollMs: number
@@ -147,15 +153,16 @@ interface Stage {
   waitStep(what: string): Promise<void>
 }
 
-function stageFor(handle: Pick<HireHandle, 'chainId'>, ctx: HireContext, deadline?: number): Stage {
+async function stageFor(handle: Pick<HireHandle, 'chainId'>, ctx: HireContext, deadline?: number): Promise<Stage> {
   const apiUrl = ctx.apiUrl ?? DEFAULT_API_URL
   const log = ctx.log ?? consoleLogger('SDK buyer')
   const pollMs = ctx.pollMs ?? 3000
   const until = deadline ?? Date.now() + (ctx.timeoutMs ?? 20 * 60_000)
+  const wallet = await openWallet(handle.chainId, ctx.privateKey)
   return {
     apiUrl,
-    account: privateKeyToAccount(ctx.privateKey),
-    chain: signerChain(handle.chainId, ctx.privateKey),
+    account: wallet.account,
+    chain: wallet.adapter,
     chainId: handle.chainId,
     log,
     pollMs,
@@ -184,10 +191,9 @@ async function openStage(options: OpenHireOptions, deadline: number | undefined)
   const log = options.log ?? consoleLogger(name)
   const pollMs = options.pollMs ?? 3000
   const until = deadline ?? Date.now() + (options.timeoutMs ?? 20 * 60_000)
-  const account = privateKeyToAccount(options.privateKey)
-  const chosenChain = options.chain === undefined ? null : normalizeChainId(options.chain)
-  if (options.chain !== undefined && !chosenChain) throw new Error(`Unknown chain: ${options.chain}`)
-  let chainId = chosenChain ?? PRIMARY_CHAIN_ID
+  const account = await accountOf(options.privateKey)
+  const chosenChain = options.chain === undefined ? null : chainFor(options.privateKey, options.chain, PRIMARY_CHAIN_ID)
+  let chainId = chosenChain ?? chainFor(options.privateKey, undefined, PRIMARY_CHAIN_ID)
   const waitStep = async (what: string) => {
     if (Date.now() > until) throw new Error(`Timed out waiting for ${what}.`)
     await sleep(pollMs)
@@ -215,7 +221,7 @@ async function openStage(options: OpenHireOptions, deadline: number | undefined)
       .sort((a, b) => Number(a.price) - Number(b.price))[0]
   }
   if (!seller?.walletAddress) throw new Error(`No online seller of "${options.capability}" fits a budget of ${options.maxBudget}.`)
-  const chain = signerChain(chainId, options.privateKey)
+  const chain = (await openWallet(chainId, options.privateKey)).adapter
   const listing = Number(seller.price)
   log(`seller: ${seller.name} (${seller.id.slice(0, 8)}) lists ${listing}`)
 
@@ -281,13 +287,19 @@ async function openStage(options: OpenHireOptions, deadline: number | undefined)
       decision = policy.decideOnOffer(offered, countersSoFar)
     }
     log(`seller asks ${offered} → ${decision.action}${decision.action === 'counter' ? ` ${decision.price}` : ''}`)
-    negotiation = await respondToNegotiation(apiUrl, account, negotiation.id, {
-      side: 'buyer',
-      action: decision.action,
-      ...(decision.action === 'counter' ? { price: decision.price } : {}),
-      ...(decision.reason ? { reason: decision.reason } : {}),
-      source,
-    })
+    try {
+      negotiation = await respondToNegotiation(apiUrl, account, negotiation.id, {
+        side: 'buyer',
+        action: decision.action,
+        ...(decision.action === 'counter' ? { price: decision.price } : {}),
+        ...(decision.reason ? { reason: decision.reason } : {}),
+        source,
+      })
+    } catch (error) {
+      // The seller's answer landed between our read and our reply: read the negotiation again.
+      if (!isStaleNegotiationError(error)) throw error
+      log('the negotiation moved on while replying — reading it again')
+    }
   }
   if (negotiation.status === 'expired') throw new Error(`No deal with ${seller.name}: the negotiation expired (a side stayed silent too long).`)
   if (negotiation.status !== 'accepted') throw new Error(`No deal with ${seller.name}: the prices never met.`)
@@ -305,7 +317,7 @@ async function openStage(options: OpenHireOptions, deadline: number | undefined)
       brief: brief.brief,
       criteria: options.criteria ?? '',
       price,
-      seller: seller.walletAddress as `0x${string}`,
+      seller: seller.walletAddress,
     },
     chain
   )
@@ -332,7 +344,7 @@ async function openStage(options: OpenHireOptions, deadline: number | undefined)
  * seller for a result nobody could check.
  */
 export async function awaitDelivery(handle: HireHandle, ctx: HireContext): Promise<Delivery> {
-  return deliveryStage(handle, stageFor(handle, ctx))
+  return deliveryStage(handle, await stageFor(handle, ctx))
 }
 
 async function deliveryStage(handle: HireHandle, s: Stage): Promise<Delivery> {
@@ -379,7 +391,7 @@ export interface SettleOutcome {
  * (unless `erc8004Feedback` is false).
  */
 export async function settleHire(handle: HireHandle, ctx: HireContext, opts: { rating?: number; erc8004Feedback?: boolean } = {}): Promise<SettleOutcome> {
-  return settleStage(handle, stageFor(handle, ctx), opts)
+  return settleStage(handle, await stageFor(handle, ctx), opts)
 }
 
 async function settleStage(handle: HireHandle, s: Stage, opts: { rating?: number; erc8004Feedback?: boolean }): Promise<SettleOutcome> {
@@ -394,9 +406,9 @@ async function settleStage(handle: HireHandle, s: Stage, opts: { rating?: number
   s.log(`rated ${score}/100`)
   outcome.rated = score
   const registries = handle.seller.erc8004AgentId && opts.erc8004Feedback !== false ? await apiErc8004Registries(s.apiUrl, s.chainId) : null
-  if (registries && handle.seller.erc8004AgentId) {
+  if (registries && handle.seller.erc8004AgentId && s.chain.family === 'evm') {
     try {
-      outcome.erc8004FeedbackTx = await s.chain
+      outcome.erc8004FeedbackTx = await (s.chain as EvmAdapter)
         .withErc8004(registries)
         .erc8004GiveFeedback(BigInt(handle.seller.erc8004AgentId), dealFeedback({ score, capability: handle.capability, chainId: s.chainId, escrowId }))
       s.log(`ERC-8004 feedback given (tx ${outcome.erc8004FeedbackTx})`)
@@ -409,7 +421,7 @@ async function settleStage(handle: HireHandle, s: Stage, opts: { rating?: number
 
 /** Disputes the delivery: the reason (at least 10 characters) goes on-chain as a hash and to the API as text. */
 export async function disputeHire(handle: HireHandle, ctx: HireContext, reason: string): Promise<void> {
-  return disputeStage(handle, stageFor(handle, ctx), reason)
+  return disputeStage(handle, await stageFor(handle, ctx), reason)
 }
 
 async function disputeStage(handle: HireHandle, s: Stage, reasonText: string): Promise<void> {
@@ -438,7 +450,7 @@ export async function hire(options: HireOptions): Promise<HireResult> {
   // One deadline for the whole deal, as before.
   const deadline = Date.now() + (options.timeoutMs ?? 20 * 60_000)
   const handle = await openStage(options, deadline)
-  const s = stageFor(handle, { ...options, log: options.log ?? consoleLogger(options.name ?? 'SDK buyer') }, deadline)
+  const s = await stageFor(handle, { ...options, log: options.log ?? consoleLogger(options.name ?? 'SDK buyer') }, deadline)
   const escrowId = BigInt(handle.escrowId)
   const sellerInfo = { id: handle.seller.id, name: handle.seller.name, wallet: handle.seller.wallet }
   const base = { escrowId, seller: sellerInfo, price: handle.price }

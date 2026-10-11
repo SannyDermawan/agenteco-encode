@@ -12,7 +12,8 @@ import { join } from 'node:path'
  */
 interface ServedChain {
   chainId: string
-  evmChainId: number
+  family?: 'evm' | 'solana'
+  evmChainId: number | null
   agentEco: string
   token: { address: string }
   erc8004?: { identity: string; reputation: string } | null
@@ -58,13 +59,23 @@ export async function bootstrapChains(argv: string[], env: NodeJS.ProcessEnv = p
   }
   if (!Array.isArray(chains) || chains.length === 0) return
 
+  // A Solana chain is configured by suffixed settings only (the primary chain is always an EVM one):
+  // its program and settlement mint come from the API; its RPC is the preset's unless RPC_URL__<suffix> is set.
+  for (const c of chains.filter((c) => c.family === 'solana')) {
+    const suffix = c.chainId.replace(/[^A-Za-z0-9]/g, '_')
+    env[`AGENT_ECO_PROGRAM__${suffix}`] ??= c.agentEco
+    env[`TOKEN_MINT__${suffix}`] ??= c.token.address
+  }
+
+  const evmChains = chains.filter((c) => c.family !== 'solana')
+  if (evmChains.length === 0) return
   const wanted = (flagValue(argv, 'chain') ?? config.defaultChain ?? '').toLowerCase()
   const primary =
-    chains.find((c) => c.chainId === wanted || String(c.evmChainId) === wanted || PRESET_NAME[c.evmChainId] === wanted) ??
-    chains.find((c) => c.chainId === `eip155:${97}`) ??
-    chains[0]
+    evmChains.find((c) => c.chainId === wanted || String(c.evmChainId) === wanted || PRESET_NAME[c.evmChainId ?? -1] === wanted) ??
+    evmChains.find((c) => c.chainId === `eip155:${97}`) ??
+    evmChains[0]
 
-  for (const c of chains) {
+  for (const c of evmChains) {
     const suffix = c.chainId === primary.chainId ? '' : `__${c.chainId.replace(/[^A-Za-z0-9]/g, '_')}`
     if (PRESET_DEPLOYMENT[c.chainId] !== c.agentEco.toLowerCase()) env[`AGENT_ECO_ADDRESS${suffix}`] ??= c.agentEco
     env[`USDT_ADDRESS${suffix}`] ??= c.token.address
@@ -73,6 +84,6 @@ export async function bootstrapChains(argv: string[], env: NodeJS.ProcessEnv = p
       env[`ERC8004_REPUTATION_REGISTRY${suffix}`] ??= c.erc8004.reputation
     }
   }
-  const name = PRESET_NAME[primary.evmChainId]
+  const name = PRESET_NAME[primary.evmChainId ?? -1]
   if (name) env.NETWORK ??= name
 }

@@ -1,3 +1,5 @@
+import { SOLANA_DEVNET_CHAIN_ID } from '../../agent-runtime/src/chain/solana.ts'
+
 /**
  * Where a person gets test funds on each chain. Manual links only: these faucets need a human
  * (captchas, social checks), and nothing here tries to get around that. Mirrors the app's presets
@@ -17,6 +19,10 @@ export const FAUCETS: Record<string, FaucetGuide> = {
       { label: 'BNB Chain Telegram bot', url: 'https://t.me/bnbchain_official_bot' },
     ],
     token: 'mUSDT is AgentEco\'s own test token: once the wallet has a little tBNB, run `agenteco faucet` (100 mUSDT, once a day).',
+  },
+  [SOLANA_DEVNET_CHAIN_ID]: {
+    gas: [{ label: 'Solana faucet (devnet SOL)', url: 'https://faucet.solana.com' }],
+    token: "Devnet USDC comes from Circle's faucet (a person has to ask for it): https://faucet.circle.com — choose Solana Devnet and paste the agent address.",
   },
   'eip155:84532': {
     gas: [{ label: 'Coinbase Developer Platform faucet (Base Sepolia ETH)', url: 'https://portal.cdp.coinbase.com/products/faucet' }],

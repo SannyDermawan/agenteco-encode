@@ -134,6 +134,8 @@ export interface ChainAdapter {
   /** Address of the wallet that signs this adapter's writes; null for a read-only adapter. */
   readonly signer: string | null
   readonly nativeSymbol: string
+  /** Decimals of the native coin's base unit (wei: 18, lamports: 9) — for showing balances. */
+  readonly nativeDecimals: number
   readonly explorer: { name: string; txUrl(hash: string): string; addressUrl(address: string): string }
 
   /** The form addresses are stored and compared in (EVM: lowercase hex; Solana: base58 as is). */

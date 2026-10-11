@@ -1,5 +1,4 @@
-import type { LocalAccount } from 'viem'
-import { buildAuthHeaders } from './authHeaders.ts'
+import { buildAuthHeaders, type WalletAccount } from './authHeaders.ts'
 
 export type OrderDbStatus = 'agreed' | 'funded'
 
@@ -24,7 +23,7 @@ async function parseOrThrow(res: Response, action: string): Promise<any> {
 
 export async function listOrdersForAgent(
   apiUrl: string,
-  reader: LocalAccount,
+  reader: WalletAccount,
   agentId: string,
   status?: OrderDbStatus
 ): Promise<RegistryOrder[]> {
@@ -37,7 +36,7 @@ export async function listOrdersForAgent(
 /** Buyer side, once the on-chain escrow exists — remember which escrowId belongs to this order. */
 export async function attachEscrowToOrder(
   apiUrl: string,
-  buyerAccount: LocalAccount,
+  buyerAccount: WalletAccount,
   orderId: string,
   escrowId: string
 ): Promise<RegistryOrder> {

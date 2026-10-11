@@ -1,9 +1,12 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
-import { formatEther, formatUnits } from 'viem'
+import { formatUnits } from 'viem'
 import { z } from 'zod'
-import { chainConfig, readChain, servedChainIds } from '../../agent-runtime/src/chain/registry.ts'
+import { chainFamily, readAdapter } from '../../agent-runtime/src/chain/multi.ts'
+import { EvmAdapter } from '../../agent-runtime/src/chain/evm.ts'
 import { discoverAgents } from '../../agent-runtime/src/index.ts'
+import { escrowContract, tokenSymbolOn } from './chains.ts'
+import { hasKey } from './keystore.ts'
 import type { Ctx } from './ctx.ts'
 import { capsFor } from './config.ts'
 import { loadState } from './link.ts'
@@ -24,7 +27,7 @@ const failure = (message: string): Reply => ({ content: [{ type: 'text', text: m
 
 /** A job without its brief and result: small, and safe to show anywhere. */
 export function jobSummary(job: JobRecord) {
-  const cfg = job.handle ? chainConfig(job.chainId) : null
+  const contract = job.handle ? escrowContract(job.chainId).url : null
   return {
     jobId: job.id,
     stage: job.stage,
@@ -34,7 +37,7 @@ export function jobSummary(job: JobRecord) {
     price: job.price ?? null,
     seller: job.handle ? { id: job.handle.seller.id, name: job.handle.seller.name, wallet: job.handle.seller.wallet } : null,
     escrowId: job.handle?.escrowId ?? null,
-    contract: cfg ? `${cfg.explorerUrl}/address/${cfg.agentEco}` : null,
+    contract,
     reviewDeadline: job.stage === 'delivered' || job.stage === 'unpublished' ? (job.reviewDeadline ?? null) : null,
     automaticChecks: job.stage === 'delivered' ? (job.problems?.length ? { passed: false, problems: job.problems } : { passed: true }) : null,
     settled: job.settle ?? null,
@@ -81,12 +84,12 @@ export function buildMcpServer(ctx: Ctx): McpServer {
     }
   }
 
-  const chainName = z.string().optional().describe('Chain: a name (bsc-testnet, base-sepolia) or a CAIP-2 id (eip155:97). Default: the configured default chain.')
+  const chainName = z.string().optional().describe('Chain: a name (bsc-testnet, base-sepolia, solana-devnet) or a CAIP-2 id (eip155:97). Default: the configured default chain.')
   const readOnly = { readOnlyHint: true, openWorldHint: true } as const
 
   server.registerTool(
     'agenteco_chains',
-    { title: 'List chains', description: 'The chains this AgentEco API serves: contract, settlement token, explorer and ERC-8004 registries.', annotations: readOnly },
+    { title: 'List chains', description: 'The chains this AgentEco API serves: family (evm or solana), contract or program, settlement token, explorer and ERC-8004 registries (EVM only).', annotations: readOnly },
     guard(async () => {
       const res = await fetch(`${ctx.api}/chains`, { signal: AbortSignal.timeout(15_000) })
       if (!res.ok) return failure(`${ctx.api}/chains answered ${res.status}: this API predates multi-chain.`)
@@ -98,18 +101,21 @@ export function buildMcpServer(ctx: Ctx): McpServer {
     'agenteco_whoami',
     { title: 'This agent', description: "This agent's wallet address, account-link state, balances on each chain and spend caps. Never includes the private key.", annotations: readOnly },
     guard(async () => {
-      const { address } = ctx.key()
+      const keys = (['evm', 'solana'] as const).filter((family) => hasKey(ctx.io.home, ctx.keyName, family)).map((family) => ctx.key(family))
+      if (!keys.length) return failure('No agent key yet. Run `agenteco init` (a person does this once).')
       const link = loadState(ctx.io.home).link
       const chains = []
-      for (const chainId of servedChainIds()) {
+      for (const chainId of ctx.knownChains()) {
         try {
-          const chain = ctx.adapter(chainId)
+          const chain = await ctx.adapter(chainId)
+          const address = ctx.keyFor(chainId).address
           const token = await chain.token()
           const [native, balance] = await Promise.all([chain.nativeBalance(address), chain.tokenBalance(address)])
           const caps = capsFor(ctx.config, chainId)
           chains.push({
             chain: chainId,
-            native: `${formatEther(native)} ${chain.nativeSymbol}`,
+            address,
+            native: `${formatUnits(native, chain.nativeDecimals)} ${chain.nativeSymbol}`,
             token: `${formatUnits(balance, token.decimals)} ${token.symbol}`,
             caps: { maxPerJob: caps.maxPerJob, maxPerDay: caps.maxPerDay, reservedOrSpentToday: spentToday(ctx.io.home, chainId) },
           })
@@ -117,7 +123,12 @@ export function buildMcpServer(ctx: Ctx): McpServer {
           chains.push({ chain: chainId, error: (error as Error).message.split('\n')[0] })
         }
       }
-      return text({ address, accountLink: link?.status === 'approved' ? { linkedTo: link.ownerWallet } : link?.status === 'pending' ? { pendingCode: link.userCode } : null, chains })
+      return text({
+        address: keys[0].address,
+        ...(keys.length > 1 ? { addresses: Object.fromEntries(keys.map((k) => [k.family, k.address])) } : {}),
+        accountLink: link?.status === 'approved' ? { linkedTo: link.ownerWallet } : link?.status === 'pending' ? { pendingCode: link.userCode } : null,
+        chains,
+      })
     })
   )
 
@@ -145,7 +156,7 @@ export function buildMcpServer(ctx: Ctx): McpServer {
         .filter((s) => s.walletAddress && (maxPrice === undefined || Number(s.price) <= maxPrice))
         .sort((a, b) => Number(a.price) - Number(b.price))
         .slice(0, 10)
-      const reader = readChain(chainId)
+      const reader = readAdapter(chainId)
       const rows = await Promise.all(
         sellers.map(async (s) => {
           const record = await reader.getReputation(s.walletAddress!).catch(() => null)
@@ -159,7 +170,7 @@ export function buildMcpServer(ctx: Ctx): McpServer {
           }
         })
       )
-      return text({ chain: chainId, token: chainConfig(chainId).tokenSymbol, sellers: rows })
+      return text({ chain: chainId, token: tokenSymbolOn(chainId), sellers: rows })
     })
   )
 
@@ -254,7 +265,7 @@ export function buildMcpServer(ctx: Ctx): McpServer {
     },
     guard(async ({ escrowId, chain }: { escrowId: string; chain?: string }) => {
       const chainId = ctx.chain(chain)
-      const reader = readChain(chainId)
+      const reader = readAdapter(chainId)
       const id = BigInt(escrowId)
       const [basic, hashes, ts] = await Promise.all([reader.getEscrowBasic(id), reader.getEscrowHashes(id), reader.getEscrowTimestamps(id)])
       const status = ['CREATED', 'FUNDED', 'EXECUTING', 'DELIVERED', 'DISPUTED', 'SETTLED', 'REFUNDED'][basic.status] ?? String(basic.status)
@@ -265,10 +276,11 @@ export function buildMcpServer(ctx: Ctx): McpServer {
         buyer: basic.buyer,
         seller: basic.seller,
         amount: basic.amount.toString(),
-        token: chainConfig(chainId).tokenSymbol,
+        token: tokenSymbolOn(chainId),
         hashes,
         timestamps: Object.fromEntries(Object.entries(ts).map(([k, v]) => [k, v === BigInt(0) ? null : new Date(Number(v) * 1000).toISOString()])),
-        contract: `${chainConfig(chainId).explorerUrl}/address/${reader.agentEcoFor(id)}`,
+        // An EVM chain may hold an escrow in an older deployment; Solana has one program.
+        contract: reader instanceof EvmAdapter ? reader.explorer.addressUrl(reader.agentEcoFor(id)) : escrowContract(chainId).url,
       })
     })
   )
@@ -284,6 +296,8 @@ export async function serveMcp(ctx: Ctx): Promise<void> {
     transport.onclose = () => resolve()
   })
   await server.connect(transport)
-  ctx.io.err(`[agenteco] MCP server ${VERSION} ready on stdio (agent ${ctx.key().address})`)
+  const wallets = (['evm', 'solana'] as const).filter((family) => hasKey(ctx.io.home, ctx.keyName, family)).map((family) => ctx.key(family).address)
+  if (!wallets.length) ctx.key() // no key of either family: fail with the usual "run agenteco init"
+  ctx.io.err(`[agenteco] MCP server ${VERSION} ready on stdio (agent ${wallets.join(', ')})`)
   await closed
 }

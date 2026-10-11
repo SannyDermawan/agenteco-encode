@@ -54,6 +54,87 @@ describe('key store', () => {
   })
 })
 
+describe('key store, Solana keys', () => {
+  test('a Solana key is a second key beside the EVM one: created once, base58 address, never overwritten', () => {
+    const h = home()
+    assert.equal(hasKey(h, 'default', 'solana'), false)
+    const address = createKey(h, 'default', 'solana')
+    assert.match(address, /^[1-9A-HJ-NP-Za-km-z]{32,44}$/)
+    assert.equal(hasKey(h, 'default', 'solana'), true)
+    assert.equal(hasKey(h), false, 'the EVM key is a different file')
+    assert.equal(keyAddress(h, 'default', 'solana'), address)
+    assert.equal(keyAddress(h), null)
+    assert.throws(() => createKey(h, 'default', 'solana'), /Solana key named "default" already exists/)
+    const key = loadKey(h, 'default', 'solana')
+    assert.equal(key.address, address)
+    assert.equal(key.privateKey.length, 64)
+    assert.throws(() => loadKey(h, 'nope', 'solana'), /No Solana key named "nope"/)
+    // Both families can exist under one name.
+    const evm = createKey(h)
+    assert.notEqual(evm, address)
+    assert.equal(loadKey(h).address, evm)
+  })
+
+  test('the Solana key file is private to the user, a loosened or damaged one is refused', { skip: process.platform === 'win32' }, () => {
+    const h = home()
+    createKey(h, 'default', 'solana')
+    const path = join(h, 'keys', 'default.solana.json')
+    assert.equal(statSync(path).mode & 0o777, 0o600)
+    const file = JSON.parse(readFileSync(path, 'utf8')) as { secretKey: string }
+    assert.equal(file.secretKey.length > 60, true)
+    chmodSync(path, 0o644)
+    assert.throws(() => loadKey(h, 'default', 'solana'), /can be read by other users/)
+    chmodSync(path, 0o600)
+    // A secret that no longer matches the address is corrupt, not silently used.
+    const other = createKey(home(), 'x', 'solana')
+    assert.notEqual(other, keyAddress(h, 'default', 'solana'))
+    writeFileSync(path, JSON.stringify({ ...file, address: other }), { mode: 0o600 })
+    assert.throws(() => loadKey(h, 'default', 'solana'), /is corrupt/)
+  })
+
+  test('scrub blanks a Solana secret in every form it is printed in', () => {
+    const h = home()
+    createKey(h, 'default', 'solana')
+    const key = loadKey(h, 'default', 'solana')
+    const secrets = new Set(key.secrets)
+    for (const form of key.secrets) assert.equal(scrub({ secrets }, `oops ${form} leaked`), 'oops [secret hidden] leaked')
+    // The wallet address is public and stays.
+    assert.equal(scrub({ secrets }, `wallet ${key.address}`), `wallet ${key.address}`)
+  })
+
+  test('key address lists both keys when there are two, and --chain picks one', async () => {
+    const h = home()
+    const evm = createKey(h)
+    const sol = createKey(h, 'default', 'solana')
+    const both = captured(h)
+    assert.equal(await runCli(['key', 'address'], both.io), 0)
+    assert.deepEqual(both.out, [`evm: ${evm}`, `solana: ${sol}`])
+    const onlySol = captured(h)
+    assert.equal(await runCli(['key', 'address', '--chain', 'solana-devnet'], onlySol.io), 0)
+    assert.deepEqual(onlySol.out, [sol])
+    const onlyEvm = captured(h)
+    assert.equal(await runCli(['key', 'address', '--chain', 'bsc-testnet'], onlyEvm.io), 0)
+    assert.deepEqual(onlyEvm.out, [evm])
+    // With two keys, exporting asks which one (and still needs a terminal first).
+    const ambiguous = captured(h, {}, { interactive: true, ask: async () => 'export my key' })
+    assert.equal(await runCli(['key', 'export'], ambiguous.io), 64)
+    assert.match(ambiguous.all(), /two keys/)
+  })
+
+  test('a Solana chain resolves, is a testnet, and has a token symbol and a faucet guide', async () => {
+    assert.equal(resolveChain('solana-devnet'), 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1')
+    assert.equal(resolveChain('solana'), 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1')
+    assert.equal(resolveChain('solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1'), 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1')
+    assert.throws(() => resolveChain('solana:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'), /Unknown chain/)
+    assert.equal(isTestnet('solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1'), true)
+    assert.deepEqual(capsFor({}, 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1'), DEFAULT_CAPS.testnet)
+    const { tokenSymbolFor } = await import('../src/config.ts')
+    const { faucetGuide } = await import('../src/faucets.ts')
+    assert.equal(tokenSymbolFor('solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1'), 'USDC')
+    assert.match(faucetGuide('solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1').gas[0].url, /faucet\.solana\.com/)
+  })
+})
+
 describe('spend caps', () => {
   const cfg = {}
   const job = (id: string, amount: number, chainId = 'eip155:97') => ({ jobId: id, chainId, amount, symbol: 'mUSDT' })

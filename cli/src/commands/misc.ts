@@ -1,11 +1,13 @@
 import { parseArgs } from 'node:util'
 import { formatEther, formatUnits } from 'viem'
+import { chainFamily } from '../../../agent-runtime/src/chain/multi.ts'
+import { SOLANA_DEVNET_CHAIN_ID, secretKeyToBase58 } from '../../../agent-runtime/src/chain/solana.ts'
 import { MOCK_USDT_ABI } from '../../../agent-runtime/src/shared/abi.generated.ts'
 import { chainConfig, signerClients } from '../../../agent-runtime/src/chain/registry.ts'
 import { CliError, type Ctx } from '../ctx.ts'
 import { DEFAULT_CAPS, capsFor, isTestnet, saveConfig, type Caps } from '../config.ts'
 import { faucetGuide } from '../faucets.ts'
-import { keyAddress } from '../keystore.ts'
+import { hasKey, keyAddress } from '../keystore.ts'
 import { spentToday } from '../spend.ts'
 
 /** `agenteco faucet`: claims AgentEco's own test token (MockUSDT, BSC Testnet) for the agent wallet. Needs a little gas first. */
@@ -42,30 +44,39 @@ export async function faucet(ctx: Ctx, args: string[]): Promise<number> {
   return 0
 }
 
-/** `agenteco key address` (safe) and `agenteco key export` (a person at a terminal, typed confirmation). */
+/**
+ * `agenteco key address [--chain <c>]` (safe) and `agenteco key export [--chain <c>]` (a person at a
+ * terminal, typed confirmation). An agent has one key per chain family; `--chain` picks the family
+ * (`solana-devnet` → the Solana key). Without it, a lone key is the one meant; with both, `address`
+ * lists them and `export` asks which.
+ */
 export async function keyCommand(ctx: Ctx, args: string[]): Promise<number> {
-  const [sub] = args
+  const [sub, ...rest] = args
   const { io } = ctx
+  const { values } = parseArgs({ args: rest, options: { chain: { type: 'string' } } })
+  const present = (['evm', 'solana'] as const).filter((family) => hasKey(io.home, ctx.keyName, family))
+  const chosen = values.chain ? [chainFamily(ctx.chain(values.chain))] : present
   if (sub === 'address' || sub === undefined) {
-    const address = keyAddress(io.home, ctx.keyName)
-    if (!address) throw new CliError('No agent key yet. Run `agenteco init`.')
-    io.out(address)
+    const found = chosen.filter((family) => present.includes(family))
+    if (!found.length) throw new CliError(`No ${values.chain ? 'matching ' : ''}agent key yet. Run \`agenteco init\`${values.chain ? ` --chain ${values.chain}` : ''}.`)
+    for (const family of found) io.out(found.length > 1 ? `${family}: ${keyAddress(io.home, ctx.keyName, family)}` : keyAddress(io.home, ctx.keyName, family)!)
     return 0
   }
   if (sub === 'export') {
     // For the person only: refuses unless both ends are a terminal, so an agent's pipe never gets it.
     if (!io.interactive || !io.ask) throw new CliError('`key export` only runs in a terminal, for a person. An agent cannot use it.', 77)
+    if (chosen.length !== 1) throw new CliError(chosen.length ? 'There are two keys (EVM and Solana): say which with --chain <name>.' : 'No agent key yet. Run `agenteco init`.', chosen.length ? 64 : 1)
     const answer = await io.ask('This prints the private key. Anyone who sees it controls the wallet. Type "export my key" to continue: ')
     if (answer.trim() !== 'export my key') {
       io.out('Cancelled.')
       return 1
     }
-    const { privateKey } = ctx.key()
+    const key = ctx.key(chosen[0])
     // Written straight to the terminal, bypassing the scrubbing that protects every other output.
-    process.stdout.write(`${privateKey}\n`)
+    process.stdout.write(`${key.family === 'evm' ? key.privateKey : secretKeyToBase58(key.privateKey)}\n`)
     return 0
   }
-  throw new CliError('Usage: agenteco key address | export', 64)
+  throw new CliError('Usage: agenteco key address | export [--chain <name>]', 64)
 }
 
 /** `agenteco caps` shows the spend caps; `agenteco caps set <testnet|mainnet> <maxPerJob> <maxPerDay>` changes them (a person's decision). */
@@ -94,7 +105,7 @@ export async function caps(ctx: Ctx, args: string[]): Promise<number> {
   }
   io.out('Spend caps (a hire reserves its budget when it starts):')
   io.out(`  defaults: testnet ${DEFAULT_CAPS.testnet.maxPerJob}/job ${DEFAULT_CAPS.testnet.maxPerDay}/day; mainnet ${DEFAULT_CAPS.mainnet.maxPerJob}/job ${DEFAULT_CAPS.mainnet.maxPerDay}/day (off until a person turns it on)`)
-  for (const chainId of ['eip155:97', 'eip155:84532', 'eip155:968', 'eip155:677']) {
+  for (const chainId of ['eip155:97', 'eip155:84532', 'eip155:968', 'eip155:677', SOLANA_DEVNET_CHAIN_ID]) {
     const c = capsFor(ctx.config, chainId)
     io.out(`  ${chainId} (${isTestnet(chainId) ? 'testnet' : 'mainnet'}): ${c.maxPerJob}/job, ${c.maxPerDay}/day, ${spentToday(io.home, chainId)} reserved or spent today`)
   }
