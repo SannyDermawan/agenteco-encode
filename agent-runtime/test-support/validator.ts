@@ -12,6 +12,7 @@ import {
   AccountRole,
   address,
   createSolanaRpc,
+  createKeyPairSignerFromBytes,
   generateKeyPairSigner,
   getAddressEncoder,
   getProgramDerivedAddress,
@@ -20,7 +21,7 @@ import {
   type Address,
   type KeyPairSigner,
 } from '@solana/kit'
-import { SPL_TOKEN_PROGRAM_ID, SOLANA_DEVNET_CHAIN_ID, SolanaAdapter, buildInitializeInstruction } from '../src/chain/solana.ts'
+import { SPL_TOKEN_PROGRAM_ID, SOLANA_DEVNET_CHAIN_ID, SolanaAdapter, buildInitializeInstruction, generateSolanaSecretKey } from '../src/chain/solana.ts'
 import { SolanaRpcBackend } from '../src/chain/solana-rpc.ts'
 import { PROGRAM_SO, TEST_PROGRAM_ID } from './litesvm.ts'
 
@@ -62,6 +63,8 @@ export interface ValidatorChain {
   mint: Address
   decimals: number
   signers: Record<'deployer' | 'arbiter' | 'buyer' | 'seller' | 'keeper' | 'other', KeyPairSigner>
+  /** The same wallets' secret keys (64 bytes), for code that takes a key — the SDK and the CLI. */
+  secretKeys: Record<'deployer' | 'arbiter' | 'buyer' | 'seller' | 'keeper' | 'other', Uint8Array>
   treasury: KeyPairSigner
   adapterFor(role: keyof ValidatorChain['signers'], overrides?: Partial<ConstructorParameters<typeof SolanaAdapter>[0]>): SolanaAdapter
   mintTo(owner: Address, amount: bigint): Promise<void>
@@ -96,8 +99,10 @@ export async function startLocalValidatorChain(feeBps = 250): Promise<ValidatorC
     }
 
     const roles = ['deployer', 'arbiter', 'buyer', 'seller', 'keeper', 'other'] as const
-    const generated = await Promise.all([...roles, 'treasury' as const, 'mint' as const].map(() => generateKeyPairSigner()))
+    const secrets = await Promise.all([...roles, 'treasury' as const, 'mint' as const].map(() => generateSolanaSecretKey()))
+    const generated = await Promise.all(secrets.map((secret) => createKeyPairSignerFromBytes(secret)))
     const signers = Object.fromEntries(roles.map((r, i) => [r, generated[i]])) as ValidatorChain['signers']
+    const secretKeys = Object.fromEntries(roles.map((r, i) => [r, secrets[i]])) as ValidatorChain['secretKeys']
     const treasury = generated[roles.length]
     const mintSigner = generated[roles.length + 1]
     for (const s of [...Object.values(signers), treasury]) {
@@ -176,6 +181,7 @@ export async function startLocalValidatorChain(feeBps = 250): Promise<ValidatorC
       mint,
       decimals,
       signers,
+      secretKeys,
       treasury,
       adapterFor,
       async mintTo(owner, amount) {

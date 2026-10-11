@@ -1,5 +1,4 @@
-import type { LocalAccount } from 'viem'
-import { buildAuthHeaders } from './authHeaders.ts'
+import { buildAuthHeaders, type WalletAccount } from './authHeaders.ts'
 import { withChain } from './chainQuery.ts'
 
 export interface EscrowResult {
@@ -47,7 +46,7 @@ export async function publishEscrowResult(
  * published it. Private to the escrow's buyer, seller and arbiter, so the
  * reader signs the request.
  */
-export async function getEscrowResult(apiUrl: string, escrowId: string, reader: LocalAccount, chainId?: string): Promise<EscrowResult | null> {
+export async function getEscrowResult(apiUrl: string, escrowId: string, reader: WalletAccount, chainId?: string): Promise<EscrowResult | null> {
   const res = await fetch(withChain(`${apiUrl}/escrow-results/${escrowId}`, chainId), { headers: await buildAuthHeaders(reader) })
   if (res.status === 404) return null
   if (!res.ok) throw new Error(`Reading escrow result failed (${res.status}): ${await res.text()}`)

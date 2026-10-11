@@ -35,8 +35,9 @@ export type PreparedJob =
   | { capability: 'tx_explainer'; input: TxExplainerInput; facts: TxFacts }
 
 export interface PrepareContext {
-  publicClient: PublicClient
-  agentEcoAddress: string
+  /** The EVM chain's client and AgentEco address; absent off EVM, where tx_explainer is unavailable. */
+  publicClient?: PublicClient
+  agentEcoAddress?: string
 }
 
 /**
@@ -69,6 +70,7 @@ export async function prepareJob(
       }
       case 'tx_explainer': {
         const input = parsed.data as TxExplainerInput
+        if (!ctx.publicClient || !ctx.agentEcoAddress) return { ok: false, reason: 'tx_explainer reads EVM transactions and is not available on this chain' }
         return { ok: true, job: { capability, input, facts: await buildTxFacts(ctx.publicClient, input.txHash as Hex, ctx.agentEcoAddress) } }
       }
     }

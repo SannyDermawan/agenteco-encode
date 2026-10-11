@@ -1,5 +1,4 @@
-import type { LocalAccount } from 'viem'
-import { buildAuthHeaders } from './authHeaders.ts'
+import { buildAuthHeaders, type WalletAccount } from './authHeaders.ts'
 
 export type NegotiationSide = 'buyer' | 'seller'
 export type NegotiationAction = 'offer' | 'counter' | 'accept' | 'reject'
@@ -44,7 +43,7 @@ async function parseOrThrow(res: Response, action: string): Promise<any> {
 /** Buyer opens a negotiation with an opening offer (§11: Offer -> ...). */
 export async function openNegotiation(
   apiUrl: string,
-  buyerAccount: LocalAccount,
+  buyerAccount: WalletAccount,
   input: { buyerAgentId: string; sellerAgentId: string; capability: string; price: number } & MoveMeta
 ): Promise<Negotiation> {
   const authHeaders = await buildAuthHeaders(buyerAccount)
@@ -59,7 +58,7 @@ export async function openNegotiation(
 /** Either side responds: counter, accept, or reject. */
 export async function respondToNegotiation(
   apiUrl: string,
-  account: LocalAccount,
+  account: WalletAccount,
   negotiationId: string,
   response: { side: NegotiationSide; action: 'counter' | 'accept' | 'reject'; price?: number } & MoveMeta
 ): Promise<Negotiation> {
@@ -74,7 +73,7 @@ export async function respondToNegotiation(
 
 export async function listNegotiationsForAgent(
   apiUrl: string,
-  reader: LocalAccount,
+  reader: WalletAccount,
   agentId: string,
   status?: NegotiationStatus
 ): Promise<Negotiation[]> {

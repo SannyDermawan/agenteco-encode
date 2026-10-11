@@ -2,14 +2,17 @@
  * SolanaAdapter: a ChainAdapter (./types.ts) over the `agenteco_escrow` Anchor program in
  * `solana/programs/agenteco_escrow`. See docs/SOLANA.md for the full design.
  *
- * Status: the only `SolanaBackend` is the litesvm one in test-support/, used by the conformance
- * test (./conformance.test.ts). There is no RPC backend, no deployment, and nothing here is
- * wired into the chain registry or the backend — see docs/SOLANA.md §9.
+ * It talks to the chain through a `SolanaBackend` (below): ./solana-rpc.ts over JSON-RPC (a local
+ * validator, devnet), or the in-process litesvm one in test-support/ that the conformance test and
+ * the API/SDK suites use. Chains are configured in ./solana-registry.ts. Nothing has run on devnet
+ * yet: the program is not deployed (docs/SOLANA.md §9).
  */
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import {
   AccountRole,
   address,
+  createKeyPairSignerFromBytes,
+  createKeyPairSignerFromPrivateKeyBytes,
   createSignableMessage,
   getAddressDecoder,
   getAddressEncoder,
@@ -26,6 +29,7 @@ import {
   type TransactionSigner,
 } from '@solana/kit'
 import { parseUnits } from 'viem'
+import { buildAuthHeaders, type WalletAccount } from '../authHeaders.ts'
 import type {
   ArbiterSetup,
   ChainAdapter,
@@ -75,20 +79,63 @@ export async function verifySolanaSignature(params: { address: string; message: 
 }
 
 /**
- * The headers that prove a Solana wallet's identity to the API (see backend/src/auth.ts): the same
- * `AgentEco:<wallet>:<timestamp>` text as for EVM wallets, signed with ed25519 and sent in base58.
+ * A Solana wallet as the API clients see an account: its base58 address and a `signMessage` that
+ * signs the UTF-8 text with ed25519 and answers base58, the form backend/src/auth.ts verifies.
  */
-export async function buildSolanaAuthHeaders(signer: MessagePartialSigner): Promise<Record<string, string>> {
-  const timestamp = Date.now()
-  const [signatures] = await signer.signMessages([createSignableMessage(`AgentEco:${signer.address}:${timestamp}`)])
+export function solanaWalletAccount(signer: MessagePartialSigner): WalletAccount {
   return {
-    'x-owner-wallet': signer.address,
-    'x-signature': getBase58Decoder().decode(signatures[signer.address]),
-    'x-timestamp': String(timestamp),
+    address: signer.address,
+    async signMessage({ message }) {
+      const [signatures] = await signer.signMessages([createSignableMessage(message)])
+      return getBase58Decoder().decode(signatures[signer.address])
+    },
   }
 }
 
-/** What SolanaAdapter needs from wherever the transactions actually run — litesvm today, a real RPC later. */
+/** The headers that prove a Solana wallet's identity to the API (see buildAuthHeaders): ed25519, base58. */
+export async function buildSolanaAuthHeaders(signer: MessagePartialSigner): Promise<Record<string, string>> {
+  return buildAuthHeaders(solanaWalletAccount(signer))
+}
+
+/** The address of a 64-byte Solana secret key (seed, then public key), without any async work. */
+export function solanaAddressOfSecretKey(secretKey: Uint8Array): Address {
+  if (secretKey.length !== 64) throw new Error(`A Solana secret key is 64 bytes (seed + public key), got ${secretKey.length}.`)
+  return getAddressDecoder().decode(secretKey.slice(32))
+}
+
+/** A new random Solana secret key (64 bytes: seed, then public key), from the system's secure random source. */
+export async function generateSolanaSecretKey(): Promise<Uint8Array> {
+  const seed = new Uint8Array(randomBytes(32))
+  const signer = await createKeyPairSignerFromPrivateKeyBytes(seed)
+  const secret = new Uint8Array(64)
+  secret.set(seed)
+  secret.set(getAddressEncoder().encode(signer.address), 32)
+  return secret
+}
+
+/**
+ * A Solana secret key from the text people keep it in: the JSON array of a Solana CLI keypair file
+ * (`[12,34,…]`, 64 numbers) or the base58 string wallets export. The key must be consistent
+ * (its second half is the public key of its first half) — checked here, so a typo fails early.
+ */
+export async function parseSolanaSecretKey(text: string): Promise<Uint8Array> {
+  const trimmed = text.trim()
+  let bytes: Uint8Array
+  try {
+    bytes = trimmed.startsWith('[') ? Uint8Array.from(JSON.parse(trimmed) as number[]) : new Uint8Array(getBase58Encoder().encode(trimmed))
+  } catch {
+    throw new Error('Not a Solana secret key: expected a JSON array of 64 numbers or a base58 string.')
+  }
+  if (bytes.length !== 64) throw new Error(`Not a Solana secret key: expected 64 bytes, got ${bytes.length}.`)
+  try {
+    await createKeyPairSignerFromBytes(bytes)
+  } catch {
+    throw new Error('Not a Solana secret key: its public half does not belong to its private half.')
+  }
+  return bytes
+}
+
+/** What SolanaAdapter needs from wherever the transactions actually run: a JSON-RPC node (./solana-rpc.ts) or the in-process litesvm one used in tests. */
 export interface SolanaBackend {
   getAccount(addr: Address): Promise<{ data: Uint8Array; lamports: bigint; owner: Address } | null>
   getClock(): Promise<{ slot: bigint; unixTimestamp: bigint }>

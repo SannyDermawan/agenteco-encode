@@ -14,6 +14,7 @@ import {
   address,
   appendTransactionMessageInstructions,
   createTransactionMessage,
+  createKeyPairSignerFromBytes,
   generateKeyPairSigner,
   getAddressEncoder,
   getProgramDerivedAddress,
@@ -29,7 +30,7 @@ import {
   type TransactionSigner,
 } from '@solana/kit'
 import { FailedTransactionMetadata, LiteSVM, TransactionMetadata } from 'litesvm'
-import { SPL_TOKEN_PROGRAM_ID, buildInitializeInstruction, type SolanaBackend } from '../src/chain/solana.ts'
+import { SPL_TOKEN_PROGRAM_ID, buildInitializeInstruction, generateSolanaSecretKey, type SolanaBackend } from '../src/chain/solana.ts'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 export const PROGRAM_SO = join(HERE, '../../solana/target/deploy/agenteco_escrow.so')
@@ -97,6 +98,8 @@ export interface SolanaTestChain {
   mint: Address
   decimals: number
   signers: Record<'deployer' | 'arbiter' | 'buyer' | 'seller' | 'keeper' | 'other', KeyPairSigner>
+  /** The same wallets' secret keys (64 bytes), for code that takes a key — the SDK and the CLI. */
+  secretKeys: Record<'deployer' | 'arbiter' | 'buyer' | 'seller' | 'keeper' | 'other', Uint8Array>
   /** The wallet that owns the treasury token account (fees are paid to its token account). */
   treasury: KeyPairSigner
   /** The settlement token's associated account of `owner`, created (empty) if it does not exist yet. */
@@ -146,8 +149,10 @@ export async function startSolanaTestChain(opts: { decimals?: number; feeBps?: n
   svm.setClock(clock)
 
   const roles = ['deployer', 'arbiter', 'buyer', 'seller', 'keeper', 'other'] as const
-  const generated = await Promise.all([...roles, 'treasury' as const].map(() => generateKeyPairSigner()))
+  const secrets = await Promise.all([...roles, 'treasury' as const].map(() => generateSolanaSecretKey()))
+  const generated = await Promise.all(secrets.map((secret) => createKeyPairSignerFromBytes(secret)))
   const signers = Object.fromEntries(roles.map((r, i) => [r, generated[i]])) as SolanaTestChain['signers']
+  const secretKeys = Object.fromEntries(roles.map((r, i) => [r, secrets[i]])) as SolanaTestChain['secretKeys']
   const treasury = generated[roles.length]
   for (const s of [...Object.values(signers), treasury]) svm.airdrop(s.address, lamports(100_000_000_000n))
 
@@ -182,6 +187,7 @@ export async function startSolanaTestChain(opts: { decimals?: number; feeBps?: n
     mint,
     decimals,
     signers,
+    secretKeys,
     treasury,
     async tokenAccountOf(owner) {
       const account = await ataOf(owner)
