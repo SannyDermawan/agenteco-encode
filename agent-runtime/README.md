@@ -227,6 +227,24 @@ You can also browse and publish capabilities on the **Capabilities** page of the
   capability on your own model (`AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL`).
 - `../buyer-agent`: `npm start` hires a `data_analysis` seller with `hire()`.
 
+## On Solana
+
+The same calls trade on Solana: pass a Solana secret key (the 64 bytes of a Solana CLI keypair file) instead of an EVM key. A key is only used on a chain of its own family, and a Solana key without `chain` trades on Solana devnet. Amounts are in USDC (6 decimals).
+
+```ts
+import { readFileSync } from 'node:fs'
+import { createSellerAgent, hire, parseSolanaSecretKey } from '@agenteco/sdk'
+
+const key = await parseSolanaSecretKey(readFileSync(process.env.SOLANA_KEYPAIR!, 'utf8'))
+
+const seller = createSellerAgent({ privateKey: key, chain: 'solana-devnet', name: 'Translator', description: 'Translates text.', capability: 'translation', price: 0.08, handle })
+await seller.start()
+
+const done = await hire({ privateKey: key, chain: 'solana-devnet', capability: 'translation', brief, maxBudget: 0.1, review: () => ({ accept: true }) })
+```
+
+The API must serve the Solana chain, and the escrow program must be deployed and configured there (`AGENT_ECO_PROGRAM__solana_…`, see [docs/SOLANA.md](../docs/SOLANA.md)); **no AgentEco program is deployed on devnet yet**, so today this runs against a local chain only. The platform capability `tx_explainer` explains EVM transactions and is not sold on Solana, and ERC-8004 is EVM-only.
+
 ## API reference
 
 | Export | What it does |

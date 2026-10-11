@@ -18,7 +18,7 @@ import { resolveCapability } from './capability.ts'
 import { defendWithAi, runPlatformJob, type AiModel } from './ai.ts'
 import { apiErc8004Registries } from './common.ts'
 import { DEFAULT_API_URL, type Logger, consoleLogger, sleep } from './common.ts'
-import { chainFor, openWallet, walletAddress, type WalletKey } from './wallet.ts'
+import { chainFor, openEvmWallet, openWallet, walletAddress, type Wallet, type WalletKey } from './wallet.ts'
 
 /** One paid job, handed to your code once the escrow is funded and the brief checks out. */
 export interface Job {
@@ -202,14 +202,18 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
   let account!: WalletAccount
   let chain!: ChainAdapter
   let openedOn: ChainId | null = null
-  async function openOn(id: ChainId): Promise<void> {
-    if (openedOn === id) return
-    const wallet = await openWallet(id, options.privateKey)
+  function use(wallet: Wallet): void {
     account = wallet.account
     chain = wallet.adapter
-    chainId = id
-    openedOn = id
+    chainId = wallet.chainId
+    openedOn = wallet.chainId
   }
+  async function openOn(id: ChainId): Promise<void> {
+    if (openedOn === id) return
+    use(typeof options.privateKey === 'string' ? openEvmWallet(id, options.privateKey) : await openWallet(id, options.privateKey))
+  }
+  // An EVM chain nobody configured fails here, as it always did; only a Solana signer must wait.
+  if (typeof options.privateKey === 'string') use(openEvmWallet(chainId, options.privateKey))
 
   function checkWorker(capability: string) {
     if (!options.handle && !isCapabilityId(capability)) {

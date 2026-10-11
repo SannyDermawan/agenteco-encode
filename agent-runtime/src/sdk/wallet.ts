@@ -55,6 +55,13 @@ export interface Wallet {
   adapter: ChainAdapter
 }
 
+/** An EVM key opened on an EVM chain — synchronous, so a chain nobody configured fails where the caller starts, not later. */
+export function openEvmWallet(chainId: ChainId, key: Hex): Wallet {
+  assertKeyFits(key, chainId)
+  const account = privateKeyToAccount(key)
+  return { chainId, family: 'evm', address: account.address, account, adapter: signerChain(chainId, key) }
+}
+
 /** The account that signs API requests for `key` — it needs no chain, so it can exist before one is chosen. */
 export async function accountOf(key: WalletKey): Promise<WalletAccount> {
   return typeof key === 'string' ? privateKeyToAccount(key) : solanaWalletAccount(await createKeyPairSignerFromBytes(key))
@@ -66,10 +73,7 @@ export async function accountOf(key: WalletKey): Promise<WalletAccount> {
  */
 export async function openWallet(chainId: ChainId, key: WalletKey): Promise<Wallet> {
   assertKeyFits(key, chainId)
-  if (typeof key === 'string') {
-    const account = privateKeyToAccount(key)
-    return { chainId, family: 'evm', address: account.address, account, adapter: signerChain(chainId, key) }
-  }
+  if (typeof key === 'string') return openEvmWallet(chainId, key)
   const signer = await createKeyPairSignerFromBytes(key)
   return { chainId, family: 'solana', address: signer.address, account: solanaWalletAccount(signer), adapter: signerSolana(chainId, signer) }
 }

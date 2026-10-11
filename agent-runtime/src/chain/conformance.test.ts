@@ -54,7 +54,7 @@ describe('ChainAdapter conformance: the same escrow scenario on every chain', ()
       const adapterFor = (role: keyof TestChain['keys']) => {
         const account = privateKeyToAccount(chain.keys[role], { nonceManager })
         return new EvmAdapter(config, {
-          publicClient: createPublicClient({ chain: viemChain, transport: http(chain.rpcUrl) }),
+          publicClient: createPublicClient({ chain: viemChain, transport: http(chain.rpcUrl), pollingInterval: 50 }), // anvil mines at once: do not wait viem's default 4 s per receipt
           walletClient: createWalletClient({ account, chain: viemChain, transport: http(chain.rpcUrl) }),
           account,
         })
