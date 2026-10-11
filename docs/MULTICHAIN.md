@@ -1,6 +1,6 @@
 # Multi-chain
 
-Status: **implemented for EVM chains** (BSC Testnet, BOT Chain, Base Sepolia presets); Solana is designed below but not built. Back to the [README](../README.md).
+Status: **implemented for EVM chains** (BSC Testnet, BOT Chain, Base Sepolia presets). Solana: the escrow program and `SolanaAdapter` are built and tested locally ([SOLANA.md](SOLANA.md)); not deployed, not wired into the backend, API, SDK or frontend. Back to the [README](../README.md).
 
 One backend, one database and one SDK run the same escrow, dispute and reputation flow on several chains at once. With no new settings, everything behaves exactly as the single-chain BNB version did.
 
@@ -23,7 +23,7 @@ Every chain is a [CAIP-2](https://chainagnostic.org/CAIPs/caip-2) id. Network na
 | BSC Testnet | `eip155:97` | `bsc-testnet`, `97` |
 | BOT Chain Testnet / Mainnet | `eip155:968` / `eip155:677` | `bot-testnet` (`testnet`) / `bot-mainnet` (`mainnet`) |
 | Base Sepolia | `eip155:84532` | `base-sepolia`, `84532` |
-| Solana devnet (planned) | `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` (genesis-hash prefix) | — |
+| Solana devnet (adapter only, not served) | `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` (genesis-hash prefix) | — (the registry does not know it yet) |
 
 ## 3. `ChainAdapter`
 
@@ -41,6 +41,8 @@ interface ChainAdapter {
   readonly explorer: { name: string; txUrl(hash: string): string; addressUrl(address: string): string }
 
   normalizeAddress(address: string): string // EVM: lowercase hex; Solana: base58 as is
+  isValidAddress(address: string): boolean
+  verifySignature(p: { address: string; message: string; signature: string }): Promise<boolean> // EVM: EIP-191; Solana: ed25519, base58
   token(): Promise<{ address: string; symbol: string; decimals: number }>
   head(): Promise<bigint>
   nativeBalance(address: string): Promise<bigint>
@@ -80,13 +82,13 @@ interface ChainAdapter {
 }
 ```
 
-Status codes are the contract's state machine, in order: `CREATED, FUNDED, EXECUTING, DELIVERED, DISPUTED, SETTLED, REFUNDED`. Amounts are base units; `createAndFundEscrow` takes a decimal amount and converts it with the token's real decimals. Hashes stay keccak256 of the committed preimage (`agent-runtime/src/shared/hashes.ts`) on every chain.
+`TxHash` is a `string`: an EVM transaction hash or a Solana signature. Status codes are the contract's state machine, in order: `CREATED, FUNDED, EXECUTING, DELIVERED, DISPUTED, SETTLED, REFUNDED`. Amounts are base units; `createAndFundEscrow` takes a decimal amount and converts it with the token's real decimals. Hashes stay keccak256 of the committed preimage (`agent-runtime/src/shared/hashes.ts`) on every chain.
 
 Rules: no chain-specific branching outside adapters; signing keys are handed to an adapter, never read from `process.env` inside it.
 
 **`EvmAdapter`** (`chain/evm.ts`, viem) holds all escrow, arbiter-council, escrow-index, keeper, reputation, token and rating-event logic, plus ERC-8004 (section 6). It has no module state: the deployment comes in as an `EvmChainConfig`, the wallet as `EvmClients`. The older helpers (`onchain/escrow.ts`, `arbiter.ts`, `escrowIndex.ts`, `host/reputation.ts`) remain as thin wrappers over the primary chain, with unchanged signatures.
 
-**`SolanaAdapter`** (planned): `@solana/kit` over an Anchor program with the same state machine. It has to absorb account and signer validation, SPL token accounts, `u64` ids, ed25519 signatures (API sign-in needs a `verifySignature` then) and an event reader on program logs.
+**`SolanaAdapter`** (`chain/solana.ts`, `@solana/kit` over the Anchor program in `solana/`): implements the interface with the same state machine, `u64` ids, SPL token accounts, ed25519 `verifySignature` and base58 addresses. It is exercised by one conformance scenario that also runs on `EvmAdapter` (`chain/conformance.test.ts`). Not done: events (so `ratings`/`ratingsInTx` throw), a devnet RPC backend, registry/backend wiring, a council program. Details and limits in [SOLANA.md](SOLANA.md).
 
 ## 4. Configuration
 
@@ -197,8 +199,8 @@ All on-chain suites run on throwaway local chains (anvil) with the real contract
 3. Chain registry in backend, runtime and frontend; chain picker; `chain` in the SDK. **Done.**
 4. ERC-8004 identity and feedback on EVM chains. **Done** (registries per chain by configuration).
 5. Base Sepolia: preset, 6-decimal handling, deploy command. **Done in code**; the contract is not deployed yet.
-6. `SolanaAdapter` and the Anchor program. **Not started.**
+6. `SolanaAdapter` and the Anchor program. **Built and tested locally** (litesvm, plus a rehearsal on a local validator); **not deployed and not wired** ([SOLANA.md](SOLANA.md) §9).
 
 ## 10. Open questions
 
-- How the council (`ArbiterCouncil`) is represented on Solana (multisig versus a program-owned set).
+- How the council (`ArbiterCouncil`) is represented on Solana: the program takes one arbiter signer (a wallet or a multisig vault); a council program is not built ([SOLANA.md](SOLANA.md) §4).

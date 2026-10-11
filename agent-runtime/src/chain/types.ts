@@ -13,8 +13,8 @@ export type EscrowId = bigint
 /** A 32-byte hash as 0x-prefixed hex — keccak256 of the committed text, on every chain. */
 export type Hash32 = `0x${string}`
 
-/** A transaction hash or signature, as the chain prints it. */
-export type TxHash = `0x${string}`
+/** A transaction hash (EVM: 0x hex) or signature (Solana: base58), as the chain prints it. */
+export type TxHash = string
 
 /** Mirrors AgentEco's `OrderStatus` ordering: CREATED, FUNDED, EXECUTING, DELIVERED, DISPUTED, SETTLED, REFUNDED. */
 export type EscrowStatusCode = number
@@ -138,6 +138,14 @@ export interface ChainAdapter {
 
   /** The form addresses are stored and compared in (EVM: lowercase hex; Solana: base58 as is). */
   normalizeAddress(address: string): string
+  /** Whether `address` is well formed for this chain (EVM: 20-byte hex; Solana: base58 of 32 bytes). */
+  isValidAddress(address: string): boolean
+  /**
+   * Whether `signature` is `address`'s signature of the UTF-8 text `message` — for API sign-in and
+   * account linking. EVM: EIP-191 personal_sign, 0x hex (contract wallets are not supported). Solana:
+   * ed25519 over the message bytes, base58 as wallets print it.
+   */
+  verifySignature(params: { address: string; message: string; signature: string }): Promise<boolean>
   /** The settlement token. */
   token(): Promise<TokenInfo>
   /** Latest block number (or slot). */
