@@ -11,6 +11,12 @@ declare_id!("GB9VQpdEQYTnw7NLcgAWLrUoeh2ZDtMjSGLmpUcZ4FoY");
 pub const MAX_FEE_BPS: u16 = 1000; // 10%
 pub const MAX_WINDOW: i64 = 90 * 24 * 60 * 60; // 90 days
 
+/// Why an escrow was refunded (`EscrowRefunded.reason`).
+pub const REFUND_ACCEPT_TIMEOUT: u8 = 0;
+pub const REFUND_EXECUTION_TIMEOUT: u8 = 1;
+pub const REFUND_DISPUTE_RULING: u8 = 2;
+pub const REFUND_DISPUTE_TIMEOUT: u8 = 3;
+
 #[program]
 pub mod agenteco_escrow {
     use super::*;
@@ -50,6 +56,7 @@ pub mod agenteco_escrow {
         config.accept_timeout = accept_timeout;
         config.dispute_timeout = dispute_timeout;
         config.next_escrow_id = first_escrow_id;
+        config.pending_admin = Pubkey::default();
         Ok(())
     }
 
@@ -59,12 +66,38 @@ pub mod agenteco_escrow {
         let config = &mut ctx.accounts.config;
         config.fee_bps = fee_bps;
         config.treasury = treasury;
+        emit!(FeeUpdated { fee_bps, treasury });
         Ok(())
     }
 
     /// Admin only: hand dispute rulings to another signer (e.g. a Squads multisig vault).
     pub fn set_arbiter(ctx: Context<AdminOnly>, arbiter: Pubkey) -> Result<()> {
+        let previous = ctx.accounts.config.arbiter;
         ctx.accounts.config.arbiter = arbiter;
+        emit!(ArbiterUpdated { previous, arbiter });
+        Ok(())
+    }
+
+    /// Admin only, step 1 of handing the admin role over: nothing changes until `new_admin`
+    /// calls `accept_admin`, so a mistyped address can never take the role. Naming the
+    /// default (all-zero) address cancels.
+    pub fn transfer_admin(ctx: Context<AdminOnly>, new_admin: Pubkey) -> Result<()> {
+        ctx.accounts.config.pending_admin = new_admin;
+        emit!(AdminTransferStarted { admin: ctx.accounts.admin.key(), pending_admin: new_admin });
+        Ok(())
+    }
+
+    /// Step 2: the address named by `transfer_admin` takes the role.
+    pub fn accept_admin(ctx: Context<AcceptAdmin>) -> Result<()> {
+        let config = &mut ctx.accounts.config;
+        require!(
+            config.pending_admin != Pubkey::default() && config.pending_admin == ctx.accounts.new_admin.key(),
+            EscrowError::Unauthorized
+        );
+        let previous = config.admin;
+        config.admin = config.pending_admin;
+        config.pending_admin = Pubkey::default();
+        emit!(AdminUpdated { previous, admin: config.admin });
         Ok(())
     }
 
@@ -121,6 +154,15 @@ pub mod agenteco_escrow {
 
         ctx.accounts.reputation.seller = ctx.accounts.seller.key();
 
+        emit!(EscrowFunded {
+            escrow_id: id,
+            buyer: ctx.accounts.buyer.key(),
+            seller: ctx.accounts.seller.key(),
+            mint: ctx.accounts.mint.key(),
+            amount,
+            task_hash,
+        });
+
         token::transfer(
             CpiContext::new(
                 ctx.accounts.token_program.key(),
@@ -148,6 +190,7 @@ pub mod agenteco_escrow {
         escrow.status = EscrowStatus::Executing;
         escrow.executing_at = now;
         escrow.execution_deadline = now + escrow.execution_window;
+        emit!(ExecutionStarted { escrow_id: escrow.id, seller: escrow.seller });
         Ok(())
     }
 
@@ -161,7 +204,7 @@ pub mod agenteco_escrow {
             );
             require!(now > escrow.accept_deadline, EscrowError::WindowNotOver);
         }
-        refund_to_buyer(&ctx.accounts.escrow, &ctx.accounts.vault, &ctx.accounts.buyer_token_account, &ctx.accounts.token_program)?;
+        refund_to_buyer(&ctx.accounts.escrow, &ctx.accounts.vault, &ctx.accounts.buyer_token_account, &ctx.accounts.token_program, REFUND_ACCEPT_TIMEOUT)?;
         ctx.accounts.escrow.status = EscrowStatus::Refunded;
         Ok(())
     }
@@ -177,6 +220,7 @@ pub mod agenteco_escrow {
         escrow.delivered_at = now;
         escrow.review_deadline = now + escrow.review_window;
         escrow.result_hash = result_hash;
+        emit!(ResultDelivered { escrow_id: escrow.id, seller: escrow.seller, result_hash });
         Ok(())
     }
 
@@ -190,7 +234,7 @@ pub mod agenteco_escrow {
             );
             require!(now > escrow.execution_deadline, EscrowError::WindowNotOver);
         }
-        refund_to_buyer(&ctx.accounts.escrow, &ctx.accounts.vault, &ctx.accounts.buyer_token_account, &ctx.accounts.token_program)?;
+        refund_to_buyer(&ctx.accounts.escrow, &ctx.accounts.vault, &ctx.accounts.buyer_token_account, &ctx.accounts.token_program, REFUND_EXECUTION_TIMEOUT)?;
         ctx.accounts.escrow.status = EscrowStatus::Refunded;
         ctx.accounts.reputation.failed_jobs += 1;
         Ok(())
@@ -231,6 +275,7 @@ pub mod agenteco_escrow {
         escrow.dispute_reason_hash = reason_hash;
         escrow.disputed_at = now;
         escrow.dispute_deadline = now + ctx.accounts.config.dispute_timeout;
+        emit!(DisputeRaised { escrow_id: escrow.id, buyer: escrow.buyer, reason_hash });
         Ok(())
     }
 
@@ -251,6 +296,7 @@ pub mod agenteco_escrow {
             EscrowError::AlreadyResponded
         );
         escrow.dispute_response_hash = response_hash;
+        emit!(DisputeResponseSubmitted { escrow_id: escrow.id, seller: escrow.seller, response_hash });
         Ok(())
     }
 
@@ -280,11 +326,17 @@ pub mod agenteco_escrow {
             EscrowError::Unauthorized
         );
         ctx.accounts.escrow.resolution_hash = rationale_hash;
+        emit!(DisputeResolved {
+            escrow_id: ctx.accounts.escrow.id,
+            arbiter: ctx.accounts.arbiter.key(),
+            to_seller,
+            rationale_hash,
+        });
 
         if to_seller {
             settle(&mut ctx.accounts.escrow, &mut ctx.accounts.reputation, &ctx.accounts.vault, &ctx.accounts.seller_or_buyer_token_account, &ctx.accounts.treasury_token_account, &ctx.accounts.token_program)
         } else {
-            refund_to_buyer(&ctx.accounts.escrow, &ctx.accounts.vault, &ctx.accounts.seller_or_buyer_token_account, &ctx.accounts.token_program)?;
+            refund_to_buyer(&ctx.accounts.escrow, &ctx.accounts.vault, &ctx.accounts.seller_or_buyer_token_account, &ctx.accounts.token_program, REFUND_DISPUTE_RULING)?;
             ctx.accounts.escrow.status = EscrowStatus::Refunded;
             ctx.accounts.reputation.failed_jobs += 1;
             Ok(())
@@ -301,7 +353,7 @@ pub mod agenteco_escrow {
             );
             require!(now > escrow.dispute_deadline, EscrowError::WindowNotOver);
         }
-        refund_to_buyer(&ctx.accounts.escrow, &ctx.accounts.vault, &ctx.accounts.buyer_token_account, &ctx.accounts.token_program)?;
+        refund_to_buyer(&ctx.accounts.escrow, &ctx.accounts.vault, &ctx.accounts.buyer_token_account, &ctx.accounts.token_program, REFUND_DISPUTE_TIMEOUT)?;
         ctx.accounts.escrow.status = EscrowStatus::Refunded;
         // Nobody was found at fault: no reputation effect, mirroring the EVM contract.
         Ok(())
@@ -321,6 +373,7 @@ pub mod agenteco_escrow {
         let rep = &mut ctx.accounts.reputation;
         rep.rating_sum += score as u64;
         rep.rating_count += 1;
+        emit!(SellerRated { escrow_id: escrow.id, seller: escrow.seller, buyer: escrow.buyer, score });
         Ok(())
     }
 }
@@ -343,6 +396,13 @@ fn settle<'info>(
 
     let fee = (escrow.amount as u128 * escrow.fee_bps as u128 / 10_000u128) as u64;
     let to_seller = escrow.amount - fee;
+    emit!(EscrowSettled {
+        escrow_id: escrow.id,
+        buyer: escrow.buyer,
+        seller: escrow.seller,
+        amount: escrow.amount,
+        fee,
+    });
 
     let escrow_id_bytes = escrow.id.to_le_bytes();
     let seeds: &[&[u8]] = &[b"vault", escrow_id_bytes.as_ref(), &[escrow.vault_bump]];
@@ -384,7 +444,14 @@ fn refund_to_buyer<'info>(
     vault: &Account<'info, TokenAccount>,
     buyer_token_account: &Account<'info, TokenAccount>,
     token_program: &Program<'info, Token>,
+    reason: u8,
 ) -> Result<()> {
+    emit!(EscrowRefunded {
+        escrow_id: escrow.id,
+        buyer: escrow.buyer,
+        amount: escrow.amount,
+        reason,
+    });
     let escrow_id_bytes = escrow.id.to_le_bytes();
     let seeds: &[&[u8]] = &[b"vault", escrow_id_bytes.as_ref(), &[escrow.vault_bump]];
     let signer_seeds: &[&[&[u8]]] = &[seeds];
@@ -419,10 +486,12 @@ pub struct Config {
     pub accept_timeout: i64,
     pub dispute_timeout: i64,
     pub next_escrow_id: u64,
+    /// Named by `transfer_admin`, empty until then; kept last so earlier offsets never move.
+    pub pending_admin: Pubkey,
 }
 
 impl Config {
-    pub const SIZE: usize = 8 + 32 + 32 + 32 + 32 + 2 + 8 + 8 + 8 + 8;
+    pub const SIZE: usize = 8 + 32 + 32 + 32 + 32 + 2 + 8 + 8 + 8 + 8 + 32;
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
@@ -514,6 +583,13 @@ pub struct Initialize<'info> {
 pub struct AdminOnly<'info> {
     #[account(constraint = admin.key() == config.admin @ EscrowError::Unauthorized)]
     pub admin: Signer<'info>,
+    #[account(mut, seeds = [b"config"], bump)]
+    pub config: Account<'info, Config>,
+}
+
+#[derive(Accounts)]
+pub struct AcceptAdmin<'info> {
+    pub new_admin: Signer<'info>,
     #[account(mut, seeds = [b"config"], bump)]
     pub config: Account<'info, Config>,
 }
@@ -696,6 +772,107 @@ pub struct RateSeller<'info> {
     pub escrow: Account<'info, Escrow>,
     #[account(mut, seeds = [b"reputation", escrow.seller.as_ref()], bump)]
     pub reputation: Account<'info, Reputation>,
+}
+
+// =================================================================
+// EVENTS (the Solana counterpart of AgentEco.sol's events; decoded by SolanaAdapter and
+// usable by a keeper or an indexer)
+// =================================================================
+
+#[event]
+pub struct EscrowFunded {
+    pub escrow_id: u64,
+    pub buyer: Pubkey,
+    pub seller: Pubkey,
+    pub mint: Pubkey,
+    pub amount: u64,
+    pub task_hash: [u8; 32],
+}
+
+#[event]
+pub struct ExecutionStarted {
+    pub escrow_id: u64,
+    pub seller: Pubkey,
+}
+
+#[event]
+pub struct ResultDelivered {
+    pub escrow_id: u64,
+    pub seller: Pubkey,
+    pub result_hash: [u8; 32],
+}
+
+/// `amount` is the full price; the seller received `amount - fee`.
+#[event]
+pub struct EscrowSettled {
+    pub escrow_id: u64,
+    pub buyer: Pubkey,
+    pub seller: Pubkey,
+    pub amount: u64,
+    pub fee: u64,
+}
+
+/// `reason`: the `REFUND_*` constants.
+#[event]
+pub struct EscrowRefunded {
+    pub escrow_id: u64,
+    pub buyer: Pubkey,
+    pub amount: u64,
+    pub reason: u8,
+}
+
+#[event]
+pub struct DisputeRaised {
+    pub escrow_id: u64,
+    pub buyer: Pubkey,
+    pub reason_hash: [u8; 32],
+}
+
+#[event]
+pub struct DisputeResponseSubmitted {
+    pub escrow_id: u64,
+    pub seller: Pubkey,
+    pub response_hash: [u8; 32],
+}
+
+#[event]
+pub struct DisputeResolved {
+    pub escrow_id: u64,
+    pub arbiter: Pubkey,
+    pub to_seller: bool,
+    pub rationale_hash: [u8; 32],
+}
+
+#[event]
+pub struct SellerRated {
+    pub escrow_id: u64,
+    pub seller: Pubkey,
+    pub buyer: Pubkey,
+    pub score: u8,
+}
+
+#[event]
+pub struct FeeUpdated {
+    pub fee_bps: u16,
+    pub treasury: Pubkey,
+}
+
+#[event]
+pub struct ArbiterUpdated {
+    pub previous: Pubkey,
+    pub arbiter: Pubkey,
+}
+
+#[event]
+pub struct AdminTransferStarted {
+    pub admin: Pubkey,
+    pub pending_admin: Pubkey,
+}
+
+#[event]
+pub struct AdminUpdated {
+    pub previous: Pubkey,
+    pub admin: Pubkey,
 }
 
 // =================================================================
