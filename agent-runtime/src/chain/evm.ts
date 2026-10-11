@@ -1,8 +1,10 @@
 import {
   decodeEventLog,
   getAbiItem,
+  isAddress,
   parseEventLogs,
   parseUnits,
+  recoverMessageAddress,
   type Log,
   type Account,
   type Address,
@@ -182,6 +184,19 @@ export class EvmAdapter implements ChainAdapter {
 
   normalizeAddress(address: string): string {
     return address.toLowerCase()
+  }
+
+  isValidAddress(address: string): boolean {
+    return isAddress(address)
+  }
+
+  async verifySignature(params: { address: string; message: string; signature: string }): Promise<boolean> {
+    try {
+      const recovered = await recoverMessageAddress({ message: params.message, signature: params.signature as Hex })
+      return recovered.toLowerCase() === params.address.toLowerCase()
+    } catch {
+      return false
+    }
   }
 
   // --- Deployments ---------------------------------------------------------

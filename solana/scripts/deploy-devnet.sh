@@ -9,6 +9,8 @@
 #   RPC_URL          default https://api.devnet.solana.com
 #   PROGRAM_KEYPAIR  the program's own keypair (default solana/target/deploy/agenteco_escrow-keypair.json);
 #                    its address must equal declare_id! in lib.rs, see `anchor keys sync`
+#   SBF_ARCH         SBPF version to build, test and deploy (default v3). Devnet still accepts v0 today, but a
+#                    validator with every feature on (and devnet once SIMD-0500 activates) only takes v3
 #   SKIP_TESTS=1     do not run the litesvm tests first
 #   DRY_RUN=1        run every check, print the deploy command, do not send it
 set -euo pipefail
@@ -17,6 +19,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 KEYPAIR="${KEYPAIR:-$HOME/.config/solana/id.json}"
 RPC_URL="${RPC_URL:-https://api.devnet.solana.com}"
 PROGRAM_KEYPAIR="${PROGRAM_KEYPAIR:-$ROOT/target/deploy/agenteco_escrow-keypair.json}"
+SBF_ARCH="${SBF_ARCH:-v3}"
 SO="$ROOT/target/deploy/agenteco_escrow.so"
 DEVNET_GENESIS_PREFIX="EtWTRABZaYq6iMfeYKouRu166VU2xqa1"
 TESTNET_GENESIS="4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY"
@@ -38,8 +41,8 @@ declared="$(sed -n 's/.*declare_id!("\([1-9A-HJ-NP-Za-km-z]*\)").*/\1/p' "$ROOT/
 actual="$(solana-keygen pubkey "$PROGRAM_KEYPAIR")"
 [ "$declared" = "$actual" ] || die "declare_id! is $declared but the program keypair is $actual: run \`anchor keys sync\` in solana/"
 
-echo "building (SBPF v0, the same bytecode the tests run)"
-(cd "$ROOT/programs/agenteco_escrow" && cargo build-sbf --arch v0)
+echo "building (SBPF $SBF_ARCH; the tests below run this same binary)"
+(cd "$ROOT/programs/agenteco_escrow" && cargo build-sbf --arch "$SBF_ARCH")
 if [ -z "${SKIP_TESTS:-}" ]; then
   echo "testing"
   (cd "$ROOT/programs/agenteco_escrow" && cargo test)

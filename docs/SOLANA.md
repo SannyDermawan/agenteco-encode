@@ -8,7 +8,7 @@ Scope: the program covers the money and the dispute decision only — escrow, se
 
 | Piece | Where | Tested by |
 |---|---|---|
-| Anchor program `agenteco_escrow` | `solana/programs/agenteco_escrow/src/lib.rs` | `tests/escrow.rs` — 18 litesvm tests (Rust) |
+| Anchor program `agenteco_escrow` | `solana/programs/agenteco_escrow/src/lib.rs` | `tests/escrow.rs` — 18 tests on litesvm 0.18 (Rust) |
 | `SolanaAdapter` (a `ChainAdapter`, `family: 'solana'`) | `agent-runtime/src/chain/solana.ts` | `src/chain/conformance.test.ts` — the scenario below, on both adapters |
 | In-process chain for tests | `agent-runtime/test-support/litesvm.ts` | — |
 | One scenario for every adapter | `agent-runtime/test-support/conformance.ts` | runs on `EvmAdapter` (anvil) and `SolanaAdapter` (litesvm) |
@@ -79,31 +79,31 @@ Run order, from the repository root:
 
 ```
 cd solana/programs/agenteco_escrow
-cargo build-sbf --arch v0     # litesvm 0.10 refuses the SBPF v3 that Anchor 1.2.1 builds by default
+cargo build-sbf --arch v3     # or v0: the tests run whichever binary is in solana/target/deploy
 cargo test                    # 18 tests
 cd ../../../agent-runtime
 npm test                      # includes src/chain/conformance.test.ts
 ```
 
-- **Rust (`tests/escrow.rs`)**: happy path with the fee split and reputation counters; finalize after the review window; accept, execution and dispute timeouts (too early, then due); dispute ruled for the seller and for the buyer; late delivery; no start after the accept window; wrong signer / wrong status / wrong mint / wrong treasury account / wrong payout party; zero hashes; the one-mint rule; fee changes (admin only, existing escrows keep their rate, new ones take the new rate); arbiter handover. Rejections are asserted by Anchor error number, not just "failed". The SPL Token program binary (`solana/test-fixtures/spl_token.so`) was dumped from devnet with `solana program dump TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA`; litesvm 0.10 does not bundle it.
+- **Rust (`tests/escrow.rs`)**: happy path with the fee split and reputation counters; finalize after the review window; accept, execution and dispute timeouts (too early, then due); dispute ruled for the seller and for the buyer; late delivery; no start after the accept window; wrong signer / wrong status / wrong mint / wrong treasury account / wrong payout party; zero hashes; the one-mint rule; fee changes (admin only, existing escrows keep their rate, new ones take the new rate); arbiter handover. Rejections are asserted by Anchor error number, not just "failed". The SPL Token program binary (`solana/test-fixtures/spl_token.so`) was dumped from devnet with `solana program dump TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA`; litesvm's Rust crate does not bundle it, so the test loads it.
 - **Conformance (`test-support/conformance.ts`)**: one scenario through the chain-neutral interface only — signature check, settlement with exact balances for buyer, seller and treasury, both dispute rulings, all four timeouts, access control, reputation after each step, listing. It runs unchanged on `EvmAdapter` against anvil and `SolanaAdapter` against litesvm; each skips itself when its tooling is missing. `evm.test.ts` and the other existing suites were not edited.
-- The litesvm used by the TypeScript tests (npm `litesvm` 1.6) runs both SBPF v0 and v3; the Rust crate's litesvm (0.10) only v0, which is why the program is built with `--arch v0` everywhere, and the tested binary is the deployed one.
+- **SBPF version.** `anchor build` produces SBPF v3 by default. litesvm 0.10 refuses a v3 binary at load time (the test panics), which is why 0.10 needed `--arch v0`; litesvm 0.18 (the Rust dev-dependency now) and the npm `litesvm` 1.6 used by the TypeScript tests run both v0 and v3 (all 18 Rust tests pass on either binary, as does the conformance test). The deploy script builds, tests and deploys one architecture (`SBF_ARCH`, default v3), so the tested binary is the deployed one. Why v3 by default: a `solana-test-validator` 4.1.2 with all features on refused to deploy the v0 binary ("sbpf_version required by the executable which are not enabled", SIMD-0500, "disable deployment of SBPF v0, v1 and v2") and took the v3 one; on devnet SIMD-0500 was still inactive on 11 Oct 2026 (`solana feature status`), so v0 still deploys there today but will not once it activates. Whether devnet takes v3 today has **not** been checked on devnet itself.
 
 ## 7. Toolchain notes
 
-Installed from official sources: Rust (rustup, 1.99), Solana CLI (`release.anza.xyz`, 4.1.2 with platform-tools v1.54), Anchor CLI 1.2.1 built from `github.com/otter-sec/anchor` with `avm install 1.2.1 --from-source` (the prebuilt binary's provenance check could not reach GitHub's attestation endpoint from the build sandbox). Things that bit:
+Installed from official sources: Rust (rustup, 1.99; litesvm 0.18 needs ≥ 1.97.1), Solana CLI (`release.anza.xyz`, 4.1.2 with platform-tools v1.54), Anchor CLI 1.2.1 built from `github.com/otter-sec/anchor` with `avm install 1.2.1 --from-source` (the prebuilt binary's provenance check could not reach GitHub's attestation endpoint from the build sandbox). Things that bit:
 
 - `avm`'s `anchor` shim panicked while reconciling platform-tools versions; the real binary (`~/.avm/bin/anchor-1.2.1`) works when called directly.
-- `anchor build` defaults to `--arch v3 --tools-version v1.57`. With Solana CLI 4.1.2 (platform-tools v1.54) use `anchor build --arch v0 --tools-version v1.54`; with a CLI that ships v1.57, `anchor build --arch v0`.
+- `anchor build` defaults to `--arch v3 --tools-version v1.57`. With Solana CLI 4.1.2 (platform-tools v1.54) it needs `anchor build --tools-version v1.54`; the deploy script uses `cargo build-sbf --arch "$SBF_ARCH"`, which has no such mismatch.
 - Anchor 1.2.1 is not on crates.io; `Cargo.toml` takes `anchor-lang`/`anchor-spl` from the git tag `v1.2.1`. Its `CpiContext::new` takes the program id, not an `AccountInfo`.
 - `Cargo.toml` declares the standard Anchor features (`idl-build`, `custom-heap`, …) so builds are free of `cfg` warnings and `anchor build` can generate the IDL.
 
 ## 8. Deploying to devnet — done by the repository owner
 
-The scripts check but have not been run against devnet by their author. A rehearsal against a local `solana-test-validator` is described in §10.
+The scripts have not been run against devnet by their author; §10 records the rehearsal on a local validator.
 
 1. Program keypair: `solana-keygen new -o solana/target/deploy/agenteco_escrow-keypair.json`, then `anchor keys sync` in `solana/` (rewrites `declare_id!` and `Anchor.toml`). The id in the repository belongs to a throwaway keypair that was not kept; the tests read `declare_id!` from the source, so they follow any id.
-2. `KEYPAIR=<devnet deployer> solana/scripts/deploy-devnet.sh` — refuses any cluster whose genesis hash is not devnet or testnet (a local validator host is allowed for rehearsals), checks that the program keypair matches `declare_id!`, builds with `--arch v0`, runs the tests, deploys. `DRY_RUN=1` stops before sending.
+2. `KEYPAIR=<devnet deployer> solana/scripts/deploy-devnet.sh` — refuses any cluster whose genesis hash is not devnet or testnet (a local validator host is allowed for rehearsals), checks that the program keypair matches `declare_id!`, builds the architecture in `SBF_ARCH` (default v3), runs the tests on that binary, deploys. `DRY_RUN=1` stops before sending.
 3. Once: `cd agent-runtime && npx tsx scripts/solana-initialize.ts --keypair <same> --mint <token> --arbiter <address> --treasury <address>` (`--dry-run` prints the call). Devnet USDC is `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU` (an SPL Token mint with 6 decimals on devnet, checked 11 Oct 2026). The treasury wallet, every seller and every buyer need an associated token account for the mint before they transact.
 4. Keys: the deployer, admin and arbiter keys are the owner's; nothing in this repository creates or stores one.
 
@@ -111,11 +111,17 @@ The scripts check but have not been run against devnet by their author. A rehear
 
 - Nothing is deployed; the backend, API, SDK, CLI and frontend do not know the chain. Wiring needs: a Solana entry type in the chain registry and `CHAINS`, a devnet RPC `SolanaBackend`, `chainId` handling beyond EVM in the API and database, and an ed25519 path in the sign-in code.
 - No events, so no `ratings()`/`ratingsInTx()` and no log-based escrow index; the adapter lists escrows by counting up to `next_escrow_id`.
-- No council program (§4). `set_arbiter` is a single-step handover by the admin.
+- No council program (§4). `set_arbiter` is a single-step handover by the admin, and the admin key itself cannot be rotated (no admin handover instruction).
 - No creation of token accounts, no escrow account closing (rent stays locked), no Token-2022.
 - The program is unaudited. Account and signer checks are tested, not formally reviewed.
 - Mainnet is out of scope; the scripts refuse it.
 
-## 10. Rehearsal against a local validator
+## 10. Rehearsal on a local validator
 
-See the end-to-end check recorded with the work: deploy with the script, initialize with the setup script (devnet USDC cloned into the validator), and read the `Config` back. It exercises the scripts, the program binary and the instruction encoding on a real validator runtime, not the adapter's full flow.
+Run on 11 Oct 2026 with `solana-test-validator` 4.1.2 (all features on; the devnet USDC mint cloned in with `--clone`, which only reads devnet) and a throwaway keypair:
+
+1. `deploy-devnet.sh` against `http://127.0.0.1:8899`: built v3, ran the 18 tests on that binary, deployed (a v0 binary was refused, see §6).
+2. `solana-initialize.ts` live: the `Config` account was created (170 bytes, owned by the program); running it again was refused ("already initialized").
+3. A cluster check: the deploy script refused a mainnet RPC (a read-only `genesis-hash` call) before building anything.
+
+This covers the scripts, the binary's deployability and the `initialize` encoding on a real validator runtime. It does **not** cover the adapter against a real cluster (no RPC backend exists), a transaction cycle on a validator, or anything on devnet.
