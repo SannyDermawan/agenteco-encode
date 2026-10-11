@@ -1,0 +1,134 @@
+/**
+ * SolanaBackend over a JSON-RPC endpoint (devnet, testnet or a local validator). Reads and
+ * confirmation use one commitment (default `confirmed`), so a read right after a write sees it.
+ * Tested against a local solana-test-validator only (docs/SOLANA.md §10); it has not run on devnet.
+ */
+import {
+  address,
+  appendTransactionMessageInstructions,
+  createSolanaRpc,
+  createTransactionMessage,
+  getBase64EncodedWireTransaction,
+  getSignatureFromTransaction,
+  pipe,
+  setTransactionMessageFeePayerSigner,
+  setTransactionMessageLifetimeUsingBlockhash,
+  signTransactionMessageWithSigners,
+  type Address,
+  type Commitment,
+  type Instruction,
+  type Signature,
+  type TransactionSigner,
+} from '@solana/kit'
+import { SOLANA_DEVNET_CHAIN_ID, type SolanaBackend } from './solana.ts'
+
+const CLOCK_SYSVAR = address('SysvarC1ock11111111111111111111111111111111')
+
+export class SolanaRpcBackend implements SolanaBackend {
+  private readonly rpc
+
+  constructor(
+    rpcUrl: string,
+    private readonly commitment: 'confirmed' | 'finalized' = 'confirmed',
+    private readonly confirmTimeoutMs = 60_000
+  ) {
+    this.rpc = createSolanaRpc(rpcUrl)
+  }
+
+  async getAccount(addr: Address) {
+    const { value } = await this.rpc.getAccountInfo(addr, { encoding: 'base64', commitment: this.commitment }).send()
+    if (!value) return null
+    return { data: new Uint8Array(Buffer.from(value.data[0], 'base64')), lamports: BigInt(value.lamports), owner: value.owner }
+  }
+
+  async getClock() {
+    const account = await this.getAccount(CLOCK_SYSVAR)
+    if (!account) throw new Error('the Clock sysvar is not readable')
+    const data = Buffer.from(account.data)
+    // Clock: slot u64, epoch_start_timestamp i64, epoch u64, leader_schedule_epoch u64, unix_timestamp i64.
+    return { slot: data.readBigUInt64LE(0), unixTimestamp: data.readBigInt64LE(32) }
+  }
+
+  async send(instructions: Instruction[], feePayer: TransactionSigner) {
+    const { value: blockhash } = await this.rpc.getLatestBlockhash({ commitment: this.commitment }).send()
+    const transaction = await pipe(
+      createTransactionMessage({ version: 0 }),
+      (tx) => setTransactionMessageFeePayerSigner(feePayer, tx),
+      (tx) => setTransactionMessageLifetimeUsingBlockhash(blockhash, tx),
+      (tx) => appendTransactionMessageInstructions(instructions, tx),
+      (tx) => signTransactionMessageWithSigners(tx)
+    )
+    const signature = getSignatureFromTransaction(transaction)
+    try {
+      // Simulated against the same commitment the reads use, so a rejection is the program's own.
+      await this.rpc
+        .sendTransaction(getBase64EncodedWireTransaction(transaction), { encoding: 'base64', preflightCommitment: this.commitment })
+        .send()
+    } catch (error) {
+      throw new Error(`transaction rejected: ${describe(error)}`, { cause: error })
+    }
+    const deadline = Date.now() + this.confirmTimeoutMs
+    while (Date.now() < deadline) {
+      const [status] = (await this.rpc.getSignatureStatuses([signature]).send()).value
+      if (status?.err) throw new Error(`transaction failed: ${JSON.stringify(status.err, (_, v) => (typeof v === 'bigint' ? v.toString() : v))}`)
+      if (status && reached(status.confirmationStatus, this.commitment)) return signature
+      await new Promise((resolve) => setTimeout(resolve, 200))
+    }
+    throw new Error(`transaction ${signature} was not ${this.commitment} after ${this.confirmTimeoutMs / 1000} s`)
+  }
+
+  async getTransactionLogs(signature: string) {
+    const tx = await this.rpc.getTransaction(signature as Signature, { encoding: 'json', commitment: this.commitment, maxSupportedTransactionVersion: 0 }).send()
+    if (!tx?.meta || tx.meta.err) return null
+    return [...(tx.meta.logMessages ?? [])]
+  }
+
+  async listProgramTransactions(programId: Address, range: { fromSlot: bigint; toSlot: bigint }) {
+    const found: { signature: string; slot: bigint }[] = []
+    let before: Signature | undefined
+    for (;;) {
+      const page = await this.rpc.getSignaturesForAddress(programId, { limit: 1000, commitment: this.commitment, ...(before && { before }) }).send()
+      if (page.length === 0) break
+      for (const entry of page) {
+        if (entry.err === null && entry.slot >= range.fromSlot && entry.slot <= range.toSlot) found.push({ signature: entry.signature, slot: BigInt(entry.slot) })
+      }
+      const oldest = page[page.length - 1]
+      if (BigInt(oldest.slot) < range.fromSlot || page.length < 1000) break
+      before = oldest.signature
+    }
+    return found.reverse()
+  }
+}
+
+const ORDER: Commitment[] = ['processed', 'confirmed', 'finalized']
+function reached(status: Commitment | null | undefined, wanted: Commitment): boolean {
+  return status !== null && status !== undefined && ORDER.indexOf(status) >= ORDER.indexOf(wanted)
+}
+
+function describe(error: unknown): string {
+  if (error instanceof Error) {
+    const logs = (error as { context?: { logs?: string[] } }).context?.logs
+    return logs?.length ? `${error.message}\n${logs.join('\n')}` : error.message
+  }
+  return String(error)
+}
+
+const DEVNET_GENESIS_PREFIX = SOLANA_DEVNET_CHAIN_ID.slice('solana:'.length)
+const TESTNET_GENESIS = '4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY'
+
+/**
+ * Whether a cluster may be used by the setup scripts: Solana devnet, testnet (by genesis hash), or any
+ * cluster served from this machine (a local validator). Mainnet-beta and every unknown cluster are refused.
+ */
+export function clusterAllowed(genesisHash: string, rpcHostname: string): boolean {
+  const local = ['127.0.0.1', 'localhost', '[::1]', '::1'].includes(rpcHostname)
+  return genesisHash.startsWith(DEVNET_GENESIS_PREFIX) || genesisHash === TESTNET_GENESIS || local
+}
+
+/** Throws unless `rpcUrl` answers for an allowed cluster (see clusterAllowed). Reads one value; sends nothing. */
+export async function assertTestCluster(rpcUrl: string): Promise<void> {
+  const genesis = await createSolanaRpc(rpcUrl).getGenesisHash().send()
+  if (!clusterAllowed(genesis, new URL(rpcUrl).hostname)) {
+    throw new Error(`refusing: ${rpcUrl} is not Solana devnet, testnet or a local validator (genesis ${genesis})`)
+  }
+}

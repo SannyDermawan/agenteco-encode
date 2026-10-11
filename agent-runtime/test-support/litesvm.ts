@@ -25,13 +25,14 @@ import {
   type Address,
   type Instruction,
   type KeyPairSigner,
+  type Signature,
   type TransactionSigner,
 } from '@solana/kit'
-import { FailedTransactionMetadata, LiteSVM } from 'litesvm'
+import { FailedTransactionMetadata, LiteSVM, TransactionMetadata } from 'litesvm'
 import { SPL_TOKEN_PROGRAM_ID, buildInitializeInstruction, type SolanaBackend } from '../src/chain/solana.ts'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PROGRAM_SO = join(HERE, '../../solana/target/deploy/agenteco_escrow.so')
+export const PROGRAM_SO = join(HERE, '../../solana/target/deploy/agenteco_escrow.so')
 const LIB_RS = join(HERE, '../../solana/programs/agenteco_escrow/src/lib.rs')
 /** The id the program was compiled with: its `declare_id!`, so another program keypair needs no change here. */
 export const TEST_PROGRAM_ID = address(/declare_id!\("([1-9A-HJ-NP-Za-km-z]{32,44})"\)/.exec(readFileSync(LIB_RS, 'utf8'))![1])
@@ -46,6 +47,9 @@ export function solanaUnavailable(): string | null {
 
 /** litesvm behind the SolanaBackend interface: accounts and the clock are read in-process, writes go through sendTransaction. */
 export class LiteSvmBackend implements SolanaBackend {
+  /** Every transaction this backend sent, with the slot it ran in: litesvm keeps no per-address history. */
+  private readonly sent: { signature: string; slot: bigint; ok: boolean }[] = []
+
   constructor(readonly svm: LiteSVM) {}
 
   async getAccount(addr: Address) {
@@ -67,12 +71,22 @@ export class LiteSvmBackend implements SolanaBackend {
       (tx) => signTransactionMessageWithSigners(tx)
     )
     const result = this.svm.sendTransaction(transaction)
+    this.sent.push({ signature: getSignatureFromTransaction(transaction), slot: this.svm.getClock().slot, ok: !(result instanceof FailedTransactionMetadata) })
     // litesvm has no blocks: a new blockhash keeps two identical transactions from being "already processed".
     this.svm.expireBlockhash()
     if (result instanceof FailedTransactionMetadata) {
       throw new Error(`transaction failed: ${result.err()}\n${result.meta().logs().join('\n')}`)
     }
     return getSignatureFromTransaction(transaction)
+  }
+
+  async getTransactionLogs(signature: string) {
+    const meta = this.svm.getTransaction(signature as Signature)
+    return meta instanceof TransactionMetadata ? meta.logs() : null
+  }
+
+  async listProgramTransactions(_programId: Address, range: { fromSlot: bigint; toSlot: bigint }) {
+    return this.sent.filter((t) => t.ok && t.slot >= range.fromSlot && t.slot <= range.toSlot).map(({ signature, slot }) => ({ signature, slot }))
   }
 }
 

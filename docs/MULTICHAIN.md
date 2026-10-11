@@ -88,7 +88,7 @@ Rules: no chain-specific branching outside adapters; signing keys are handed to 
 
 **`EvmAdapter`** (`chain/evm.ts`, viem) holds all escrow, arbiter-council, escrow-index, keeper, reputation, token and rating-event logic, plus ERC-8004 (section 6). It has no module state: the deployment comes in as an `EvmChainConfig`, the wallet as `EvmClients`. The older helpers (`onchain/escrow.ts`, `arbiter.ts`, `escrowIndex.ts`, `host/reputation.ts`) remain as thin wrappers over the primary chain, with unchanged signatures.
 
-**`SolanaAdapter`** (`chain/solana.ts`, `@solana/kit` over the Anchor program in `solana/`): implements the interface with the same state machine, `u64` ids, SPL token accounts, ed25519 `verifySignature` and base58 addresses. It is exercised by one conformance scenario that also runs on `EvmAdapter` (`chain/conformance.test.ts`). Not done: events (so `ratings`/`ratingsInTx` throw), a devnet RPC backend, registry/backend wiring, a council program. Details and limits in [SOLANA.md](SOLANA.md).
+**`SolanaAdapter`** (`chain/solana.ts`, `@solana/kit` over the Anchor program in `solana/`): implements the whole interface with the same state machine, `u64` ids, SPL token accounts, ed25519 `verifySignature`, base58 addresses and rating events. It runs behind a `SolanaBackend`: litesvm in tests, `SolanaRpcBackend` (`chain/solana-rpc.ts`) for a cluster. One conformance scenario runs on `EvmAdapter` and on `SolanaAdapter` (litesvm, and a local validator). Not done: registry and backend wiring, any run on devnet, a council program (a Squads vault is the decided arbiter). Details and limits in [SOLANA.md](SOLANA.md).
 
 ## 4. Configuration
 
@@ -199,8 +199,8 @@ All on-chain suites run on throwaway local chains (anvil) with the real contract
 3. Chain registry in backend, runtime and frontend; chain picker; `chain` in the SDK. **Done.**
 4. ERC-8004 identity and feedback on EVM chains. **Done** (registries per chain by configuration).
 5. Base Sepolia: preset, 6-decimal handling, deploy command. **Done in code**; the contract is not deployed yet.
-6. `SolanaAdapter` and the Anchor program. **Built and tested locally** (litesvm, plus a rehearsal on a local validator); **not deployed and not wired** ([SOLANA.md](SOLANA.md) §9).
+6. `SolanaAdapter` and the Anchor program. **Built and tested locally** (litesvm and a local validator); **not deployed and not wired** ([SOLANA.md](SOLANA.md) §9).
 
 ## 10. Open questions
 
-- How the council (`ArbiterCouncil`) is represented on Solana: the program takes one arbiter signer (a wallet or a multisig vault); a council program is not built ([SOLANA.md](SOLANA.md) §4).
+- The council on Solana is a Squads multisig vault as the program's one arbiter signer; the vault-signed ruling is not tested ([SOLANA.md](SOLANA.md) §4).

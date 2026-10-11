@@ -63,7 +63,12 @@ export function isSolanaChainId(chainId: string): boolean {
 export interface SolanaBackend {
   getAccount(addr: Address): Promise<{ data: Uint8Array; lamports: bigint; owner: Address } | null>
   getClock(): Promise<{ slot: bigint; unixTimestamp: bigint }>
+  /** Sends one transaction signed by `feePayer` (and by every signer inside the instructions) and resolves once it is confirmed; throws when it fails. */
   send(instructions: IInstruction[], feePayer: TransactionSigner): Promise<TxHash>
+  /** The program log lines of a transaction, or null when it is unknown or failed (a failed transaction's events never happened). */
+  getTransactionLogs(signature: string): Promise<string[] | null>
+  /** Successful transactions that touched `programId` in slots [fromSlot, toSlot], oldest first. */
+  listProgramTransactions(programId: Address, range: { fromSlot: bigint; toSlot: bigint }): Promise<{ signature: string; slot: bigint }[]>
 }
 
 export interface SolanaChainConfig {
@@ -338,6 +343,48 @@ function decodeTokenAmount(data: Uint8Array): bigint {
   return Buffer.from(data).readBigUInt64LE(64)
 }
 
+/** The events of `programId` in a transaction's log lines (Anchor `emit!` writes them as "Program data: <base64>"). */
+function programEvents(logs: string[], programId: Address): Uint8Array[] {
+  const stack: string[] = []
+  const events: Uint8Array[] = []
+  for (const line of logs) {
+    const invoke = /^Program (\S+) invoke \[\d+\]$/.exec(line)
+    if (invoke) {
+      stack.push(invoke[1])
+      continue
+    }
+    if (/^Program \S+ (success|failed)/.test(line)) {
+      stack.pop()
+      continue
+    }
+    const data = /^Program data: (\S+)$/.exec(line)
+    // Only what the escrow program itself emitted: another program in the same transaction can log too.
+    if (data && stack[stack.length - 1] === programId) events.push(new Uint8Array(Buffer.from(data[1], 'base64')))
+  }
+  return events
+}
+
+const SELLER_RATED = createHash('sha256').update('event:SellerRated').digest().subarray(0, 8)
+
+/** The SellerRated events among `events`: escrow_id u64, seller, buyer, score u8 (after the 8-byte discriminator). */
+function ratingEvents(events: Uint8Array[], txHash: string): RatingEvent[] {
+  const out: RatingEvent[] = []
+  for (const e of events) {
+    const b = Buffer.from(e)
+    if (b.length < 8 + 8 + 32 + 32 + 1 || !b.subarray(0, 8).equals(SELLER_RATED)) continue
+    out.push({
+      escrowId: b.readBigUInt64LE(8),
+      seller: bytesToAddress(b.subarray(16, 48)),
+      buyer: bytesToAddress(b.subarray(48, 80)),
+      score: b.readUInt8(80),
+      txHash,
+    })
+  }
+  return out
+}
+
+const ATA_PROGRAM_ID = address('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
+
 export interface InitializeParams {
   programId: Address
   /** Signs, pays for the Config account and becomes the program's admin (fee and arbiter changes). */
@@ -472,7 +519,7 @@ export class SolanaAdapter implements ChainAdapter {
 
   private async ataFor(owner: Address): Promise<Address> {
     const [pda] = await getProgramDerivedAddress({
-      programAddress: address('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'),
+      programAddress: ATA_PROGRAM_ID,
       seeds: [pubkeyBytes(owner), pubkeyBytes(SPL_TOKEN_PROGRAM_ID), pubkeyBytes(this.mint)],
     })
     return pda
@@ -482,6 +529,29 @@ export class SolanaAdapter implements ChainAdapter {
     const ata = await this.ataFor(address(addr))
     const acc = await this.backend.getAccount(ata)
     return acc ? decodeTokenAmount(acc.data) : 0n
+  }
+
+  /**
+   * Creates `owner`'s associated token account for the settlement token if it does not exist yet
+   * (the signer pays the rent), and returns its address. Buyers, sellers and the treasury each
+   * need one before they transact: the escrow program never creates token accounts.
+   */
+  async ensureTokenAccount(owner: string): Promise<{ address: string; created: boolean; txHash: TxHash | null }> {
+    const payer = this.requireSigner()
+    const ata = await this.ataFor(address(owner))
+    if (await this.backend.getAccount(ata)) return { address: ata, created: false, txHash: null }
+    const txHash = await this.backend.send(
+      [
+        {
+          programAddress: ATA_PROGRAM_ID,
+          // create_idempotent: a second creator racing this one does not fail.
+          accounts: [writableSigner(payer), writable(ata), readonly(address(owner)), readonly(this.mint), readonly(SYSTEM_PROGRAM_ID), readonly(SPL_TOKEN_PROGRAM_ID)],
+          data: new Uint8Array([1]),
+        },
+      ],
+      payer
+    )
+    return { address: ata, created: true, txHash }
   }
 
   async createAndFundEscrow(params: { seller: string; amount: number | string; taskHash: Hash32 }): Promise<EscrowId> {
@@ -802,13 +872,18 @@ export class SolanaAdapter implements ChainAdapter {
     return { minWindow: config.minWindow, maxWindow: 90n * 24n * 60n * 60n, disputeTimeout: config.disputeTimeout }
   }
 
-  async ratingsInTx(_txHash: string): Promise<RatingEvent[]> {
-    throw new Error('ratingsInTx is not implemented for Solana yet: the program emits no on-chain events this phase (see docs/SOLANA.md §10)')
+  async ratingsInTx(txHash: string): Promise<RatingEvent[]> {
+    const logs = await this.backend.getTransactionLogs(txHash)
+    return logs ? ratingEvents(programEvents(logs, this.programId), txHash) : []
   }
 
-  async ratings(_fromBlock: bigint, _toBlock: bigint): Promise<RatingEvent[]> {
-    throw new Error('ratings is not implemented for Solana yet: the program emits no on-chain events this phase (see docs/SOLANA.md §10)')
+  /** SellerRated events in slots [fromBlock, toBlock] (Solana's "block number" is the slot). */
+  async ratings(fromBlock: bigint, toBlock: bigint): Promise<RatingEvent[]> {
+    const out: RatingEvent[] = []
+    for (const tx of await this.backend.listProgramTransactions(this.programId, { fromSlot: fromBlock, toSlot: toBlock })) {
+      const logs = await this.backend.getTransactionLogs(tx.signature)
+      if (logs) out.push(...ratingEvents(programEvents(logs, this.programId), tx.signature))
+    }
+    return out
   }
 }
-
-export const __internal = { decodeEscrow, decodeConfig, decodeReputation, bytesToAddress, sighash }
