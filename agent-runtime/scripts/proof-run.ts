@@ -1,6 +1,6 @@
 /**
  * A proof run on a live testnet: real escrow deals through the chain-neutral ChainAdapter, on
- * Base Sepolia, Ethereum Sepolia, Arbitrum Sepolia, Tempo Moderato or Solana devnet. Three deals, nothing mocked:
+ * Base Sepolia, Ethereum Sepolia, Arbitrum Sepolia, Tempo Moderato, BOT Chain Testnet or Solana devnet. Three deals, nothing mocked:
  *
  *   1. settle        create+fund, start, deliver, accept: fee to the treasury, rest to the seller, a rating
  *   2. dispute, buyer wins    deliver, dispute, the seller answers, the arbiter rules for the buyer: refund, no fee
@@ -10,7 +10,7 @@
  * .proof/results-<chain>.json. Test wallets come from .proof/wallets.json (created by hand, git-ignored);
  * the arbiter of Base Sepolia is a member of its council (ARBITER_PRIVATE_KEY in backend/.env).
  *
- *   cd agent-runtime && npx tsx scripts/proof-run.ts base-sepolia | ethereum-sepolia | arbitrum-sepolia | tempo-moderato
+ *   cd agent-runtime && npx tsx scripts/proof-run.ts base-sepolia | ethereum-sepolia | arbitrum-sepolia | tempo-moderato | bot-testnet
  *   cd agent-runtime && npx tsx scripts/proof-run.ts solana-devnet
  *
  * Keys are read from local files and never printed. Testnet and devnet only.
@@ -24,6 +24,7 @@ const EVM = {
   'base-sepolia': { chain: 'eip155:84532', eco: '0xF8448762AeCE0039f1072Da74477fbFAD629fDB8', block: '48021794', rpc: 'https://sepolia.base.org' },
   'ethereum-sepolia': { chain: 'eip155:11155111', eco: '0x3048b1a3CeeE4f1AF09485e49f059d094EF6f865', block: '11901363', rpc: undefined },
   'arbitrum-sepolia': { chain: 'eip155:421614', eco: '0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea', block: '318529770', rpc: 'https://sepolia-rollup.arbitrum.io/rpc' },
+  'bot-testnet': { chain: 'eip155:968', eco: '0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea', block: '26642374', rpc: undefined },
   'tempo-moderato': { chain: 'eip155:42431', eco: '0x2620424C73A39624bDcd3fa43aABF425d6Da997e', block: '39319911', rpc: undefined },
 } as const
 type EvmName = keyof typeof EVM

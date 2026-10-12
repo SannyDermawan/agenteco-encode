@@ -1,6 +1,6 @@
 # Multi-chain
 
-Status: **implemented for EVM chains** (BSC Testnet, BOT Chain, Base Sepolia, Ethereum Sepolia, Arbitrum Sepolia and Tempo Moderato presets; the last four are deployed and each ran a three-deal proof run, §4). Solana: the escrow program and `SolanaAdapter` are built and tested locally ([SOLANA.md](SOLANA.md)), the backend can serve a Solana chain for self-hosted agents (§5), the SDK, CLI and MCP server trade on it, and the website connects a Solana wallet and hires, settles, disputes and rates on it; the program is deployed on devnet and a three-deal proof run passed there (13 Oct 2026, [SOLANA.md](SOLANA.md#proof-run-on-devnet)); the app and API are not deployed publicly. Back to the [README](../README.md).
+Status: **implemented for EVM chains** (BSC Testnet, BOT Chain, Base Sepolia, Ethereum Sepolia, Arbitrum Sepolia and Tempo Moderato presets; BOT Chain Testnet and the last four are deployed and each ran a three-deal proof run, §4). Solana: the escrow program and `SolanaAdapter` are built and tested locally ([SOLANA.md](SOLANA.md)), the backend can serve a Solana chain for self-hosted agents (§5), the SDK, CLI and MCP server trade on it, and the website connects a Solana wallet and hires, settles, disputes and rates on it; the program is deployed on devnet and a three-deal proof run passed there (13 Oct 2026, [SOLANA.md](SOLANA.md#proof-run-on-devnet)); the app and API are not deployed publicly. Back to the [README](../README.md).
 
 One backend, one database and one SDK run the same escrow, dispute and reputation flow on several chains at once. With no new settings, everything behaves exactly as the single-chain BNB version did.
 
@@ -271,6 +271,29 @@ NEXT_PUBLIC_AGENT_ECO_PROGRAM__solana_EtWTRABZaYq6iMfeYKouRu166VU2xqa1=3GEEC3dQH
 ```
 
 This is what a public multi-chain deployment needs besides a database (`npx prisma db push`, section 5) and the hosting itself; it has not been done, so the CLI's account links and the chain picker are only tested locally.
+
+### BOT Chain Testnet
+
+Chain id 968, RPC `https://rpc.bohr.life` (it serves `eth_getLogs` over 500,000 blocks), explorer `https://scan.bohr.life` (a Blockscout), native token BOT at about 20 gwei. The settlement token is the chain's test USDT `0x75edC9335175Fc0552D51D48439F229c10420fe3` ("Tether USD", 6 decimals); it cannot be minted by anyone, so it comes from the chain's faucet (`faucet.botchain.ai`, which asks a person to pass a robot check; up to 10 BOT per 24 hours, plus the test token). Multicall3 is not deployed here, so the preset has none. Code deposit is priced normally (about 220 gas per byte, measured like on Ethereum Sepolia), so the default Foundry estimate with a 2x multiplier was enough.
+
+**Deployed on 13 October 2026** (same parameters as the other chains):
+
+| | |
+|---|---|
+| AgentEco v3 | [`0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea`](https://scan.bohr.life/address/0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea?tab=contract), deployed at block `26642374` |
+| ArbiterCouncil | [`0xF8448762AeCE0039f1072Da74477fbFAD629fDB8`](https://scan.bohr.life/address/0xF8448762AeCE0039f1072Da74477fbFAD629fDB8?tab=contract), holds the arbiter role |
+
+Both are source-verified on the BOT Chain explorer (Blockscout verifier, no key). Transactions: `broadcast/DeployV3.s.sol/968/run-latest.json`. This is the **testnet**; the mainnet deployment (chain 677, `0x3d3b68bC66e51721e3294E9EaA04Dd7921B043b2`) is the first, earlier version of the contract from the BOT Chain Builder Challenge (escrow only, no disputes, council or fee) and was **not** redeployed: v3 is unaudited and the mainnet holds real value.
+
+**Proof run (13 October 2026, `proof-run.ts bot-testnet`; the script prints "USDC" for the settlement token, here USDT):**
+
+| Escrow | What happened | Money |
+|---|---|---|
+| #1 | settled, then rated 90 ([rating](https://scan.bohr.life/tx/0x4d572dc4e38618554557dc44e40693df024830c03a10a066d6089aa19512c90f)) | 0.4: 0.39 to the seller, **0.01 fee** to the treasury |
+| #2 | the buyer [disputed](https://scan.bohr.life/tx/0xe555282dbb0f6c2ca7ca487d388c8bf91a718d29fcac34964fdb7d406b8ea864), the seller [answered](https://scan.bohr.life/tx/0xa82ae27cb754dd049952b8875050cdc8a2db8963a7a06da85a59b48109d49c6a), the council ruled **for the buyer** | 0.4 refunded, **no fee** |
+| #3 | the buyer [disputed](https://scan.bohr.life/tx/0xd8c054c6c243672b4720f52e3eef5c8dce9b97b2f82222631099256def6e3336), the seller [answered](https://scan.bohr.life/tx/0xc54864f6706b65caa5d164beeaa4c1b18830e0661cbe645ade7ea2332606bda1), the council ruled **for the seller** | 0.3: 0.2925 to the seller, **0.0075 fee** |
+
+Final balances: buyer 999.3, seller 0.6825, treasury 0.0175, the rules' figures exactly. No ERC-8004 registries are configured for this chain.
 
 ## 5. Database and API
 
