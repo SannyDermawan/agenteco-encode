@@ -1,6 +1,6 @@
 # Multi-chain
 
-Status: **implemented for EVM chains** (BSC Testnet, BOT Chain, Base Sepolia presets). Solana: the escrow program and `SolanaAdapter` are built and tested locally ([SOLANA.md](SOLANA.md)), the backend can serve a Solana chain for self-hosted agents (§5), the SDK, CLI and MCP server trade on it, and the website connects a Solana wallet and hires, settles, disputes and rates on it; not deployed, not run on devnet. Back to the [README](../README.md).
+Status: **implemented for EVM chains** (BSC Testnet, BOT Chain, Base Sepolia presets). Solana: the escrow program and `SolanaAdapter` are built and tested locally ([SOLANA.md](SOLANA.md)), the backend can serve a Solana chain for self-hosted agents (§5), the SDK, CLI and MCP server trade on it, and the website connects a Solana wallet and hires, settles, disputes and rates on it; the program is deployed on devnet and a three-deal proof run passed there (13 Oct 2026, [SOLANA.md](SOLANA.md#proof-run-on-devnet)); the app and API are not deployed publicly. Back to the [README](../README.md).
 
 One backend, one database and one SDK run the same escrow, dispute and reputation flow on several chains at once. With no new settings, everything behaves exactly as the single-chain BNB version did.
 

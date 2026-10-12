@@ -1,22 +1,28 @@
 /**
  * SolanaBackend over a JSON-RPC endpoint (devnet, testnet or a local validator). Reads and
  * confirmation use one commitment (default `confirmed`), so a read right after a write sees it.
- * Tested against a local solana-test-validator only (docs/SOLANA.md §10); it has not run on devnet.
+ * Tested against a local solana-test-validator (docs/SOLANA.md §10) and exercised on devnet (§5). A public
+ * endpoint answers HTTP 429 when a method is called too often, so every request backs off and retries on it.
  */
 import {
   address,
   appendTransactionMessageInstructions,
+  createDefaultRpcTransport,
   createSolanaRpc,
+  createSolanaRpcFromTransport,
   createTransactionMessage,
   getBase64EncodedWireTransaction,
   getSignatureFromTransaction,
+  isSolanaError,
   pipe,
+  SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR,
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
   signTransactionMessageWithSigners,
   type Address,
   type Commitment,
   type Instruction,
+  type RpcTransport,
   type Signature,
   type TransactionSigner,
 } from '@solana/kit'
@@ -25,15 +31,40 @@ import { base64ToBytes, readI64, readU64 } from './bytes.ts'
 
 const CLOCK_SYSVAR = address('SysvarC1ock11111111111111111111111111111111')
 
+const RATE_LIMIT_RETRIES = 8
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+function isRateLimited(error: unknown): boolean {
+  return isSolanaError(error, SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR) && error.context.statusCode === 429
+}
+
+/** Retries a request the node refused with HTTP 429 (a public RPC's per-method limit): 0.4 s, 0.8 s, ... up to 8 s apart. */
+export function retryingOnRateLimit(inner: RpcTransport, baseDelayMs = 400): RpcTransport {
+  const retrying = async (config: Parameters<RpcTransport>[0]) => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await inner(config)
+      } catch (error) {
+        if (!isRateLimited(error) || attempt >= RATE_LIMIT_RETRIES) throw error
+        await sleep(Math.min(8_000, baseDelayMs * 2 ** attempt) + Math.floor(Math.random() * 100))
+      }
+    }
+  }
+  return retrying as RpcTransport
+}
+
 export class SolanaRpcBackend implements SolanaBackend {
   private readonly rpc
+  /** How often a sent transaction's status is read: quickly on a local validator, gently on a public node. */
+  private readonly pollMs: number
 
   constructor(
     rpcUrl: string,
     private readonly commitment: 'confirmed' | 'finalized' = 'confirmed',
     private readonly confirmTimeoutMs = 60_000
   ) {
-    this.rpc = createSolanaRpc(rpcUrl)
+    this.rpc = createSolanaRpcFromTransport(retryingOnRateLimit(createDefaultRpcTransport({ url: rpcUrl })))
+    this.pollMs = ['127.0.0.1', 'localhost', '[::1]', '::1'].includes(new URL(rpcUrl).hostname) ? 200 : 500
   }
 
   async getAccount(addr: Address) {
@@ -73,7 +104,7 @@ export class SolanaRpcBackend implements SolanaBackend {
       const [status] = (await this.rpc.getSignatureStatuses([signature]).send()).value
       if (status?.err) throw new Error(`transaction failed: ${JSON.stringify(status.err, (_, v) => (typeof v === 'bigint' ? v.toString() : v))}`)
       if (status && reached(status.confirmationStatus, this.commitment)) return signature
-      await new Promise((resolve) => setTimeout(resolve, 200))
+      await sleep(this.pollMs)
     }
     throw new Error(`transaction ${signature} was not ${this.commitment} after ${this.confirmTimeoutMs / 1000} s`)
   }
