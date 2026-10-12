@@ -206,7 +206,7 @@ describe('SolanaAdapter helpers (litesvm)', { skip: solanaUnavailable() ?? false
     assert.equal(await buyer.sweepNative(newcomer.address), null, 'nothing left to sweep')
   })
 
-  test('the fee rate is readable: the platform\'s now, and the one an escrow was created with', async () => {
+  test('the fee rate and the reputation counters are readable, and a seller without a token account gets one with the escrow', async () => {
     const chain = await startSolanaTestChain({ feeBps: FEE_BPS })
     const config = {
       chainId: SOLANA_DEVNET_CHAIN_ID,

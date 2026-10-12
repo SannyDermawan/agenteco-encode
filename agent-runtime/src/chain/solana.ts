@@ -27,8 +27,9 @@ import {
   type SignatureBytes,
   type TransactionSigner,
 } from '@solana/kit'
-import { parseUnits } from 'viem'
+import { bytesToHex, hexToBytes, parseUnits } from 'viem'
 import { buildAuthHeaders, type WalletAccount } from '../authHeaders.ts'
+import { base64ToBytes, bytesEqual, concatBytes, i64le, readI64, readU16, readU64, readU8, u16le, u64le } from './bytes.ts'
 import type {
   ArbiterSetup,
   ChainAdapter,
@@ -172,25 +173,7 @@ function sighash(name: string): Uint8Array {
 
 function assertDiscriminator(data: Uint8Array, accountName: string): void {
   const expected = sha256(enc(`account:${accountName}`)).subarray(0, 8)
-  if (!Buffer.from(data).subarray(0, 8).equals(expected)) throw new Error(`not a ${accountName} account of this program`)
-}
-
-function u64le(n: bigint): Uint8Array {
-  const b = Buffer.alloc(8)
-  b.writeBigUInt64LE(n)
-  return new Uint8Array(b)
-}
-
-function i64le(n: bigint): Uint8Array {
-  const b = Buffer.alloc(8)
-  b.writeBigInt64LE(n)
-  return new Uint8Array(b)
-}
-
-function u16le(n: number): Uint8Array {
-  const b = Buffer.alloc(2)
-  b.writeUInt16LE(n)
-  return new Uint8Array(b)
+  if (!bytesEqual(data.subarray(0, 8), expected)) throw new Error(`not a ${accountName} account of this program`)
 }
 
 const addressEncoder = getAddressEncoder()
@@ -267,21 +250,21 @@ interface DecodedEscrow {
   rated: boolean
 }
 
-function hex32(b: Buffer): Hash32 {
-  return `0x${b.toString('hex')}` as Hash32
+function hex32(b: Uint8Array): Hash32 {
+  return bytesToHex(b) as Hash32
 }
 
 function decodeEscrow(data: Uint8Array): DecodedEscrow {
   assertDiscriminator(data, 'Escrow')
-  const b = Buffer.from(data).subarray(8) // skip the 8-byte Anchor discriminator
+  const b = data.subarray(8) // skip the 8-byte Anchor discriminator
   let o = 0
   const u64 = () => {
-    const v = b.readBigUInt64LE(o)
+    const v = readU64(b, o)
     o += 8
     return v
   }
   const i64 = () => {
-    const v = b.readBigInt64LE(o)
+    const v = readI64(b, o)
     o += 8
     return v
   }
@@ -300,9 +283,9 @@ function decodeEscrow(data: Uint8Array): DecodedEscrow {
   const seller = pk()
   const mint = pk()
   const amount = u64()
-  const statusIdx = b.readUInt8(o)
+  const statusIdx = readU8(b, o)
   o += 1
-  const feeBps = b.readUInt16LE(o)
+  const feeBps = readU16(b, o)
   o += 2
   const createdAt = i64()
   const fundedAt = i64()
@@ -321,7 +304,7 @@ function decodeEscrow(data: Uint8Array): DecodedEscrow {
   const disputeReasonHash = hash()
   const disputeResponseHash = hash()
   const resolutionHash = hash()
-  const rated = b.readUInt8(o) === 1
+  const rated = readU8(b, o) === 1
   return {
     id,
     buyer,
@@ -364,7 +347,7 @@ interface DecodedConfig {
 }
 
 function decodeConfig(data: Uint8Array): DecodedConfig {
-  const b = Buffer.from(data).subarray(8)
+  const b = data.subarray(8)
   assertDiscriminator(data, 'Config')
   let o = 0
   const pk = () => {
@@ -376,15 +359,15 @@ function decodeConfig(data: Uint8Array): DecodedConfig {
   const arbiter = pk()
   const treasury = pk()
   const mint = pk()
-  const feeBps = b.readUInt16LE(o)
+  const feeBps = readU16(b, o)
   o += 2
-  const minWindow = b.readBigInt64LE(o)
+  const minWindow = readI64(b, o)
   o += 8
-  const acceptTimeout = b.readBigInt64LE(o)
+  const acceptTimeout = readI64(b, o)
   o += 8
-  const disputeTimeout = b.readBigInt64LE(o)
+  const disputeTimeout = readI64(b, o)
   o += 8
-  const nextEscrowId = b.readBigUInt64LE(o)
+  const nextEscrowId = readU64(b, o)
   return { admin, arbiter, treasury, mint, feeBps, minWindow, acceptTimeout, disputeTimeout, nextEscrowId }
 }
 
@@ -398,10 +381,10 @@ interface DecodedReputation {
 
 function decodeReputation(data: Uint8Array): DecodedReputation {
   assertDiscriminator(data, 'Reputation')
-  const b = Buffer.from(data).subarray(8 + 32) // skip discriminator + seller pubkey
+  const b = data.subarray(8 + 32) // skip discriminator + seller pubkey
   let o = 0
   const u64 = () => {
-    const v = b.readBigUInt64LE(o)
+    const v = readU64(b, o)
     o += 8
     return v
   }
@@ -416,7 +399,7 @@ function decodeReputation(data: Uint8Array): DecodedReputation {
 
 function decodeTokenAmount(data: Uint8Array): bigint {
   // spl-token Account layout: mint(32) owner(32) amount(u64) ...
-  return Buffer.from(data).readBigUInt64LE(64)
+  return readU64(data, 64)
 }
 
 /** The events of `programId` in a transaction's log lines (Anchor `emit!` writes them as "Program data: <base64>"). */
@@ -435,7 +418,7 @@ function programEvents(logs: string[], programId: Address): Uint8Array[] {
     }
     const data = /^Program data: (\S+)$/.exec(line)
     // Only what the escrow program itself emitted: another program in the same transaction can log too.
-    if (data && stack[stack.length - 1] === programId) events.push(new Uint8Array(Buffer.from(data[1], 'base64')))
+    if (data && stack[stack.length - 1] === programId) events.push(base64ToBytes(data[1]))
   }
   return events
 }
@@ -446,13 +429,13 @@ const SELLER_RATED = sha256(enc('event:SellerRated')).subarray(0, 8)
 function ratingEvents(events: Uint8Array[], txHash: string): RatingEvent[] {
   const out: RatingEvent[] = []
   for (const e of events) {
-    const b = Buffer.from(e)
-    if (b.length < 8 + 8 + 32 + 32 + 1 || !b.subarray(0, 8).equals(SELLER_RATED)) continue
+    const b = e
+    if (b.length < 8 + 8 + 32 + 32 + 1 || !bytesEqual(b.subarray(0, 8), SELLER_RATED)) continue
     out.push({
-      escrowId: b.readBigUInt64LE(8),
+      escrowId: readU64(b, 8),
       seller: bytesToAddress(b.subarray(16, 48)),
       buyer: bytesToAddress(b.subarray(48, 80)),
-      score: b.readUInt8(80),
+      score: readU8(b, 80),
       txHash,
     })
   }
@@ -490,7 +473,7 @@ export interface InitializeParams {
 /** The one-time `initialize` call that sets a deployed program up (see docs/SOLANA.md). */
 export async function buildInitializeInstruction(p: InitializeParams): Promise<IInstruction> {
   const config = await configPda(p.programId)
-  const data = Buffer.concat([
+  const data = concatBytes([
     sighash('initialize'),
     pubkeyBytes(p.arbiter),
     pubkeyBytes(p.treasury),
@@ -583,7 +566,7 @@ export class SolanaAdapter implements ChainAdapter {
 
   async token(): Promise<TokenInfo> {
     const acc = await this.getAccountOrThrow(this.mint, 'mint')
-    const decimals = Buffer.from(acc.data).readUInt8(44) // spl-token Mint: mint_authority COption(36) + supply(8) = 44
+    const decimals = readU8(acc.data, 44) // spl-token Mint: mint_authority COption(36) + supply(8) = 44
     return { address: this.mint, symbol: this.tokenSymbol, decimals }
   }
 
@@ -658,12 +641,12 @@ export class SolanaAdapter implements ChainAdapter {
           },
         ]
 
-    const data = Buffer.concat([
+    const data = concatBytes([
       sighash('create_and_fund_escrow'),
       u64le(amountBase),
       i64le(this.executionWindow),
       i64le(this.reviewWindow),
-      Buffer.from(params.taskHash.slice(2), 'hex'),
+      hexToBytes(params.taskHash),
     ])
     const ix: IInstruction = {
       programAddress: this.programId,
@@ -698,7 +681,7 @@ export class SolanaAdapter implements ChainAdapter {
   async markDelivered(id: EscrowId, resultHash: Hash32): Promise<void> {
     const seller = this.requireSigner()
     const escrow = await escrowPda(this.programId, id)
-    const data = Buffer.concat([sighash('mark_delivered'), Buffer.from(resultHash.slice(2), 'hex')])
+    const data = concatBytes([sighash('mark_delivered'), hexToBytes(resultHash)])
     await this.backend.send(
       [{ programAddress: this.programId, accounts: [readonlySigner(seller), writable(escrow)], data: new Uint8Array(data) }],
       seller
@@ -736,7 +719,7 @@ export class SolanaAdapter implements ChainAdapter {
     const buyer = this.requireSigner()
     const escrow = await escrowPda(this.programId, id)
     const configAddr = await configPda(this.programId)
-    const data = Buffer.concat([sighash('raise_dispute'), Buffer.from(reasonHash.slice(2), 'hex')])
+    const data = concatBytes([sighash('raise_dispute'), hexToBytes(reasonHash)])
     return this.backend.send(
       [{ programAddress: this.programId, accounts: [readonlySigner(buyer), writable(escrow), readonly(configAddr)], data: new Uint8Array(data) }],
       buyer
@@ -746,7 +729,7 @@ export class SolanaAdapter implements ChainAdapter {
   async submitDisputeResponse(id: EscrowId, responseHash: Hash32): Promise<TxHash> {
     const seller = this.requireSigner()
     const escrow = await escrowPda(this.programId, id)
-    const data = Buffer.concat([sighash('submit_dispute_response'), Buffer.from(responseHash.slice(2), 'hex')])
+    const data = concatBytes([sighash('submit_dispute_response'), hexToBytes(responseHash)])
     return this.backend.send(
       [{ programAddress: this.programId, accounts: [readonlySigner(seller), writable(escrow)], data: new Uint8Array(data) }],
       seller
@@ -758,7 +741,7 @@ export class SolanaAdapter implements ChainAdapter {
     const e = await this.decodedEscrow(id)
     const escrow = await escrowPda(this.programId, id)
     const reputation = await reputationPda(this.programId, e.seller)
-    const data = Buffer.concat([sighash('rate_seller'), Buffer.from([score])])
+    const data = concatBytes([sighash('rate_seller'), Uint8Array.of(score)])
     return this.backend.send(
       [{ programAddress: this.programId, accounts: [readonlySigner(buyer), writable(escrow), writable(reputation)], data: new Uint8Array(data) }],
       buyer
@@ -775,7 +758,7 @@ export class SolanaAdapter implements ChainAdapter {
     const config = await this.decodedConfig()
     const payoutAta = toSeller ? await this.ataFor(e.seller) : await this.ataFor(e.buyer)
     const treasuryAta = await this.ataFor(config.treasury)
-    const data = Buffer.concat([sighash('resolve_dispute'), Buffer.from([toSeller ? 1 : 0]), Buffer.from(rationaleHash.slice(2), 'hex')])
+    const data = concatBytes([sighash('resolve_dispute'), Uint8Array.of(toSeller ? 1 : 0), hexToBytes(rationaleHash)])
     return this.backend.send(
       [
         {
@@ -849,7 +832,7 @@ export class SolanaAdapter implements ChainAdapter {
     const from = this.requireSigner()
     const fromAta = await this.ataFor(from.address)
     const toAta = await this.ataFor(address(to))
-    const data = Buffer.concat([Buffer.from([3]), u64le(amount)]) // spl-token Transfer
+    const data = concatBytes([Uint8Array.of(3), u64le(amount)]) // spl-token Transfer
     return this.backend.send(
       [{ programAddress: SPL_TOKEN_PROGRAM_ID, accounts: [writable(fromAta), writable(toAta), readonlySigner(from)], data: new Uint8Array(data) }],
       from
@@ -862,7 +845,7 @@ export class SolanaAdapter implements ChainAdapter {
     const fee = 5000n
     if (!acc || acc.lamports <= fee) return null
     const amount = acc.lamports - fee
-    const data = Buffer.concat([Buffer.from([2, 0, 0, 0]), u64le(amount)]) // System::Transfer
+    const data = concatBytes([Uint8Array.of(2, 0, 0, 0), u64le(amount)]) // System::Transfer
     return this.backend.send(
       [{ programAddress: SYSTEM_PROGRAM_ID, accounts: [writableSigner(from), writable(address(to))], data: new Uint8Array(data) }],
       from
