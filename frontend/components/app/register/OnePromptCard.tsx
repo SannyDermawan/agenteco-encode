@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { NeumorphicCard } from '../NeumorphicCard'
-import { NETWORK, NETWORK_LABEL } from '@/lib/web3/network'
+import { AVAILABLE_NETWORKS, NETWORK, type NetworkName } from '@/lib/web3/network'
 import { API_URL, CodeBlock, Note } from './shared'
 
 /** The instructions an agent follows (docs/ONBOARDING.md explains the design). They pin the CLI version they run. */
@@ -17,11 +17,24 @@ type Role = 'seller' | 'buyer'
  */
 export function OnePromptCard({ initialRole = 'seller' }: { initialRole?: Role }) {
   const [role, setRole] = useState<Role>(initialRole)
+  // Every network this site offers can be picked, one or several; the one the visitor is on starts selected.
+  const [chains, setChains] = useState<NetworkName[]>([NETWORK])
+  function toggle(name: NetworkName) {
+    setChains((cur) => (cur.includes(name) ? (cur.length > 1 ? cur.filter((c) => c !== name) : cur) : [...cur, name]))
+  }
+  const chosen = AVAILABLE_NETWORKS.filter((n) => chains.includes(n.name))
+  const labels = chosen.map((n) => n.label).join(', ')
+  const names = chosen.map((n) => n.name).join(', ')
+  const many = chosen.length > 1
   const apiLine = API_URL.includes('localhost') ? '' : `\nUse this AgentEco API: ${API_URL} (set AGENTECO_API_URL to it).`
   const goal = role === 'seller' ? 'I want it to sell work: ask me which capability and price.' : 'I want it to hire other agents.'
-  const prompt = `Set up AgentEco for me, as a ${role} agent on ${NETWORK_LABEL} (chain: ${NETWORK}).
+  const chainLine = many
+    ? `Set it up on the first chain, then repeat the init step (agenteco init --role ${role} --chain <name>) for each of the others, one at a time and asking me before each. One key is kept per chain family and reused.`
+    : ''
+  const prompt = `Set up AgentEco for me, as a ${role} agent on ${labels} (${many ? 'chains' : 'chain'}: ${names}).
 
-Fetch ${ONBOARD_URL} and follow it exactly, in order.${apiLine}
+Fetch ${ONBOARD_URL} and follow it exactly, in order.${apiLine}${chainLine ? `
+${chainLine}` : ''}
 ${goal}
 Ask me before anything that installs, spends money or changes my configuration. Never print, or ask me for, a private key.`
 
@@ -49,6 +62,35 @@ Ask me before anything that installs, spends money or changes my configuration. 
               {r === 'seller' ? 'Sell work' : 'Hire agents'}
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <p className="mb-2 text-[12px] font-medium text-[#8B8D96]">Chains (pick one or several)</p>
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Chains">
+          {AVAILABLE_NETWORKS.map((n) => {
+            const on = chains.includes(n.name)
+            return (
+              <button
+                key={n.name}
+                type="button"
+                aria-pressed={on}
+                onClick={() => toggle(n.name)}
+                className={`rounded-lg border px-2.5 py-1 text-[12px] font-medium transition ${on ? 'border-[#5B5FEF]/50 bg-[#5B5FEF]/[0.16] text-[#F5F5F7]' : 'border-white/[0.06] bg-[#0B0C11] text-[#8B8D96] hover:text-[#F5F5F7]'}`}
+              >
+                {n.label}
+              </button>
+            )
+          })}
+          {AVAILABLE_NETWORKS.length > 1 ? (
+            <button
+              type="button"
+              onClick={() => setChains(AVAILABLE_NETWORKS.map((n) => n.name))}
+              className="rounded-lg px-2.5 py-1 text-[12px] text-[#8E91FF] hover:text-[#B6B8FF]"
+            >
+              All
+            </button>
+          ) : null}
         </div>
       </div>
 
