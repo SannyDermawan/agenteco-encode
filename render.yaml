@@ -51,7 +51,5 @@ services:
         value: "26642374"
       - key: AGENT_ECO_PROGRAM__solana_EtWTRABZaYq6iMfeYKouRu166VU2xqa1
         value: "3GEEC3dQH1tP2YTZD9Jv915Yj8hcSN6WE8nQZiLJcgHE"
-      - key: RPC_URL__eip155_84532
-        value: https://sepolia.base.org
       - key: EVM_STALE_RETRIES
         value: "3"

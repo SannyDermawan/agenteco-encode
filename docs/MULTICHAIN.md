@@ -256,7 +256,6 @@ DEPLOYMENT_BLOCK__eip155_42431=39319911
 AGENT_ECO_ADDRESS__eip155_968=0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea
 DEPLOYMENT_BLOCK__eip155_968=26642374
 AGENT_ECO_PROGRAM__solana_EtWTRABZaYq6iMfeYKouRu166VU2xqa1=3GEEC3dQH1tP2YTZD9Jv915Yj8hcSN6WE8nQZiLJcgHE
-RPC_URL__eip155_84532=https://sepolia.base.org   # the load-balanced PublicNode lagged transactions on Base
 EVM_STALE_RETRIES=3                              # retries a revert caused by such a lagging node
 
 # website (build-time, NEXT_PUBLIC_ prefix, same values)

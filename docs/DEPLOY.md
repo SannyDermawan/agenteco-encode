@@ -36,11 +36,12 @@ AGENT_ECO_ADDRESS__eip155_42431=0x2620424C73A39624bDcd3fa43aABF425d6Da997e
 DEPLOYMENT_BLOCK__eip155_42431=39319911
 AGENT_ECO_ADDRESS__eip155_968=0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea
 DEPLOYMENT_BLOCK__eip155_968=26642374
-RPC_URL__eip155_84532=https://sepolia.base.org
 EVM_STALE_RETRIES=3
 DATABASE_URL=...        # secret
 DIRECT_URL=...          # secret
 ```
+
+Do **not** set `RPC_URL__eip155_84532=https://sepolia.base.org` for the servers: that node answers `eth_getLogs` only over 200 blocks, so the rating index fails every minute. The default (PublicNode, with sepolia.base.org as the fallback) serves 45,000 blocks per call; `EVM_STALE_RETRIES` covers a lagging node. (The proof runs used the official node alone, because they sent transactions in quick succession.)
 
 Only the **api** serves Solana (it needs no key); add `solana-devnet` to its `CHAINS` and `AGENT_ECO_PROGRAM__solana_EtWTRABZaYq6iMfeYKouRu166VU2xqa1=3GEEC3dQH1tP2YTZD9Jv915Yj8hcSN6WE8nQZiLJcgHE`. Leave Solana out of the keeper's `CHAINS`: its Solana keeper wants a keypair **file** (`SOLANA_KEEPER_KEYPAIR`), which a Railway service does not have.
 

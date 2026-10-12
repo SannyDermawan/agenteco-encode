@@ -61,6 +61,12 @@ export async function indexRecentRatings(chainId: ChainId): Promise<void> {
   const head = await chain.head()
   const last = scannedTo.get(chainId)
   let from = last === undefined ? (head > INITIAL_LOOKBACK ? head - INITIAL_LOOKBACK : BigInt(0)) : last + BigInt(1)
+  // Nothing was emitted before the contract existed, and a public node may have pruned that far back: a chain
+  // whose contract is younger than the lookback starts at its deployment block instead.
+  if (last === undefined && chainFamily(chainId) === 'evm') {
+    const deployed = readChain(chainId).config.deploymentBlock
+    if (deployed !== null && from < deployed) from = deployed
+  }
   // EVM: what the RPC allows per getLogs call. Solana: slots per pass (the RPC backend pages through the program's signatures itself).
   const span = chainFamily(chainId) === 'evm' ? readChain(chainId).config.logRange : SOLANA_SCAN_SPAN
   let stored = 0
