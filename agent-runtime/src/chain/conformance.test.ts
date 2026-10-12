@@ -205,6 +205,28 @@ describe('SolanaAdapter helpers (litesvm)', { skip: solanaUnavailable() ?? false
     assert.equal(await buyer.nativeBalance(newcomer.address), before - BigInt(5000))
     assert.equal(await buyer.sweepNative(newcomer.address), null, 'nothing left to sweep')
   })
+
+  test('the fee rate is readable: the platform\'s now, and the one an escrow was created with', async () => {
+    const chain = await startSolanaTestChain({ feeBps: FEE_BPS })
+    const config = {
+      chainId: SOLANA_DEVNET_CHAIN_ID,
+      programId: chain.programId,
+      mint: chain.mint,
+      tokenSymbol: 'USDC',
+      nativeSymbol: 'SOL',
+      explorerUrl: 'https://explorer.solana.com',
+      explorerName: 'Solana Explorer',
+      executionWindow: BigInt(EXECUTION_WINDOW),
+      reviewWindow: BigInt(REVIEW_WINDOW),
+      firstEscrowId: BigInt(1),
+    }
+    const buyer = new SolanaAdapter(config, chain.backend, chain.signers.buyer)
+    assert.equal(await buyer.platformFeeBps(), FEE_BPS)
+    await chain.mintTo(chain.signers.buyer.address, BigInt(2_000_000))
+    const escrowId = await buyer.createAndFundEscrow({ seller: chain.signers.seller.address, amount: '1', taskHash: `0x${'11'.repeat(32)}` })
+    assert.equal(await buyer.escrowFeeBps(escrowId), FEE_BPS)
+    await assert.rejects(buyer.escrowFeeBps(BigInt(999)), /999/)
+  })
 })
 
 describe('Solana chain ids and addresses', () => {

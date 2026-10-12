@@ -57,8 +57,7 @@ export const SPL_TOKEN_PROGRAM_ID = address('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss
 const SYSTEM_PROGRAM_ID = address('11111111111111111111111111111111')
 const RENT_SYSVAR_ID = address('SysvarRent111111111111111111111111111111111')
 
-/** CAIP-2 id of Solana devnet: `solana:` + the first 32 base58 characters of its genesis hash. */
-export const SOLANA_DEVNET_CHAIN_ID = 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1'
+export { SOLANA_DEVNET_CHAIN_ID } from './solana-presets.ts'
 
 /** Whether `chainId` has the shape of a Solana CAIP-2 id (`solana:` + 32 base58 characters). */
 export function isSolanaChainId(chainId: string): boolean {
@@ -865,6 +864,16 @@ export class SolanaAdapter implements ChainAdapter {
 
   async getEscrowStatus(id: EscrowId): Promise<EscrowStatusCode> {
     return (await this.decodedEscrow(id)).status
+  }
+
+  /** The platform fee, in basis points, that escrows created now pay when they settle to the seller (read from the program's config). */
+  async platformFeeBps(): Promise<number> {
+    return (await this.decodedConfig()).feeBps
+  }
+
+  /** The fee, in basis points, this escrow was created with — fixed for its lifetime. */
+  async escrowFeeBps(id: EscrowId): Promise<number> {
+    return (await this.decodedEscrow(id)).feeBps
   }
 
   async getResultHash(id: EscrowId): Promise<Hash32> {

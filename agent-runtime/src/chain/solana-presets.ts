@@ -1,10 +1,12 @@
-import { SOLANA_DEVNET_CHAIN_ID } from './solana.ts'
 import type { ChainId } from './types.ts'
+
+/** CAIP-2 id of Solana devnet: `solana:` + the first 32 base58 characters of its genesis hash. */
+export const SOLANA_DEVNET_CHAIN_ID = 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1'
 
 /**
  * The Solana clusters AgentEco knows, as plain data — shared by ./solana-registry.ts (the process
  * side, which reads the environment) and the website (which imports this file into the browser,
- * so it must stay free of Node APIs).
+ * so it must stay free of Node APIs and of every other module — not even ./solana.ts).
  */
 
 export interface SolanaPreset {

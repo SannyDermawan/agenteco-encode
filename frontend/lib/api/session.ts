@@ -1,12 +1,14 @@
 import { getAddress } from 'viem'
 import { createSiweMessage, generateSiweNonce } from 'viem/siwe'
-import { READ_SESSION_HEADER, READ_SESSION_MAX_AGE_MS, READ_SESSION_STATEMENT } from '@shared/session'
+import { READ_SESSION_HEADER, READ_SESSION_MAX_AGE_MS, READ_SESSION_STATEMENT, createSolanaSessionMessage } from '@shared/session'
+import { normalizeWallet, walletFamily } from '@shared/wallets'
 import { appChain } from '../web3/chain'
+import { CHAIN_KEY } from '../web3/network'
 import type { WalletSigner } from './authHeaders'
 
 /**
  * Read session for the connected wallet: one free Sign-In with Ethereum
- * signature, kept for up to 24 h, sent with every request for the wallet's
+ * signature (for a Solana wallet, the same session as CAIP-122 text signed with ed25519), kept for up to 24 h, sent with every request for the wallet's
  * own data (see backend/src/session.ts). Kept per address in localStorage so
  * a reload or a new tab doesn't ask again.
  */
@@ -18,7 +20,8 @@ interface StoredSession {
 
 // Ask again a little before expiry rather than fail mid-page.
 const RENEW_MARGIN_MS = 5 * 60 * 1000
-const storageKey = (address: string) => `agenteco.readSession.${address.toLowerCase()}`
+// Stored per wallet in its stored form: EVM lowercase, Solana exactly as given (base58 is case-sensitive).
+const storageKey = (address: string) => `agenteco.readSession.${normalizeWallet(address)}`
 
 let activeAddress: string | null = null
 const listeners = new Set<() => void>()
@@ -33,7 +36,7 @@ function notify() {
 const memory = new Map<string, StoredSession>()
 
 function load(address: string): StoredSession | null {
-  let stored = memory.get(address.toLowerCase()) ?? null
+  let stored = memory.get(normalizeWallet(address)) ?? null
   if (!stored) {
     try {
       const raw = window.localStorage.getItem(storageKey(address))
@@ -47,7 +50,7 @@ function load(address: string): StoredSession | null {
 }
 
 function save(address: string, session: StoredSession) {
-  memory.set(address.toLowerCase(), session)
+  memory.set(normalizeWallet(address), session)
   try {
     window.localStorage.setItem(storageKey(address), JSON.stringify(session))
   } catch {
@@ -57,7 +60,7 @@ function save(address: string, session: StoredSession) {
 
 /** Called by SessionSync whenever the connected wallet changes. */
 export function setActiveAddress(address: string | null) {
-  const next = address?.toLowerCase() ?? null
+  const next = address ? normalizeWallet(address) : null
   if (next === activeAddress) return
   activeAddress = next
   lastError = null // a rejection by the previous wallet says nothing about this one
@@ -122,9 +125,30 @@ export function signInForReads(signer: WalletSigner): Promise<void> {
   return pending
 }
 
+/** 16 random letters and digits (the nonce of a Solana session message). */
+function solanaNonce(): string {
+  const alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => alphabet[b % alphabet.length]).join('')
+}
+
 async function requestSignature(signer: WalletSigner): Promise<void> {
   const issuedAt = new Date()
   const expirationTime = new Date(issuedAt.getTime() + READ_SESSION_MAX_AGE_MS)
+  if (walletFamily(signer.address) === 'solana') {
+    const message = createSolanaSessionMessage({
+      domain: window.location.host,
+      address: signer.address,
+      statement: READ_SESSION_STATEMENT,
+      uri: window.location.origin,
+      chainId: CHAIN_KEY,
+      nonce: solanaNonce(),
+      issuedAt,
+      expirationTime,
+    })
+    const signature = await signer.signMessageAsync({ message })
+    save(signer.address, { header: btoa(JSON.stringify({ family: 'solana', message, signature })), expiresAt: expirationTime.getTime() })
+    return
+  }
   const message = createSiweMessage({
     domain: window.location.host,
     address: getAddress(signer.address),

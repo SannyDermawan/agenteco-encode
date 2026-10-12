@@ -48,7 +48,7 @@ export interface HireInput {
  */
 export async function hireWithTask(input: HireInput): Promise<{ escrowId: bigint; task: ApiTask }> {
   const { signer, decimals, seller, onStep } = input
-  const buyer = signer.address
+  const buyer = signer.address as `0x${string}`
   const amount = parseUnits(input.price, decimals)
 
   onStep('checking-balance')
