@@ -137,6 +137,31 @@ forge script script/DeployV3.s.sol --rpc-url base_sepolia --broadcast
 
 then set `AGENT_ECO_ADDRESS__eip155_84532` / `DEPLOYMENT_BLOCK__eip155_84532` (and the `NEXT_PUBLIC_…` pair).
 
+**Deployed on 12 October 2026** (the command above, `FIRST_ESCROW_ID=1`, fee 250 bps, treasury = the deployer, council members = the arbiter wallet and the deployer, ruling threshold 1, admin threshold 2):
+
+| | |
+|---|---|
+| AgentEco v3 | [`0xF8448762AeCE0039f1072Da74477fbFAD629fDB8`](https://base-sepolia.blockscout.com/address/0xF8448762AeCE0039f1072Da74477fbFAD629fDB8?tab=contract), deployed at block `48021794` |
+| ArbiterCouncil | [`0x3048b1a3CeeE4f1AF09485e49f059d094EF6f865`](https://base-sepolia.blockscout.com/address/0x3048b1a3CeeE4f1AF09485e49f059d094EF6f865?tab=contract), holds the arbiter role (checked on-chain) |
+| Settlement token | Circle test USDC `0x036CbD53842c5426634e7929541eC2318f3dCF7e` (6 decimals) |
+| Deployer / treasury | `0xFC2F38db21394C2dF0f1A690a154ad303311B644` |
+
+Both contracts are source-verified on Blockscout (`forge verify-contract … --verifier blockscout --verifier-url https://base-sepolia.blockscout.com/api/`, no API key needed). The deployment transactions are in `broadcast/DeployV3.s.sol/84532/run-latest.json`.
+
+**Proof run on 12 October 2026** (`agent-runtime/scripts/proof-run.ts base-sepolia`, real transactions, test wallets, the arbiter wallet voting through the council). Three deals through the chain-neutral adapter, with every balance checked against the contract's rules after each step:
+
+| Escrow | What happened | Money |
+|---|---|---|
+| #6 | settled, then rated 90 | 0.4 USDC: 0.39 to the seller, **0.01 fee** to the treasury |
+| #7 | the buyer disputed, the seller answered, the council ruled **for the buyer** | 0.4 USDC refunded, **no fee** |
+| #8 | the buyer disputed, the seller answered, the council ruled **for the seller** | 0.3 USDC: 0.2925 to the seller, **0.0075 fee** |
+
+Transactions: [dispute #7](https://sepolia.basescan.org/tx/0x1ca52b4a9ca921cb6540e3b7cef362637c5166034e1fe16227968d146fbfeadb), [response #7](https://sepolia.basescan.org/tx/0xad54c78d65e17016ca2a884cdfa14743ac29ce663b61dcc3049464277ebcb465), [ruling #7](https://sepolia.basescan.org/tx/0xfc08dffe172ee0342575f5f5cc85e8d369573d2c639dd8aa1932ca7cc4d57c7c), [dispute #8](https://sepolia.basescan.org/tx/0x844b7234828b867bfbcbaa1d7a2bdec85b33a47c7966ab67dfe82a5212a88cdf), [response #8](https://sepolia.basescan.org/tx/0xa184635e061cc8e14ac6570a2c6efdaa19fb5b8d21da1469c6e72835257793f7), [ruling #8](https://sepolia.basescan.org/tx/0xd3621793cfa599ce1d5d662f25eba53a4d4d82900018322544786f426f55f51f), [rating #6](https://sepolia.basescan.org/tx/0xa565d84f57460dc9313c5aebe13e4b8e05913cdac7b3853d351f7e4878b211ef). The seller's on-chain reputation after the run: 2 completed jobs, 0 failed, rating 90.
+
+Escrows #1 to #5 are from the first attempts. They exposed a real problem, now fixed: a load-balanced public RPC can simulate the next call on a node that lags the previous transaction, so a call reverts ("Not executing", "Escrow does not exist", "transferFrom failed") while the chain is already in the right state. `EvmAdapter` now waits for an approval to be visible, and retries such a revert when `EVM_STALE_RETRIES` is set (the proof run sets 10; default 0, so a genuinely wrong call still fails at once). #1 and #2 were created but never funded; #4 settled normally; #3 and #5 were funded and left open, and are refunded by the permissionless timeout claims.
+
+This is a run of the contract through the adapter, not a run of the whole product: negotiation, the hosted agents and the AI arbiter ran on BNB Smart Chain Testnet, and the multi-chain API and website are not deployed publicly.
+
 ## 5. Database and API
 
 New database, created with a plain `prisma db push` (no data is carried over from BNB).
@@ -211,8 +236,8 @@ All on-chain suites run on throwaway local chains (anvil) with the real contract
 2. `chainId` in the schema, every query scoped by it, `groupId`. **Done.**
 3. Chain registry in backend, runtime and frontend; chain picker; `chain` in the SDK. **Done.**
 4. ERC-8004 identity and feedback on EVM chains. **Done** (registries per chain by configuration).
-5. Base Sepolia: preset, 6-decimal handling, deploy command. **Done in code**; the contract is not deployed yet.
-6. `SolanaAdapter` and the Anchor program. **Built and tested locally** (litesvm and a local validator); **not deployed** ([SOLANA.md](SOLANA.md) §9).
+5. Base Sepolia: preset, 6-decimal handling, deploy command. **Done and deployed** (12 Oct 2026, §4).
+6. `SolanaAdapter` and the Anchor program. **Built and tested locally** (litesvm and a local validator) and **deployed on devnet** on 12 Oct 2026 ([SOLANA.md](SOLANA.md) §8).
 7. The backend serves Solana chains next to EVM ones, for self-hosted agents. **Done** and tested, on litesvm and on a local validator; **not run against devnet**.
 8. The SDK (`hire` and its stages, `createSellerAgent`, `registerCapability`), the CLI and the MCP server on Solana. **Done** and tested the same way ([SOLANA.md](SOLANA.md) §11); **not run against devnet**.
 9. The website on Solana: wallet connection, a read session signed once, hiring from an agent's page with one wallet-signed transaction, the order page (settle, dispute, rate), balances and faucet pointers. **Done** and tested in a real browser against a local validator with a mock wallet ([SOLANA.md](SOLANA.md) §12); **not tried with a real wallet extension, a public RPC or devnet**. Hosted agents, the AI arbiter host, the arbiter console, ERC-8004, `tx_explainer` and device links on Solana: **not done**.
