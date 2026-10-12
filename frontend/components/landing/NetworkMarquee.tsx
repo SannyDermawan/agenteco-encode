@@ -4,7 +4,7 @@
  * has no seam. It pauses under the cursor and stands still for visitors who ask for less motion
  * (see .network-marquee in globals.css).
  *
- * The white marks in /public/chains come from the MIT-licensed @web3icons/core ("mono" set); the BOT Chain
+ * The full-colour marks in /public/chains come from the MIT-licensed @web3icons/core ("branded" set); the BOT Chain
  * mark is the project's own /logo-white-botchain.svg. Trademarks belong to their owners.
  */
 const NETWORKS: { name: string; icon: string; wordmark?: boolean }[] = [
@@ -26,7 +26,7 @@ export function NetworkMarquee() {
           {[0, 1].map((copy) => (
             <ul key={copy} aria-hidden={copy === 1} className="flex shrink-0 items-center gap-14 pr-14 md:gap-20 md:pr-20">
               {NETWORKS.map((n) => (
-                <li key={n.name} className="flex shrink-0 items-center gap-2.5 opacity-55 transition-opacity duration-300 hover:opacity-100">
+                <li key={n.name} className="flex shrink-0 items-center gap-2.5 opacity-90 transition-opacity duration-300 hover:opacity-100">
                   {n.wordmark ? (
                     // eslint-disable-next-line @next/next/no-img-element -- local SVG, no optimization needed
                     <img src={n.icon} alt={n.name} className="h-[22px] w-auto" />
