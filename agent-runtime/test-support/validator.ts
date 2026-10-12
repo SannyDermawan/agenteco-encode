@@ -21,7 +21,8 @@ import {
   type Address,
   type KeyPairSigner,
 } from '@solana/kit'
-import { SPL_TOKEN_PROGRAM_ID, SOLANA_DEVNET_CHAIN_ID, SolanaAdapter, buildInitializeInstruction, generateSolanaSecretKey } from '../src/chain/solana.ts'
+import { SPL_TOKEN_PROGRAM_ID, SOLANA_DEVNET_CHAIN_ID, SolanaAdapter, buildInitializeInstruction } from '../src/chain/solana.ts'
+import { generateSolanaSecretKey } from '../src/chain/solana-keys.ts'
 import { SolanaRpcBackend } from '../src/chain/solana-rpc.ts'
 import { PROGRAM_SO, TEST_PROGRAM_ID } from './litesvm.ts'
 

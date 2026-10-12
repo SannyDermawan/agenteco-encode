@@ -7,7 +7,7 @@
  * the API/SDK suites use. Chains are configured in ./solana-registry.ts. Nothing has run on devnet
  * yet: the program is not deployed (docs/SOLANA.md §9).
  */
-import { createHash, createPrivateKey, createPublicKey, randomBytes } from 'node:crypto'
+import { sha256 } from '@noble/hashes/sha2'
 import {
   AccountRole,
   address,
@@ -102,17 +102,6 @@ export function solanaAddressOfSecretKey(secretKey: Uint8Array): Address {
   return getAddressDecoder().decode(secretKey.slice(32))
 }
 
-// The fixed front of an ed25519 private key in PKCS#8 DER; the 32-byte seed follows.
-const ED25519_PKCS8_PREFIX = Buffer.from('302e020100300506032b657004220420', 'hex')
-
-/** A new random Solana secret key (64 bytes: seed, then public key), from the system's secure random source. */
-export function generateSolanaSecretKey(): Uint8Array {
-  const seed = randomBytes(32)
-  const privateKey = createPrivateKey({ key: Buffer.concat([ED25519_PKCS8_PREFIX, seed]), format: 'der', type: 'pkcs8' })
-  const spki = createPublicKey(privateKey).export({ format: 'der', type: 'spki' })
-  return new Uint8Array(Buffer.concat([seed, spki.subarray(spki.length - 32)]))
-}
-
 /** A Solana secret key as the base58 text wallets export (and `parseSolanaSecretKey` reads). */
 export function secretKeyToBase58(secretKey: Uint8Array): string {
   return getBase58Decoder().decode(secretKey)
@@ -179,11 +168,11 @@ function enc(s: string): Uint8Array {
 }
 
 function sighash(name: string): Uint8Array {
-  return new Uint8Array(createHash('sha256').update(`global:${name}`).digest()).slice(0, 8)
+  return sha256(enc(`global:${name}`)).slice(0, 8)
 }
 
 function assertDiscriminator(data: Uint8Array, accountName: string): void {
-  const expected = createHash('sha256').update(`account:${accountName}`).digest().subarray(0, 8)
+  const expected = sha256(enc(`account:${accountName}`)).subarray(0, 8)
   if (!Buffer.from(data).subarray(0, 8).equals(expected)) throw new Error(`not a ${accountName} account of this program`)
 }
 
@@ -452,7 +441,7 @@ function programEvents(logs: string[], programId: Address): Uint8Array[] {
   return events
 }
 
-const SELLER_RATED = createHash('sha256').update('event:SellerRated').digest().subarray(0, 8)
+const SELLER_RATED = sha256(enc('event:SellerRated')).subarray(0, 8)
 
 /** The SellerRated events among `events`: escrow_id u64, seller, buyer, score u8 (after the 8-byte discriminator). */
 function ratingEvents(events: Uint8Array[], txHash: string): RatingEvent[] {
