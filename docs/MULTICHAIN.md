@@ -283,7 +283,7 @@ Chain id 968, RPC `https://rpc.bohr.life` (it serves `eth_getLogs` over 500,000 
 | AgentEco v3 | [`0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea`](https://scan.bohr.life/address/0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea?tab=contract), deployed at block `26642374` |
 | ArbiterCouncil | [`0xF8448762AeCE0039f1072Da74477fbFAD629fDB8`](https://scan.bohr.life/address/0xF8448762AeCE0039f1072Da74477fbFAD629fDB8?tab=contract), holds the arbiter role |
 
-Both are source-verified on the BOT Chain explorer (Blockscout verifier, no key). Transactions: `broadcast/DeployV3.s.sol/968/run-latest.json`. This is the **testnet**; the mainnet deployment (chain 677, `0x3d3b68bC66e51721e3294E9EaA04Dd7921B043b2`) is the first, earlier version of the contract from the BOT Chain Builder Challenge (escrow only, no disputes, council or fee) and was **not** redeployed: v3 is unaudited and the mainnet holds real value.
+Both are source-verified on the BOT Chain explorer (Blockscout verifier, no key). Transactions: `broadcast/DeployV3.s.sol/968/run-latest.json`. This is the **testnet**; the mainnet deployment (chain 677, `0x3d3b68bC66e51721e3294E9EaA04Dd7921B043b2`) is the first, earlier version of the contract from Build Week Hackathon Vol. 2 (on GMT) (escrow only, no disputes, council or fee) and was **not** redeployed: v3 is unaudited and the mainnet holds real value.
 
 **Proof run (13 October 2026, `proof-run.ts bot-testnet`; the script prints "USDC" for the settlement token, here USDT):**
 
