@@ -226,6 +226,22 @@ describe('SolanaAdapter helpers (litesvm)', { skip: solanaUnavailable() ?? false
     const escrowId = await buyer.createAndFundEscrow({ seller: chain.signers.seller.address, amount: '1', taskHash: `0x${'11'.repeat(32)}` })
     assert.equal(await buyer.escrowFeeBps(escrowId), FEE_BPS)
     await assert.rejects(buyer.escrowFeeBps(BigInt(999)), /999/)
+
+    // A seller that has never held the token has no token account: the escrow's own transaction creates it.
+    const fresh = await generateKeyPairSigner()
+    assert.equal(await chain.svm.getAccount(fresh.address).exists, false, 'precondition: no account at all yet')
+    await chain.mintTo(chain.signers.buyer.address, BigInt(1_000_000))
+    await buyer.createAndFundEscrow({ seller: fresh.address, amount: '1', taskHash: `0x${'33'.repeat(32)}` })
+    assert.equal((await buyer.ensureTokenAccount(fresh.address)).created, false, 'the seller got its token account in the funding transaction')
+
+    // The five raw counters, in AgentEco.sol's order, move with a settled job (volume is the escrow's amount).
+    const seller = new SolanaAdapter(config, chain.backend, chain.signers.seller)
+    assert.deepEqual(await buyer.reputationCounters(chain.signers.seller.address), [0n, 0n, 0n, 0n, 0n])
+    await seller.startExecution(escrowId)
+    await seller.markDelivered(escrowId, `0x${'22'.repeat(32)}`)
+    await buyer.acceptAndSettle(escrowId)
+    await buyer.rateSeller(escrowId, 80)
+    assert.deepEqual(await buyer.reputationCounters(chain.signers.seller.address), [1n, 0n, 1_000_000n, 80n, 1n])
   })
 })
 

@@ -1,7 +1,7 @@
 'use client'
 import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useAccount } from 'wagmi'
+import { useWallet } from '@/lib/wallet/useWallet'
 import { NeumorphicCard } from '@/components/app/NeumorphicCard'
 import { PageFade } from '@/components/app/PageFade'
 import { PrivateOrderNotice } from '@/components/app/SessionGate'
@@ -12,7 +12,7 @@ import { getEscrowAccess } from '@/lib/api/escrows'
  * (checked by the API). Must sit inside a SessionGate.
  */
 export function EscrowAccessGate({ escrowId, children }: { escrowId: string; children: ReactNode }) {
-  const { address } = useAccount()
+  const { address } = useWallet()
   const valid = /^\d{1,30}$/.test(escrowId)
   const access = useQuery({
     queryKey: ['escrowAccess', escrowId, address],

@@ -645,6 +645,18 @@ export class SolanaAdapter implements ChainAdapter {
     const reputation = await reputationPda(this.programId, seller)
     const configAddr = await configPda(this.programId)
     const buyerAta = await this.ataFor(buyer.address)
+    // The seller is paid into its token account at settlement and the program never creates one: when the
+    // seller has none yet, the same transaction creates it (the buyer pays its rent, once).
+    const sellerAta = await this.ataFor(seller)
+    const createSellerAta: IInstruction[] = (await this.backend.getAccount(sellerAta))
+      ? []
+      : [
+          {
+            programAddress: ATA_PROGRAM_ID,
+            accounts: [writableSigner(buyer), writable(sellerAta), readonly(seller), readonly(this.mint), readonly(SYSTEM_PROGRAM_ID), readonly(SPL_TOKEN_PROGRAM_ID)],
+            data: new Uint8Array([1]), // create_idempotent
+          },
+        ]
 
     const data = Buffer.concat([
       sighash('create_and_fund_escrow'),
@@ -670,7 +682,7 @@ export class SolanaAdapter implements ChainAdapter {
       ],
       data: new Uint8Array(data),
     }
-    await this.backend.send([ix], buyer)
+    await this.backend.send([...createSellerAta, ix], buyer)
     return id
   }
 
@@ -936,6 +948,17 @@ export class SolanaAdapter implements ChainAdapter {
 
   async listEscrows(opts?: { currentOnly?: boolean }): Promise<EscrowBasic[]> {
     return this.readEscrowBasics(await this.escrowIds(opts))
+  }
+
+  /**
+   * A seller's five on-chain counters in the order AgentEco.sol's getReputation() returns them — completed
+   * jobs, failed jobs, settled volume (token base units), rating sum, rating count — all zero before the first job.
+   */
+  async reputationCounters(seller: string): Promise<readonly [bigint, bigint, bigint, bigint, bigint]> {
+    const acc = await this.backend.getAccount(await reputationPda(this.programId, address(seller)))
+    if (!acc) return [0n, 0n, 0n, 0n, 0n]
+    const r = decodeReputation(acc.data)
+    return [r.completedJobs, r.failedJobs, r.totalVolumeSettled, r.ratingSum, r.ratingCount]
   }
 
   async getReputation(seller: string): Promise<OnchainReputation> {

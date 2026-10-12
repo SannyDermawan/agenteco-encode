@@ -319,6 +319,8 @@ export interface NetworkConfig {
   /** The AgentEco contract (the Solana program, on Solana) and the link to an address on this network's explorer. */
   contractAddress: string
   explorerAddressUrl(address: string): string
+  /** Link to a transaction (hash) on the explorer. */
+  explorerTxUrl(hash: string): string
 }
 
 export function networkConfig(name: EvmNetworkName): NetworkConfig {
@@ -389,6 +391,7 @@ export function networkConfig(name: EvmNetworkName): NetworkConfig {
     })),
     contractAddress: address('AGENT_ECO_ADDRESS', env.agentEco, preset.deployment?.agentEcoAddress),
     explorerAddressUrl: (a) => `${preset.explorerUrl}/address/${a}`,
+    explorerTxUrl: (h) => `${preset.explorerUrl}/tx/${h}`,
   }
 }
 
@@ -420,6 +423,8 @@ export interface SolanaNetworkConfig {
   firstEscrowId: bigint
   contractAddress: string
   explorerAddressUrl(address: string): string
+  /** Link to a transaction (its signature) on the explorer. */
+  explorerTxUrl(hash: string): string
 }
 
 export type AnyNetworkConfig = NetworkConfig | SolanaNetworkConfig
@@ -482,6 +487,7 @@ export function solanaNetworkConfig(name: SolanaNetworkName): SolanaNetworkConfi
     firstEscrowId: BigInt(first),
     contractAddress: programId,
     explorerAddressUrl: (a) => `${preset.explorerUrl}/address/${a}${preset.explorerQuery}`,
+    explorerTxUrl: (h) => `${preset.explorerUrl}/tx/${h}${preset.explorerQuery}`,
   }
 }
 
@@ -564,6 +570,11 @@ export const CONTRACT_ADDRESS = selected.contractAddress
 
 export function explorerAddressUrl(address: string): string {
   return selected.explorerAddressUrl(address)
+}
+
+/** A transaction (EVM hash or Solana signature) on the selected network's explorer. */
+export function explorerTxUrl(hash: string): string {
+  return selected.explorerTxUrl(hash)
 }
 
 // --- The EVM network (see `active`) ---

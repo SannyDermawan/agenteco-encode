@@ -1,6 +1,6 @@
 'use client'
 import './polyfills'
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { getWallets } from '@wallet-standard/app'
 import type { Wallet, WalletAccount } from '@wallet-standard/base'
 import { StandardConnect, StandardDisconnect, StandardEvents } from '@wallet-standard/features'
@@ -42,11 +42,41 @@ const SolanaWalletContext = createContext<SolanaWalletContextValue | null>(null)
 const supports = (wallet: Wallet) =>
   StandardConnect in wallet.features && SolanaSignMessage in wallet.features && SolanaSignTransaction in wallet.features
 
-function readFound(): Found[] {
+// The wallets registered with this page, as an external store: wallets announce themselves before or
+// after the page loads, and the list changes as extensions load or are removed.
+const EMPTY: readonly Found[] = []
+let walletList: readonly Found[] = EMPTY
+const walletListeners = new Set<() => void>()
+let watching = false
+
+function readFound(): readonly Found[] {
   return getWallets()
     .get()
     .filter(supports)
     .map((wallet) => ({ wallet, choice: { name: wallet.name, icon: wallet.icon } }))
+}
+
+function watchWallets() {
+  if (watching) return
+  watching = true
+  walletList = readFound()
+  const refresh = () => {
+    walletList = readFound()
+    walletListeners.forEach((listener) => listener())
+  }
+  getWallets().on('register', refresh)
+  getWallets().on('unregister', refresh)
+}
+
+function subscribeWallets(listener: () => void): () => void {
+  watchWallets()
+  walletListeners.add(listener)
+  return () => walletListeners.delete(listener)
+}
+
+const walletsSnapshot = (): readonly Found[] => {
+  watchWallets()
+  return walletList
 }
 
 function rememberedWallet(): string | null {
@@ -93,28 +123,16 @@ function transactionSigner(wallet: Wallet, account: WalletAccount, chain: string
   }
 }
 
+const accountOf = (accounts: readonly WalletAccount[]) => accounts.find((a) => a.chains.some((c) => c.startsWith('solana:'))) ?? accounts[0]
+
 export function SolanaWalletProvider({ children }: { children: ReactNode }) {
-  const [found, setFound] = useState<Found[]>([])
+  const found = useSyncExternalStore(subscribeWallets, walletsSnapshot, () => EMPTY)
   const [active, setActive] = useState<{ wallet: Wallet; account: WalletAccount } | null>(null)
   const [isConnecting, setConnecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const triedRemembered = useRef(false)
 
-  // Wallets announce themselves — before or after the page loads.
-  useEffect(() => {
-    const registry = getWallets()
-    setFound(readFound())
-    const offRegister = registry.on('register', () => setFound(readFound()))
-    const offUnregister = registry.on('unregister', () => setFound(readFound()))
-    return () => {
-      offRegister()
-      offUnregister()
-    }
-  }, [])
-
-  const accountOf = (accounts: readonly WalletAccount[]) => accounts.find((a) => a.chains.some((c) => c.startsWith('solana:'))) ?? accounts[0]
-
-  const connectTo = useCallback(async (wallet: Wallet, silent: boolean) => {
+  async function connectTo(wallet: Wallet, silent: boolean) {
     setConnecting(true)
     setError(null)
     try {
@@ -129,21 +147,18 @@ export function SolanaWalletProvider({ children }: { children: ReactNode }) {
     } finally {
       setConnecting(false)
     }
-  }, [])
+  }
 
-  const connect = useCallback(
-    async (walletName?: string) => {
-      const target = walletName ? found.find((f) => f.choice.name === walletName) : found.length === 1 ? found[0] : undefined
-      if (!target) {
-        setError(found.length === 0 ? 'No Solana wallet found in this browser. Install Phantom, Solflare or Backpack, then reload.' : 'Pick a wallet.')
-        return
-      }
-      await connectTo(target.wallet, false)
-    },
-    [found, connectTo]
-  )
+  async function connect(walletName?: string) {
+    const target = walletName ? found.find((f) => f.choice.name === walletName) : found.length === 1 ? found[0] : undefined
+    if (!target) {
+      setError(found.length === 0 ? 'No Solana wallet found in this browser. Install Phantom, Solflare or Backpack, then reload.' : 'Pick a wallet.')
+      return
+    }
+    await connectTo(target.wallet, false)
+  }
 
-  const disconnect = useCallback(async () => {
+  async function disconnect() {
     const current = active
     setActive(null)
     remember(null)
@@ -152,7 +167,7 @@ export function SolanaWalletProvider({ children }: { children: ReactNode }) {
     } catch {
       // The wallet was already gone: nothing left to disconnect.
     }
-  }, [active])
+  }
 
   // Reconnect the wallet used last time, without a prompt, as soon as it has registered.
   useEffect(() => {
@@ -161,8 +176,11 @@ export function SolanaWalletProvider({ children }: { children: ReactNode }) {
     const target = name ? found.find((f) => f.choice.name === name) : undefined
     if (!target) return
     triedRemembered.current = true
-    void connectTo(target.wallet, true)
-  }, [found, active, connectTo])
+    // Not in the effect's own turn: connecting sets state, which is for callbacks, not effect bodies.
+    queueMicrotask(() => {
+      void connectTo(target.wallet, true)
+    })
+  }, [found, active])
 
   // The wallet can switch account or disconnect from its own UI.
   useEffect(() => {
@@ -176,27 +194,33 @@ export function SolanaWalletProvider({ children }: { children: ReactNode }) {
     })
   }, [active])
 
-  const address = active?.account.address ?? null
-  const signer = useMemo<WalletSigner | null>(() => {
-    if (!active) return null
+  let signer: WalletSigner | null = null
+  let txSigner: TransactionModifyingSigner | null = null
+  if (active) {
     const feature = active.wallet.features[SolanaSignMessage] as {
       signMessage(...inputs: { account: WalletAccount; message: Uint8Array }[]): Promise<readonly { signature: Uint8Array }[]>
     }
-    return {
+    signer = {
       address: active.account.address,
       signMessageAsync: async ({ message: text }) => {
         const [{ signature }] = await feature.signMessage({ account: active.account, message: new TextEncoder().encode(text) })
         return getBase58Decoder().decode(signature)
       },
     }
-  }, [active])
-  const txSigner = useMemo(() => (active && SOLANA ? transactionSigner(active.wallet, active.account, SOLANA.walletChain) : null), [active])
-  const choices = useMemo(() => found.map((f) => f.choice), [found])
+    if (SOLANA) txSigner = transactionSigner(active.wallet, active.account, SOLANA.walletChain)
+  }
 
-  const value = useMemo<SolanaWalletContextValue>(
-    () => ({ choices, walletName: active?.wallet.name ?? null, address, isConnecting, error, connect, disconnect, signer, txSigner }),
-    [choices, active, address, isConnecting, error, connect, disconnect, signer, txSigner]
-  )
+  const value: SolanaWalletContextValue = {
+    choices: found.map((f) => f.choice),
+    walletName: active?.wallet.name ?? null,
+    address: active?.account.address ?? null,
+    isConnecting,
+    error,
+    connect,
+    disconnect,
+    signer,
+    txSigner,
+  }
   return <SolanaWalletContext.Provider value={value}>{children}</SolanaWalletContext.Provider>
 }
 

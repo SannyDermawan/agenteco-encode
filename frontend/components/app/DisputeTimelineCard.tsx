@@ -1,12 +1,13 @@
 'use client'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useAccount, useSignMessage } from 'wagmi'
+import { sameWallet } from '@shared/wallets'
+import { useWallet } from '@/lib/wallet/useWallet'
 import { NeumorphicCard } from './NeumorphicCard'
 import { HashCheck } from './HashCheck'
 import { Remaining, useNow } from './DeadlineCountdown'
 import { forgetPendingReason, getDisputeReason, readPendingReason, submitDisputeReason, type ApiDispute } from '@/lib/api/disputes'
-import { useEscrowHashes, useIsArbiter } from '@/lib/web3/hooks'
+import { useEscrowHashes, useIsArbiter } from '@/lib/chain/hooks'
 import { explorerTxUrl } from '@/lib/web3/escrowEvents'
 
 const DISPUTED = 4 // AgentEco.sol OrderStatus
@@ -62,11 +63,10 @@ function rulingRationale(d: ApiDispute): string | null {
  * anyone, so it can be followed without being the arbiter.
  */
 export function DisputeTimelineCard({ escrowId, status, buyer }: { escrowId: bigint; status: number; buyer: string }) {
-  const { address } = useAccount()
-  const { signMessageAsync } = useSignMessage()
+  const { address, signer } = useWallet()
   const queryClient = useQueryClient()
   const isArbiter = useIsArbiter(address, escrowId)
-  const isBuyer = !!address && address.toLowerCase() === buyer.toLowerCase()
+  const isBuyer = !!address && sameWallet(address, buyer)
   const now = useNow()
   const open = status === DISPUTED
 
@@ -89,11 +89,11 @@ export function DisputeTimelineCard({ escrowId, status, buyer }: { escrowId: big
   if (!open && !d) return null
 
   async function handleSave() {
-    if (!address) return
+    if (!address || !signer) return
     setSaving(true)
     setError(null)
     try {
-      await submitDisputeReason({ address, signMessageAsync }, escrowId.toString(), draft.trim())
+      await submitDisputeReason(signer, escrowId.toString(), draft.trim())
       forgetPendingReason(escrowId.toString())
       await queryClient.invalidateQueries({ queryKey: ['disputeReason', escrowId.toString()] })
     } catch (err) {

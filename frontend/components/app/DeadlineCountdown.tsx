@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { NeumorphicCard } from './NeumorphicCard'
 import { formatDuration } from '@/lib/web3/constants'
-import { useEscrowDisputeInfo, useEscrowWindows } from '@/lib/web3/hooks'
+import { useEscrowDisputeInfo, useEscrowWindows } from '@/lib/chain/hooks'
 
 // AgentEco.sol OrderStatus
 const FUNDED = 1

@@ -1,7 +1,7 @@
 'use client'
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useAccount, useSignMessage } from 'wagmi'
+import { useWallet } from '@/lib/wallet/useWallet'
 import { CUSTOM_CATEGORIES, registerCapabilitySchema } from '@shared/capabilities/custom'
 import { NeumorphicCard } from './NeumorphicCard'
 import { FIELD_CLASS, Field } from './FormField'
@@ -162,8 +162,7 @@ function FieldsEditor({ title, hint, fields, onChange }: { title: string; hint: 
 }
 
 export function CapabilityPublisher({ taken, onPublished, title = 'Publish a capability' }: { taken: string[]; onPublished: (capability: CapabilityInfo) => void; title?: string }) {
-  const { address, isConnected } = useAccount()
-  const { signMessageAsync } = useSignMessage()
+  const { address, isConnected, signer } = useWallet()
   const queryClient = useQueryClient()
   const [template, setTemplate] = useState<TemplateKey>('text')
   const [meta, setMeta] = useState({ id: '', name: '', category: 'Automation' as (typeof CUSTOM_CATEGORIES)[number], description: '', rubric: TEMPLATES.text.rubric as string })
@@ -226,11 +225,11 @@ export function CapabilityPublisher({ taken, onPublished, title = 'Publish a cap
   }, [meta, input, output, mode, json, examples, taken])
 
   async function publish() {
-    if (!address || !check.data) return
+    if (!address || !signer || !check.data) return
     setBusy(true)
     setError(null)
     try {
-      const published = await registerCapability({ address, signMessageAsync }, check.data)
+      const published = await registerCapability(signer, check.data)
       await queryClient.invalidateQueries({ queryKey: ['capabilities'] })
       onPublished(published)
     } catch (err) {

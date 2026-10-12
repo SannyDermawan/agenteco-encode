@@ -1,12 +1,12 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import { formatUnits } from 'viem'
-import { useAccount } from 'wagmi'
+import { normalizeWallet, sameWallet } from '@shared/wallets'
+import { useWallet } from './wallet/useWallet'
 import { useReadSession } from '@/components/app/SessionGate'
 import { listAgents, type ApiAgent } from './api/agents'
 import { listOrders, buildActivityEntries, toOrderRow, type ApiOrder } from './api/orders'
-import { useEscrowStatuses, useEscrowTimestampsMulti, useUsdtDecimals } from './web3/hooks'
-import { useEscrowsInvolving } from './web3/escrowEvents'
+import { useEscrowStatuses, useEscrowTimestampsMulti, useEscrowsInvolving, useTokenDecimals } from './chain/hooks'
 import type { ActivityEntry, Order } from './agenteco-data'
 
 const ON_CHAIN_SETTLED = 5
@@ -29,7 +29,7 @@ type OrderRowWithMeta = Order & { sortAt: number; escrowId?: bigint }
  * hires that only exist on-chain (no Order row) — both with live escrow status.
  */
 export function useOverview() {
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useWallet()
   // Orders are private: nothing is fetched until the wallet has signed in (SessionGate).
   const { signedIn } = useReadSession()
   const [agents, setAgents] = useState<ApiAgent[]>([])
@@ -37,7 +37,7 @@ export function useOverview() {
   const [orders, setOrders] = useState<ApiOrder[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { data: decimals } = useUsdtDecimals()
+  const { data: decimals } = useTokenDecimals()
 
   useEffect(() => {
     if (!address || !signedIn) {
@@ -98,10 +98,10 @@ export function useOverview() {
 
   const orderRows = useMemo((): OrderRowWithMeta[] => {
     const agentByWallet = new Map(
-      allAgents.filter((a) => a.walletAddress).map((a) => [a.walletAddress!.toLowerCase(), a] as const)
+      allAgents.filter((a) => a.walletAddress).map((a) => [normalizeWallet(a.walletAddress!), a] as const)
     )
     const nameFor = (wallet: string) =>
-      wallet.toLowerCase() === address?.toLowerCase() ? 'You' : (agentByWallet.get(wallet.toLowerCase())?.name ?? truncateAddress(wallet))
+      address && sameWallet(wallet, address) ? 'You' : (agentByWallet.get(normalizeWallet(wallet))?.name ?? truncateAddress(wallet))
 
     const negotiated = orders.map((o): OrderRowWithMeta => ({
       ...toOrderRow(o),
@@ -113,7 +113,7 @@ export function useOverview() {
     const direct = directHires.map((e): OrderRowWithMeta => {
       const createdAt = timestampsOf.get(e.escrowId.toString())?.[0]
       const sortAt = createdAt ? Number(createdAt) * 1000 : 0
-      const seller = agentByWallet.get(e.seller.toLowerCase())
+      const seller = agentByWallet.get(normalizeWallet(e.seller))
       return {
         id: `Escrow #${e.escrowId}`,
         buyer: nameFor(e.buyer),

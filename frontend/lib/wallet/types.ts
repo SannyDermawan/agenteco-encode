@@ -11,6 +11,8 @@ export interface WalletSigner {
   signMessageAsync: (args: { message: string }) => Promise<string>
 }
 
+import type { TransactionModifyingSigner } from '@runtime/chain/kit.ts'
+
 /** A wallet the visitor can pick on Solana (wallets register themselves with the page — wallet-standard). */
 export interface WalletChoice {
   name: string
@@ -34,4 +36,6 @@ export interface WalletState {
   disconnect: () => void
   /** Null until connected. */
   signer: WalletSigner | null
+  /** Solana only: signs transactions for the escrow program (EVM wallets sign through wagmi's own config). Null until connected. */
+  txSigner: TransactionModifyingSigner | null
 }

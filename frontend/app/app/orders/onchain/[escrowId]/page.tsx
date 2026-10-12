@@ -10,11 +10,11 @@ import { DeadlineCountdown } from '@/components/app/DeadlineCountdown'
 import { PageFade } from '@/components/app/PageFade'
 import { SessionGate } from '@/components/app/SessionGate'
 import { EscrowAccessGate } from '@/components/app/EscrowAccessGate'
+import { SolanaEscrowActions } from '@/components/app/solana/SolanaEscrowActions'
 import { agentEcoFor } from '@/lib/web3/abi'
 import { EscrowFeeBreakdown } from '@/components/app/PlatformFee'
-import { explorerAddressUrl, TOKEN_SYMBOL } from '@/lib/web3/network'
-import { useEscrowBasic, useEscrowTimestamps, useReputation, useUsdtDecimals } from '@/lib/web3/hooks'
-import { useEscrowTxHashes } from '@/lib/web3/escrowEvents'
+import { CONTRACT_ADDRESS, FAMILY, explorerAddressUrl, TOKEN_SYMBOL } from '@/lib/web3/network'
+import { useEscrowBasic, useEscrowFlags, useEscrowTimestamps, useEscrowTxHashes, useReputation, useTokenDecimals } from '@/lib/chain/hooks'
 
 function truncateAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`
@@ -43,7 +43,8 @@ function OnChainOrder({ escrowIdParam }: { escrowIdParam: string }) {
   const basic = useEscrowBasic(escrowId ?? undefined)
   const timestamps = useEscrowTimestamps(escrowId ?? undefined)
   const txHashes = useEscrowTxHashes(escrowId ?? undefined)
-  const { data: decimals } = useUsdtDecimals()
+  const { data: decimals } = useTokenDecimals()
+  const flags = useEscrowFlags(escrowId ?? undefined).data
   const seller = basic.data?.[1]
   const reputation = useReputation(seller)
 
@@ -105,12 +106,12 @@ function OnChainOrder({ escrowIdParam }: { escrowIdParam: string }) {
           <div className="mt-1 flex flex-wrap items-center gap-3 text-[13.5px] text-[#8B8D96]">
             <span>{amountFormatted} {TOKEN_SYMBOL}</span>
             <a
-              href={explorerAddressUrl(agentEcoFor(escrowId))}
+              href={explorerAddressUrl(FAMILY === 'solana' ? CONTRACT_ADDRESS : agentEcoFor(escrowId))}
               target="_blank"
               rel="noreferrer"
               className="text-[#5B5FEF] hover:underline"
             >
-              View contract on explorer ↗
+              View {FAMILY === 'solana' ? 'program' : 'contract'} on explorer ↗
             </a>
           </div>
         </div>
@@ -140,14 +141,22 @@ function OnChainOrder({ escrowIdParam }: { escrowIdParam: string }) {
 
             <NeumorphicCard className="p-6">
               <h3 className="mb-3 text-[12px] font-medium tracking-[0.1em] text-[#8B8D96]">ACTIONS</h3>
-              <EscrowActionPanel
-                escrowId={escrowId}
-                buyer={buyer}
-                seller={sellerAddr}
-                amount={amount}
-                status={status}
-                onChanged={refetchAll}
-              />
+              {FAMILY === 'solana' ? (
+                flags ? (
+                  <SolanaEscrowActions escrowId={escrowId} buyer={buyer} seller={sellerAddr} status={status} flags={flags} onChanged={refetchAll} />
+                ) : (
+                  <p className="text-[13px] text-[#8B8D96]">Loading…</p>
+                )
+              ) : (
+                <EscrowActionPanel
+                  escrowId={escrowId}
+                  buyer={buyer as `0x${string}`}
+                  seller={sellerAddr as `0x${string}`}
+                  amount={amount}
+                  status={status}
+                  onChanged={refetchAll}
+                />
+              )}
             </NeumorphicCard>
 
             <EscrowReviewCards escrowId={escrowId} status={status} buyer={buyer} deliveredAt={timestamps.data?.[3]} />

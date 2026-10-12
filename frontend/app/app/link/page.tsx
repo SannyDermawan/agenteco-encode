@@ -5,6 +5,8 @@ import { FIELD_CLASS } from '@/components/app/FormField'
 import { NeumorphicCard } from '@/components/app/NeumorphicCard'
 import { PageFade } from '@/components/app/PageFade'
 import { approveDeviceLink, lookupDeviceLink, type DeviceLinkInfo } from '@/lib/api/deviceLinks'
+import { FAMILY } from '@/lib/web3/network'
+import { UnsupportedOnSolana } from '@/components/app/solana/UnsupportedOnSolana'
 
 const BUTTON =
   'rounded-lg bg-[#5B5FEF] px-4 py-2 text-[13px] font-medium text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60'
@@ -21,7 +23,7 @@ function formatCode(raw: string): string {
  * message (no transaction). The link lists the agent under your account; it cannot spend
  * your funds, and you can unlink it any time.
  */
-export default function LinkPage() {
+function LinkPageEvm() {
   const { address, isConnected } = useAccount()
   const { connect, connectors, isPending: isConnecting } = useConnect()
   const { signMessageAsync } = useSignMessage()
@@ -151,4 +153,8 @@ export default function LinkPage() {
       </div>
     </PageFade>
   )
+}
+
+export default function LinkPage() {
+  return FAMILY === 'solana' ? <UnsupportedOnSolana title="Link an agent" why="Linking an agent to your account asks your wallet to approve a message on an EVM network; there is no Solana version yet. An agent works under its own Solana wallet without it." instead={{ href: '/app/register-agent', label: 'Register your own agent' }} /> : <LinkPageEvm />
 }

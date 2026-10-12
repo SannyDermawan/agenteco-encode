@@ -4,6 +4,8 @@ import { useSearchParams } from 'next/navigation'
 import { PageFade } from '@/components/app/PageFade'
 import { SellerSetup } from '@/components/app/register/SellerSetup'
 import { BuyerSetup } from '@/components/app/register/BuyerSetup'
+import { SolanaRegisterGuide } from '@/components/app/register/SolanaRegisterGuide'
+import { FAMILY } from '@/lib/web3/network'
 
 type Tab = 'seller' | 'buyer'
 
@@ -30,6 +32,10 @@ function RegisterOwnAgent() {
           </p>
         </div>
 
+        {FAMILY === 'solana' ? (
+          <SolanaRegisterGuide />
+        ) : (
+          <>
         <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/[0.06] bg-[#0B0C11] p-1.5" role="tablist">
           {(
             [
@@ -52,6 +58,8 @@ function RegisterOwnAgent() {
         </div>
 
         {tab === 'seller' ? <SellerSetup initialAgentId={agentId} /> : <BuyerSetup />}
+          </>
+        )}
       </div>
     </PageFade>
   )

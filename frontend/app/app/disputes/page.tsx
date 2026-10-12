@@ -16,6 +16,8 @@ import { useArbiter, useArbiterCouncil, useIsArbiter, useUsdtDecimals } from '@/
 import { TOKEN_SYMBOL } from '@/lib/web3/network'
 import { getModerationQueue } from '@/lib/api/moderation'
 import { ModerationQueue } from '@/components/app/moderation/ModerationQueue'
+import { FAMILY } from '@/lib/web3/network'
+import { UnsupportedOnSolana } from '@/components/app/solana/UnsupportedOnSolana'
 
 const DISPUTED = 4 // AgentEco.sol OrderStatus
 
@@ -158,7 +160,7 @@ function DisputeRow({ d, record, decimals }: { d: DisputeSummary; record?: ApiDi
 }
 
 /** The arbiter's inbox: every dispute on the contract, open ones (longest waiting) first. */
-export default function DisputesPage() {
+function DisputesPageEvm() {
   const { address, isConnected } = useAccount()
   const { signedIn } = useReadSession()
   const { data: arbiter } = useArbiter()
@@ -280,4 +282,8 @@ export default function DisputesPage() {
       </div>
     </PageFade>
   )
+}
+
+export default function DisputesPage() {
+  return FAMILY === 'solana' ? <UnsupportedOnSolana title="Disputes console" why="On Solana the arbiter is the escrow program's arbiter signer (a wallet, or a multisig vault), and the AI arbiter and the council console only exist for EVM. A dispute is still raised, answered and shown on its order page; its ruling is made with that signer." instead={{ href: '/app/orders', label: 'See your orders' }} /> : <DisputesPageEvm />
 }

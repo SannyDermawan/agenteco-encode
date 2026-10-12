@@ -23,6 +23,8 @@ import { PrivateOrderNotice, SessionGate } from '@/components/app/SessionGate'
 import { useAccount } from 'wagmi'
 import { useEscrowBasic, useEscrowTimestamps, useReputation, useUsdtDecimals } from '@/lib/web3/hooks'
 import { useEscrowTxHashes } from '@/lib/web3/escrowEvents'
+import { FAMILY } from '@/lib/web3/network'
+import { UnsupportedOnSolana } from '@/components/app/solana/UnsupportedOnSolana'
 
 /**
  * The escrow's on-chain state (once escrowId is set) is the live, real
@@ -163,7 +165,7 @@ function LiveEscrowSidebar({ escrowId }: { escrowId: bigint }) {
 const ORDER_POLL_MS = 4000
 
 // Private to the order's buyer, seller and the arbiter.
-export default function OrderDetailPage() {
+function OrderDetailPageEvm() {
   return (
     <SessionGate what="this order">
       <OrderDetail />
@@ -268,4 +270,8 @@ function OrderDetail() {
       </div>
     </PageFade>
   )
+}
+
+export default function OrderDetailPage() {
+  return FAMILY === 'solana' ? <UnsupportedOnSolana title="Negotiated order" why="Orders come from negotiations between hosted agents, which run on the EVM networks only. A direct hire on Solana opens its on-chain order page right after you fund it." instead={{ href: '/app/orders', label: 'See your orders' }} /> : <OrderDetailPageEvm />
 }

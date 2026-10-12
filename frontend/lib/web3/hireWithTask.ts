@@ -8,6 +8,7 @@ import { assertUsdtBalance } from './usdtBalance'
 import { TOKEN_SYMBOL } from './network'
 import { createTask, linkTaskEscrow, type ApiTask, type TaskLinkReceipt } from '@/lib/api/tasks'
 import type { WalletSigner } from '@/lib/api/authHeaders'
+import type { TransactionModifyingSigner } from '@runtime/chain/kit.ts'
 
 export type HireStep =
   | 'checking-balance'
@@ -30,8 +31,10 @@ export const HIRE_STEP_LABEL: Record<HireStep, string> = {
 
 export interface HireInput {
   signer: WalletSigner
+  /** Solana only: the wallet's transaction signer (the EVM flow signs through wagmi's config). */
+  txSigner?: TransactionModifyingSigner | null
   decimals: number
-  seller: `0x${string}`
+  seller: string
   price: string
   capability: string
   brief: unknown
@@ -68,7 +71,7 @@ export async function hireWithTask(input: HireInput): Promise<{ escrowId: bigint
     address: AGENT_ECO_ADDRESS,
     abi: AGENT_ECO_ABI,
     functionName: 'createEscrow',
-    args: [seller, amount, EXECUTION_WINDOW_SECONDS, REVIEW_WINDOW_SECONDS, task.taskHash],
+    args: [seller as `0x${string}`, amount, EXECUTION_WINDOW_SECONDS, REVIEW_WINDOW_SECONDS, task.taskHash],
   })
   const createReceipt = await waitForTransactionReceipt(wagmiConfig, { hash: createHash })
   const escrowId = parseCreatedEscrowId(createReceipt)

@@ -1,7 +1,7 @@
 'use client'
 import './polyfills'
 import { useQuery } from '@tanstack/react-query'
-import type { EscrowBasic, EscrowDisputeInfo, EscrowHashes, EscrowTimestamps, EscrowWindows, OnchainReputation, TokenInfo } from '@runtime/chain/types.ts'
+import type { EscrowBasic, EscrowDisputeInfo, EscrowHashes, EscrowTimestamps, EscrowWindows, TokenInfo } from '@runtime/chain/types.ts'
 import { SOLANA } from '@/lib/web3/network'
 import { solanaReader } from './chain'
 
@@ -47,10 +47,14 @@ export interface SolanaEscrow {
   flags: { acceptTimedOut: boolean; executionTimedOut: boolean; reviewExpired: boolean; disputeTimedOut: boolean }
 }
 
-/** Everything the order page shows about one escrow, read together so the page never mixes two moments. */
-export function useSolanaEscrow(escrowId: bigint | undefined) {
-  return useQuery<SolanaEscrow>({
+/**
+ * Everything the order page shows about one escrow, read together so the page never mixes two moments.
+ * `select` picks what one component needs; all of them share the one polled read.
+ */
+export function useSolanaEscrow<T = SolanaEscrow>(escrowId: bigint | undefined, select?: (escrow: SolanaEscrow) => T) {
+  return useQuery<SolanaEscrow, Error, T>({
     queryKey: [chainKey, 'escrow', escrowId?.toString()],
+    select: select as (escrow: SolanaEscrow) => T,
     enabled: escrowId !== undefined,
     refetchInterval: (query) => (query.state.data && TERMINAL.has(query.state.data.basic.status) ? false : LIVE_POLL_MS),
     retry: 1,
@@ -74,13 +78,13 @@ export function useSolanaEscrow(escrowId: bigint | undefined) {
   })
 }
 
-/** A seller's on-chain record. */
-export function useSolanaReputation(seller: string | undefined) {
-  return useQuery<OnchainReputation>({
+/** A seller's five on-chain counters (completed, failed, volume, rating sum, rating count). */
+export function useSolanaReputationCounters(seller: string | undefined) {
+  return useQuery({
     queryKey: [chainKey, 'reputation', seller],
     enabled: !!seller,
     refetchInterval: 15_000,
-    queryFn: () => solanaReader().getReputation(seller!),
+    queryFn: () => solanaReader().reputationCounters(seller!),
   })
 }
 

@@ -4,7 +4,7 @@ import { NeumorphicCard } from './NeumorphicCard'
 import { CapabilityResultView } from './CapabilityResultView'
 import { HashCheck } from './HashCheck'
 import { getEscrowResult } from '@/lib/api/escrowResults'
-import { useEscrowHashes } from '@/lib/web3/hooks'
+import { useEscrowHashes } from '@/lib/chain/hooks'
 import { capabilityLabel } from '@/lib/capabilityTemplates'
 
 const DELIVERED_OR_LATER = 3 // AgentEco.sol OrderStatus.DELIVERED

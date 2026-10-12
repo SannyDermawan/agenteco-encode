@@ -2,8 +2,8 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { JSX } from 'react'
-import { useAccount } from 'wagmi'
-import { useIsArbiter } from '@/lib/web3/hooks'
+import { useWallet } from '@/lib/wallet/useWallet'
+import { useIsArbiter } from '@/lib/chain/hooks'
 import { useDisputes } from '@/lib/web3/escrowEvents'
 import { BrandLogo } from '@/components/BrandLogo'
 import {
@@ -57,7 +57,7 @@ export function AppSidebar({ open, onClose }: { open: boolean; onClose: () => vo
   const pathname = usePathname()
 
   // The arbiter's inbox — only shown to the wallet the contract names as arbiter.
-  const { address } = useAccount()
+  const { address } = useWallet()
   const isArbiter = useIsArbiter(address)
   const { data: disputes } = useDisputes(isArbiter)
   const openDisputes = disputes?.filter((d) => d.status === DISPUTED).length ?? 0

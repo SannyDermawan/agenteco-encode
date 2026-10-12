@@ -8,9 +8,10 @@ import { AppSidebar } from '@/components/app/AppSidebar'
 import { AppTopbar } from '@/components/app/AppTopbar'
 import { DemoModeBanner } from '@/components/app/DemoModeBanner'
 import { FaucetStrip } from '@/components/app/FaucetStrip'
+import { SolanaFundingStrip } from '@/components/app/SolanaFunding'
 import { SessionSync } from '@/components/app/SessionGate'
 import { SolanaWalletProvider } from '@/lib/solana/wallet'
-import { SOLANA_OFFERED } from '@/lib/web3/network'
+import { FAMILY, SOLANA_OFFERED } from '@/lib/web3/network'
 
 const noSubscription = () => () => {}
 
@@ -31,7 +32,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         <div className="lg:pl-[248px]">
           <AppTopbar onMenuClick={() => setSidebarOpen(true)} />
           <DemoModeBanner />
-          <FaucetStrip />
+          {FAMILY === 'solana' ? <SolanaFundingStrip /> : <FaucetStrip />}
           <main className="mx-auto max-w-[1400px] px-4 py-6 md:px-7 md:py-8">{children}</main>
         </div>
       </div>

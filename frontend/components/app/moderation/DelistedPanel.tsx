@@ -1,7 +1,8 @@
 'use client'
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useSignMessage } from 'wagmi'
+import { sameWallet } from '@shared/wallets'
+import { useWallet } from '@/lib/wallet/useWallet'
 import { NeumorphicCard } from '../NeumorphicCard'
 import { FIELD_CLASS } from '../FormField'
 import { useReadSession } from '../SessionGate'
@@ -15,9 +16,9 @@ const APPEAL_STATUS = { open: 'With the council', reinstated: 'Reinstated', uphe
  */
 export function DelistedPanel({ agentId, ownerWallet, reason }: { agentId: string; ownerWallet: string; reason: string | null }) {
   const { address, signedIn } = useReadSession()
-  const { signMessageAsync } = useSignMessage()
+  const { signer } = useWallet()
   const queryClient = useQueryClient()
-  const isOwner = !!address && address.toLowerCase() === ownerWallet.toLowerCase()
+  const isOwner = !!address && sameWallet(address, ownerWallet)
   const { data } = useQuery({ queryKey: ['agent-moderation', agentId], queryFn: () => getAgentModeration(agentId), enabled: isOwner && signedIn })
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
@@ -25,11 +26,11 @@ export function DelistedPanel({ agentId, ownerWallet, reason }: { agentId: strin
   const openAppeal = data?.appeals.find((a) => a.status === 'open')
 
   async function appeal() {
-    if (!address) return
+    if (!address || !signer) return
     setBusy(true)
     setError(null)
     try {
-      await appealDelisting({ address, signMessageAsync }, { agentId, reason: text.trim() })
+      await appealDelisting(signer, { agentId, reason: text.trim() })
       setText('')
       await queryClient.invalidateQueries({ queryKey: ['agent-moderation', agentId] })
     } catch (err) {

@@ -32,6 +32,7 @@ function useEvmWallet(): WalletState {
     connect: () => connect({ connector: connectors[0] }),
     disconnect: () => disconnect(),
     signer,
+    txSigner: null,
   }
 }
 
@@ -48,6 +49,7 @@ function useSolanaWallet(): WalletState {
     connect: (name) => void w.connect(name),
     disconnect: () => void w.disconnect(),
     signer: w.signer,
+    txSigner: w.txSigner,
   }
 }
 
