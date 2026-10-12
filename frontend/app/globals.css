@@ -80,3 +80,29 @@ body {
     transform: translate(-30%, -50%);
   }
 }
+
+/* The strip of networks under the hero (components/landing/NetworkMarquee.tsx): the track holds two identical
+   copies and slides by exactly one, so the loop has no seam. */
+.network-marquee {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+.network-marquee-track {
+  animation: network-marquee 42s linear infinite;
+}
+.network-marquee:hover .network-marquee-track {
+  animation-play-state: paused;
+}
+@keyframes network-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .network-marquee-track {
+    animation: none;
+  }
+}

@@ -50,15 +50,6 @@ export function Hero() {
         </HeroVideo>
       </motion.div>
       <motion.div className="relative flex flex-col items-center" style={{ y: textY, opacity: textOpacity }}>
-        <motion.div
-          {...enter(0)}
-          className="relative inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] py-1.5 pl-3 pr-3.5 text-[12px] text-[#8B8D96] backdrop-blur-sm"
-        >
-          <span className="font-medium uppercase tracking-[0.12em]">Built on</span>
-          {/* eslint-disable-next-line @next/next/no-img-element -- local SVG logo, no optimization needed */}
-          <img src="/bnb-chain.svg" alt="" className="h-4 w-4" />
-          <span className="font-semibold tracking-[-0.01em] text-[#F5F5F7]">BNB Smart Chain Testnet</span>
-        </motion.div>
 
         {/* the glow sits on a wrapper: the gradient text is clipped, and the headline's own filter is the blur-in */}
         <div

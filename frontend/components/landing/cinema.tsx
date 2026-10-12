@@ -14,16 +14,18 @@ const TONES = { blue: '79,124,255', violet: '139,92,246', indigo: '91,95,239', a
 const SPOTS = { center: '50%', left: '20%', right: '80%' } as const
 
 /**
- * A section's backdrop on the plain #08090D page: a stage light from above,
- * a fine grid that fades out of it, and a hairline along the top edge.
- * Tone and position vary from section to section so the page has rhythm.
+ * A section's backdrop on the plain #08090D page: a stage light from above and a fine grid that fades out
+ * of it. Both fade in and out along the section's top and bottom edges, and there is no hairline, so the
+ * sections run into one another instead of being cut by a line. Tone and position vary from section to
+ * section so the page has rhythm.
  */
 export function SectionGlow({ tone = 'indigo', at = 'center' }: { tone?: keyof typeof TONES; at?: keyof typeof SPOTS }) {
   const rgb = TONES[tone]
   const x = SPOTS[at]
   const fade = `radial-gradient(52% 42% at ${x} 0%, #000, transparent 75%)`
+  const edges = 'linear-gradient(180deg, transparent 0, #000 220px, #000 calc(100% - 220px), transparent 100%)'
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden" style={{ WebkitMaskImage: edges, maskImage: edges }}>
       <div className="absolute inset-0" style={{ background: `radial-gradient(58% 46% at ${x} 0%, rgba(${rgb},.17), transparent 70%)` }} />
       <div
         className="absolute inset-0"
@@ -34,7 +36,6 @@ export function SectionGlow({ tone = 'indigo', at = 'center' }: { tone?: keyof t
           maskImage: fade,
         }}
       />
-      <div className="absolute inset-x-0 top-0 h-px" style={{ background: `linear-gradient(90deg, transparent 8%, rgba(${rgb},.55) ${x}, transparent 92%)` }} />
     </div>
   )
 }

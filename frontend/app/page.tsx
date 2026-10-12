@@ -12,6 +12,7 @@ import { Faq } from "@/components/landing/Faq";
 import { Capabilities } from "@/components/landing/Capabilities";
 import { GuideLoader } from "@/components/landing/GuideLoader";
 import { WorldBackdrop } from "@/components/landing/WorldBackdrop";
+import { NetworkMarquee } from "@/components/landing/NetworkMarquee";
 
 export default function Home() {
   return (
@@ -19,6 +20,7 @@ export default function Home() {
       <WorldBackdrop />
       <Navbar />
       <Hero />
+      <NetworkMarquee />
       {/* everything below the hero is drawn at 85%, as if the browser were zoomed out a little: sections
           fit a laptop screen instead of needing a scroll each. (See .landing-zoom in globals.css.) */}
       <div className="landing-zoom">

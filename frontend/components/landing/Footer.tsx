@@ -30,7 +30,7 @@ export function Footer() {
   const [activeLink, setActiveLink] = useState<string | null>(null)
 
   return (
-    <footer className="relative border-t border-white/10 bg-[#0A0B1E]/80 px-5 backdrop-blur-xl text-[#F5F5F7]">
+    <footer className="relative bg-[#0A0B1E]/80 px-5 backdrop-blur-xl text-[#F5F5F7]">
       <div className="mx-auto max-w-[1200px] pb-[32px] pt-14 md:pb-[38px] md:pt-16">
         <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
           <div className="max-w-[380px]">
