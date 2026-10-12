@@ -1,6 +1,6 @@
 # Multi-chain
 
-Status: **implemented for EVM chains** (BSC Testnet, BOT Chain, Base Sepolia presets). Solana: the escrow program and `SolanaAdapter` are built and tested locally ([SOLANA.md](SOLANA.md)) the backend can serve a Solana chain for self-hosted agents (§5), and the SDK, CLI and MCP server trade on it; not deployed, not in the frontend. Back to the [README](../README.md).
+Status: **implemented for EVM chains** (BSC Testnet, BOT Chain, Base Sepolia presets). Solana: the escrow program and `SolanaAdapter` are built and tested locally ([SOLANA.md](SOLANA.md)), the backend can serve a Solana chain for self-hosted agents (§5), the SDK, CLI and MCP server trade on it, and the website connects a Solana wallet and hires, settles, disputes and rates on it; not deployed, not run on devnet. Back to the [README](../README.md).
 
 One backend, one database and one SDK run the same escrow, dispute and reputation flow on several chains at once. With no new settings, everything behaves exactly as the single-chain BNB version did.
 
@@ -88,7 +88,7 @@ Rules: no chain-specific branching outside adapters; signing keys are handed to 
 
 **`EvmAdapter`** (`chain/evm.ts`, viem) holds all escrow, arbiter-council, escrow-index, keeper, reputation, token and rating-event logic, plus ERC-8004 (section 6). It has no module state: the deployment comes in as an `EvmChainConfig`, the wallet as `EvmClients`. The older helpers (`onchain/escrow.ts`, `arbiter.ts`, `escrowIndex.ts`, `host/reputation.ts`) remain as thin wrappers over the primary chain, with unchanged signatures.
 
-**`SolanaAdapter`** (`chain/solana.ts`, `@solana/kit` over the Anchor program in `solana/`): implements the whole interface with the same state machine, `u64` ids, SPL token accounts, ed25519 `verifySignature`, base58 addresses and rating events. It runs behind a `SolanaBackend`: litesvm in tests, `SolanaRpcBackend` (`chain/solana-rpc.ts`) for a cluster. One conformance scenario runs on `EvmAdapter` and on `SolanaAdapter` (litesvm, and a local validator). The backend serves it through `chain/multi.ts` (§5). Not done: any run on devnet, the frontend, a council program (a Squads vault is the decided arbiter). Details and limits in [SOLANA.md](SOLANA.md).
+**`SolanaAdapter`** (`chain/solana.ts`, `@solana/kit` over the Anchor program in `solana/`): implements the whole interface with the same state machine, `u64` ids, SPL token accounts, ed25519 `verifySignature`, base58 addresses and rating events. It runs behind a `SolanaBackend`: litesvm in tests, `SolanaRpcBackend` (`chain/solana-rpc.ts`) for a cluster. One conformance scenario runs on `EvmAdapter` and on `SolanaAdapter` (litesvm, and a local validator). The backend serves it through `chain/multi.ts` (§5). Not done: any run on devnet, a real wallet extension on the website, a council program (a Squads vault is the decided arbiter). Details and limits in [SOLANA.md](SOLANA.md).
 
 ## 4. Configuration
 
@@ -121,6 +121,8 @@ NEXT_PUBLIC_CHAINS=bsc-testnet,base-sepolia              # offered networks, the
 NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_84532=0x…
 NEXT_PUBLIC_DEPLOY_BLOCK__eip155_84532=…
 ```
+
+A Solana network is offered the same way (`NEXT_PUBLIC_CHAINS=solana-devnet,…`); its settings are `NEXT_PUBLIC_AGENT_ECO_PROGRAM__solana_<genesis prefix>` (required: no default deployment), `NEXT_PUBLIC_TOKEN_MINT__…`, `NEXT_PUBLIC_RPC_URL__…`, `NEXT_PUBLIC_RPC_FALLBACK_URLS__…` and `NEXT_PUBLIC_FIRST_ESCROW_ID__…` (see [SOLANA.md](SOLANA.md) §12).
 
 Read at build time; the build fails if an offered network lacks its deployment. With more than one network, the top bar shows a picker: the choice is remembered in the browser and the app reloads on it. Every API call names the selected chain (`lib/api/base.ts`). The `/app` pages render in the browser only, so they never disagree with a server render; the landing page always describes the default network (`lib/web3/landingNetwork.ts`).
 
@@ -195,7 +197,7 @@ All on-chain suites run on throwaway local chains (anvil) with the real contract
 - **Regression:** `agent-runtime/src/onchain/escrow.chain.test.ts` and `backend/src/keeper/escrowKeeper.chain.test.ts` were written against the single-chain code before any refactor and pass unchanged: the whole escrow lifecycle, wallet-arbiter and council rulings, the escrow index, every keeper timeout, on-chain reputation. The original suites (forge 97, backend 76, agent-runtime 53) are unchanged.
 - **Adapter and registry:** `chain/evm.test.ts` (explicit config, two deployments on one chain), `chain/default.test.ts` (the primary chain matches `network.ts`), `chain/registry.test.ts` (`CHAINS`, suffixes, aliases, fail-fast), `chain/erc8004.test.ts` (registration, feedback, owner refused).
 - **Schema:** `backend/src/db.schema.test.ts` — the same escrow id on two chains, every escrow-keyed table unique per `(chain_id, escrow_id)`.
-- **Solana:** `agent-runtime/src/chain/multi.test.ts` (names, environment settings, `CHAINS` across families, fail-fast), `agent-runtime/src/shared/wallets.test.ts`, and `backend/src/solana.e2e.test.ts` — the API with a Solana chain as its default next to an EVM one: ed25519 sign-in and its case sensitivity, agents, a deal, results, a dispute, ratings and the scanner, the keeper, and the refusals above. It runs on litesvm by default and on a real `solana-test-validator` with `SOLANA_LOCAL_VALIDATOR=1` (about 2 minutes; then the chain is built from the environment through `SolanaRpcBackend`, as in production). `backend/src/sdk.solana.e2e.test.ts` and `cli/test/solana.e2e.test.ts` run the SDK, the CLI and the MCP server on Solana the same way. Details in [SOLANA.md](SOLANA.md) §6 and §11.
+- **Solana:** `agent-runtime/src/chain/multi.test.ts` (names, environment settings, `CHAINS` across families, fail-fast), `agent-runtime/src/shared/wallets.test.ts`, and `backend/src/solana.e2e.test.ts` — the API with a Solana chain as its default next to an EVM one: ed25519 sign-in and its case sensitivity, agents, a deal, results, a dispute, ratings and the scanner, the keeper, and the refusals above. It runs on litesvm by default and on a real `solana-test-validator` with `SOLANA_LOCAL_VALIDATOR=1` (about 2 minutes; then the chain is built from the environment through `SolanaRpcBackend`, as in production). `backend/src/sdk.solana.e2e.test.ts` and `cli/test/solana.e2e.test.ts` run the SDK, the CLI and the MCP server on Solana the same way. `backend/src/frontend.solana.e2e.test.ts` drives the built website in Chromium against a local validator with a mock wallet-standard wallet (opt-in, `SOLANA_BROWSER_E2E=1`, about a minute). Details in [SOLANA.md](SOLANA.md) §6, §11 and §12.
 - **End to end:** `backend/src/multichain.e2e.test.ts` — the API serving two local chains (chain id 97 with an 18-decimal token, 84532 with a 6-decimal token): escrow #1 on both without mixing, access per chain, disputes per chain arbiter, ratings read from the right chain, cross-chain negotiation refused, ERC-8004 registration checks and deal feedback.
 - Test-only ERC-8004 registries: `test/mocks/ERC8004Registries.sol` (implements just what AgentEco calls; not the reference implementation).
 
@@ -212,7 +214,8 @@ All on-chain suites run on throwaway local chains (anvil) with the real contract
 5. Base Sepolia: preset, 6-decimal handling, deploy command. **Done in code**; the contract is not deployed yet.
 6. `SolanaAdapter` and the Anchor program. **Built and tested locally** (litesvm and a local validator); **not deployed** ([SOLANA.md](SOLANA.md) §9).
 7. The backend serves Solana chains next to EVM ones, for self-hosted agents. **Done** and tested, on litesvm and on a local validator; **not run against devnet**.
-8. The SDK (`hire` and its stages, `createSellerAgent`, `registerCapability`), the CLI and the MCP server on Solana. **Done** and tested the same way ([SOLANA.md](SOLANA.md) §11); **not run against devnet**. Frontend, hosted agents, the AI arbiter host, ERC-8004, `tx_explainer` and device links on Solana: **not done**.
+8. The SDK (`hire` and its stages, `createSellerAgent`, `registerCapability`), the CLI and the MCP server on Solana. **Done** and tested the same way ([SOLANA.md](SOLANA.md) §11); **not run against devnet**.
+9. The website on Solana: wallet connection, a read session signed once, hiring from an agent's page with one wallet-signed transaction, the order page (settle, dispute, rate), balances and faucet pointers. **Done** and tested in a real browser against a local validator with a mock wallet ([SOLANA.md](SOLANA.md) §12); **not tried with a real wallet extension, a public RPC or devnet**. Hosted agents, the AI arbiter host, the arbiter console, ERC-8004, `tx_explainer` and device links on Solana: **not done**.
 
 ## 10. Open questions
 

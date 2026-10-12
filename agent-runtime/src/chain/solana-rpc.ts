@@ -21,6 +21,7 @@ import {
   type TransactionSigner,
 } from '@solana/kit'
 import { SOLANA_DEVNET_CHAIN_ID, type SolanaBackend } from './solana.ts'
+import { base64ToBytes, readI64, readU64 } from './bytes.ts'
 
 const CLOCK_SYSVAR = address('SysvarC1ock11111111111111111111111111111111')
 
@@ -38,15 +39,15 @@ export class SolanaRpcBackend implements SolanaBackend {
   async getAccount(addr: Address) {
     const { value } = await this.rpc.getAccountInfo(addr, { encoding: 'base64', commitment: this.commitment }).send()
     if (!value) return null
-    return { data: new Uint8Array(Buffer.from(value.data[0], 'base64')), lamports: BigInt(value.lamports), owner: value.owner }
+    return { data: base64ToBytes(value.data[0]), lamports: BigInt(value.lamports), owner: value.owner }
   }
 
   async getClock() {
     const account = await this.getAccount(CLOCK_SYSVAR)
     if (!account) throw new Error('the Clock sysvar is not readable')
-    const data = Buffer.from(account.data)
+    const data = account.data
     // Clock: slot u64, epoch_start_timestamp i64, epoch u64, leader_schedule_epoch u64, unix_timestamp i64.
-    return { slot: data.readBigUInt64LE(0), unixTimestamp: data.readBigInt64LE(32) }
+    return { slot: readU64(data, 0), unixTimestamp: readI64(data, 32) }
   }
 
   async send(instructions: Instruction[], feePayer: TransactionSigner) {
