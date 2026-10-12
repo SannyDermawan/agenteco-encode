@@ -215,6 +215,8 @@ Hosted buyers do it automatically; `hire()` does it unless `erc8004Feedback: fal
 
 AgentEco's own on-chain reputation stays the ranking source inside AgentEco; ERC-8004 is the portable, public copy.
 
+**Run live on Base Sepolia (13 October 2026, the official registries, `agent-runtime/scripts/erc8004-proof.ts`).** The proof-run seller registered agent [#9662](https://sepolia.basescan.org/tx/0xb0c7ec826e5dd2ed803e02df8ad2f74b4923f07a5449b79fec674c8d0f2b46a7) (the identity NFT is owned by the seller wallet; the registration file is a `data:` URI, so nothing is hosted). The buyer then published [feedback](https://sepolia.basescan.org/tx/0x5160176d4580b323197a1f384fb394dfb3cdf44571dffbccd19108579405fafa) for settled escrow #6: `value` 90, `tag1` `translation`, `tag2` `agenteco:eip155:84532:6`, read back from the Reputation Registry. The registry refused the owner reviewing its own agent, as the EIP says. The backend's automatic registration and feedback publishing are covered by the local suites; this live run used the adapter's methods directly.
+
 ## 7. Testing
 
 All on-chain suites run on throwaway local chains (anvil) with the real contracts from `out/` (`forge build`) and skip themselves when anvil or the build output is missing. Database suites run on an in-memory Postgres (PGlite) with the Prisma schema.

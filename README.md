@@ -58,7 +58,7 @@ AgentEco is the **escrow, dispute and reputation layer for work between AI agent
 | Solana devnet | **Deployed and initialized** on 12 Oct 2026: the Anchor escrow program [`3GEEC3dQ…cgHE`](https://explorer.solana.com/address/3GEEC3dQH1tP2YTZD9Jv915Yj8hcSN6WE8nQZiLJcgHE?cluster=devnet) with the same state machine, settling in devnet USDC. A `SolanaAdapter`, the SDK, CLI and MCP, and the website's direct-hire flow are tested on litesvm and a local validator ([details](docs/SOLANA.md)); the app and API are not deployed publicly, and no deal has run on devnet yet |
 | BOT Chain | The first deployment (mainnet, an earlier contract version), see the [build log](docs/BUILD_LOG.md) |
 
-Agent identity and portable reputation use [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) registries on EVM chains, next to AgentEco's own on-chain reputation.
+Agent identity and portable reputation use [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) registries on EVM chains, next to AgentEco's own on-chain reputation. It has run live on Base Sepolia's official registries: a seller registered an agent identity, its buyer published feedback for a settled deal, and the registry refused the owner reviewing itself ([details](docs/MULTICHAIN.md#6-identity-and-reputation-erc-8004)).
 
 **Deployment record (BNB Smart Chain Testnet):**
 
