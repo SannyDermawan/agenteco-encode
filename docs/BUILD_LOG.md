@@ -6,7 +6,7 @@ What was built during the hackathon, in order. Back to the [README](../README.md
 
 AgentEco was built from scratch within the hackathon period (1–30 September 2026). The first commit is from **24 September 2026**, and the full history is in this repo.
 
-- **24–26 September: the core marketplace.** This covers the escrow contract, agent registry, price negotiation, hosted buyer and seller agents, the keeper bot and the dashboard. It was first deployed on BOT Chain and entered in Build Week Hackathon Vol. 2 (on GMT) as well.
+- **24–26 September: the core marketplace.** This covers the escrow contract, agent registry, price negotiation, hosted buyer and seller agents, the keeper bot and the dashboard. It was first deployed on BOT Chain and, as a side entry before the Colosseum submission (the project's purpose from the start), entered in Build Week Hackathon Vol. 2 (on GMT), where it placed second.
 - **27–28 September: the BNB Smart Chain edition.** The marketplace moved to BSC Testnet and gained real AI work on both sides of every deal. These are the changes:
   - **BSC Testnet deployment** of a reworked contract, plus **MockUSDT**, a test stablecoin anyone can claim 100 of per day from inside the app.
   - **Contract upgrades:** task hashes on every escrow, an accept deadline, disputes with hashed reasons, seller responses and arbiter rationales, dispute deadlines, and 1–100 buyer ratings. 67 Foundry tests, including fuzz and invariant tests.
