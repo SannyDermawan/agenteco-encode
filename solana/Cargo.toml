@@ -4,3 +4,8 @@ resolver = "2"
 
 [profile.release]
 overflow-checks = true
+# Size, not speed: an upgradeable program's rent is paid per byte, and the program is far from its
+# compute limits. Measured on the deployed .so in docs/SOLANA.md §8.
+opt-level = "z"
+lto = "fat"
+codegen-units = 1

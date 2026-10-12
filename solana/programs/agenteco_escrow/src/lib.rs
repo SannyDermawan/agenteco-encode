@@ -6,7 +6,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
-declare_id!("GB9VQpdEQYTnw7NLcgAWLrUoeh2ZDtMjSGLmpUcZ4FoY");
+declare_id!("3GEEC3dQH1tP2YTZD9Jv915Yj8hcSN6WE8nQZiLJcgHE");
 
 pub const MAX_FEE_BPS: u16 = 1000; // 10%
 pub const MAX_WINDOW: i64 = 90 * 24 * 60 * 60; // 90 days

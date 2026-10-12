@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-agenteco_escrow = "GB9VQpdEQYTnw7NLcgAWLrUoeh2ZDtMjSGLmpUcZ4FoY"
+agenteco_escrow = "3GEEC3dQH1tP2YTZD9Jv915Yj8hcSN6WE8nQZiLJcgHE"
 
 [provider]
 cluster = "devnet"
