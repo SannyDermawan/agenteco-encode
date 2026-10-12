@@ -181,7 +181,7 @@ const PRESETS: Record<EvmNetworkName, NetworkPreset> = {
     logHistory: null,
     logRange: BigInt(45000),
     multicall3: '0xcA11bde05977b3631167028862bE2a173976CA11',
-    // No AgentEco deployment yet: NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_84532 and _DEPLOY_BLOCK__ must be set.
+    // Deployed (docs/MULTICHAIN.md section 4); the app offers it once NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_84532 and _DEPLOY_BLOCK__ are set.
   },
   'ethereum-sepolia': {
     chainId: 11155111,
@@ -205,7 +205,7 @@ const PRESETS: Record<EvmNetworkName, NetworkPreset> = {
     logHistory: BigInt(50000),
     logRange: BigInt(9000),
     multicall3: '0xcA11bde05977b3631167028862bE2a173976CA11',
-    // No AgentEco deployment yet: NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_11155111 and _DEPLOY_BLOCK__ must be set.
+    // Deployed (docs/MULTICHAIN.md section 4); the app offers it once NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_11155111 and _DEPLOY_BLOCK__ are set.
   },
   'arbitrum-sepolia': {
     chainId: 421614,
@@ -230,7 +230,7 @@ const PRESETS: Record<EvmNetworkName, NetworkPreset> = {
     logHistory: null,
     logRange: BigInt(45000),
     multicall3: '0xcA11bde05977b3631167028862bE2a173976CA11',
-    // No AgentEco deployment yet: NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_421614 and _DEPLOY_BLOCK__ must be set.
+    // Deployed (docs/MULTICHAIN.md section 4); the app offers it once NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_421614 and _DEPLOY_BLOCK__ are set.
   },
   'tempo-moderato': {
     chainId: 42431,
@@ -251,7 +251,7 @@ const PRESETS: Record<EvmNetworkName, NetworkPreset> = {
     logHistory: null,
     logRange: BigInt(90000),
     multicall3: '0xcA11bde05977b3631167028862bE2a173976CA11',
-    // No AgentEco deployment yet: NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_42431 and _DEPLOY_BLOCK__ must be set.
+    // Deployed (docs/MULTICHAIN.md section 4); the app offers it once NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_42431 and _DEPLOY_BLOCK__ are set.
   },
 }
 

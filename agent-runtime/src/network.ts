@@ -141,7 +141,7 @@ export const NETWORK_PRESETS: Record<NetworkName, NetworkPreset> = {
     multicall3: '0xcA11bde05977b3631167028862bE2a173976CA11',
     // Official ERC-8004 registries (same checks as on BSC Testnet).
     erc8004: { identity: '0x8004A818BFB912233c491871b3d84c89A494BD9e', reputation: '0x8004B663056A597Dffe9eCcC1965A193B7388713' },
-    // No AgentEco deployment yet: AGENT_ECO_ADDRESS (or AGENT_ECO_ADDRESS__eip155_84532) must be set.
+    // Deployed (docs/MULTICHAIN.md section 4), but a chain other than the primary serves nothing until AGENT_ECO_ADDRESS__eip155_84532 (and its block) is set.
   },
   'ethereum-sepolia': {
     chainId: 11155111,

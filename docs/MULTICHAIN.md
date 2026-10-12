@@ -238,6 +238,40 @@ Transactions: [dispute #2](https://explore.testnet.tempo.xyz/tx/0x1a83a93442a33c
 
 These runs, like Base's, are the contract through the adapter: negotiation, hosted agents and the AI arbiter ran on BNB Smart Chain Testnet, and the multi-chain API and website are not deployed publicly.
 
+### Serving every deployed chain (copy-paste)
+
+The deployments of this repository, as the settings a backend and a website need to serve them. The default chain stays BNB (`bsc-testnet`, its deployment is built in); every other chain is listed in `CHAINS` and configured with its suffix. Values are public addresses and block numbers, no secrets.
+
+```
+# backend
+CHAINS=bsc-testnet,base-sepolia,ethereum-sepolia,arbitrum-sepolia,tempo-moderato,solana-devnet
+AGENT_ECO_ADDRESS__eip155_84532=0xF8448762AeCE0039f1072Da74477fbFAD629fDB8
+DEPLOYMENT_BLOCK__eip155_84532=48021794
+AGENT_ECO_ADDRESS__eip155_11155111=0x3048b1a3CeeE4f1AF09485e49f059d094EF6f865
+DEPLOYMENT_BLOCK__eip155_11155111=11901363
+AGENT_ECO_ADDRESS__eip155_421614=0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea
+DEPLOYMENT_BLOCK__eip155_421614=318529770
+AGENT_ECO_ADDRESS__eip155_42431=0x2620424C73A39624bDcd3fa43aABF425d6Da997e
+DEPLOYMENT_BLOCK__eip155_42431=39319911
+AGENT_ECO_PROGRAM__solana_EtWTRABZaYq6iMfeYKouRu166VU2xqa1=3GEEC3dQH1tP2YTZD9Jv915Yj8hcSN6WE8nQZiLJcgHE
+RPC_URL__eip155_84532=https://sepolia.base.org   # the load-balanced PublicNode lagged transactions on Base
+EVM_STALE_RETRIES=3                              # retries a revert caused by such a lagging node
+
+# website (build-time, NEXT_PUBLIC_ prefix, same values)
+NEXT_PUBLIC_CHAINS=bsc-testnet,base-sepolia,ethereum-sepolia,arbitrum-sepolia,tempo-moderato,solana-devnet
+NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_84532=0xF8448762AeCE0039f1072Da74477fbFAD629fDB8
+NEXT_PUBLIC_DEPLOY_BLOCK__eip155_84532=48021794
+NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_11155111=0x3048b1a3CeeE4f1AF09485e49f059d094EF6f865
+NEXT_PUBLIC_DEPLOY_BLOCK__eip155_11155111=11901363
+NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_421614=0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea
+NEXT_PUBLIC_DEPLOY_BLOCK__eip155_421614=318529770
+NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_42431=0x2620424C73A39624bDcd3fa43aABF425d6Da997e
+NEXT_PUBLIC_DEPLOY_BLOCK__eip155_42431=39319911
+NEXT_PUBLIC_AGENT_ECO_PROGRAM__solana_EtWTRABZaYq6iMfeYKouRu166VU2xqa1=3GEEC3dQH1tP2YTZD9Jv915Yj8hcSN6WE8nQZiLJcgHE
+```
+
+This is what a public multi-chain deployment needs besides a database (`npx prisma db push`, section 5) and the hosting itself; it has not been done, so the CLI's account links and the chain picker are only tested locally.
+
 ## 5. Database and API
 
 New database, created with a plain `prisma db push` (no data is carried over from BNB).
