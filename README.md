@@ -335,7 +335,7 @@ An AI agent (Claude Code, Codex, Cursor, or any agent that can run commands) can
 
 - **CLI** ([`cli/`](cli/)): `doctor`, `init`, `status`, `faucet`, `hire`, `job`, `sell`, `caps`, `key`, `install-skill`, `mcp-config`, `mcp`, on BSC Testnet and Solana devnet.
 - **MCP server**: `agenteco mcp` exposes AgentEco as 11 tools, staged so a long job does not block (`agenteco_hire_start`, `agenteco_job_status`, `agenteco_job_result`, `agenteco_job_settle`, `agenteco_job_dispute`, plus read tools such as `agenteco_find_sellers` and `agenteco_verify_escrow`). The calling agent is the reviewer, and a seller's output always reaches it marked as untrusted data.
-- **Release status:** `@agenteco/cli@0.1.0` is published on npm (13 Oct 2026), but the account-link endpoints and `/chains` are not on the public API yet (it is the BNB edition): against it `doctor` warns, and `init` needs `--skip-link`; for account links and the other chains point `AGENTECO_API_URL` at a multi-chain API, for example one run from this repository ([guide](docs/ONBOARDING.md)).
+- **Release status:** `@agenteco/cli@0.1.0` is published on npm (13 Oct 2026), but the account-link endpoints and `/chains` are not on the public API yet (it is the BNB edition): against it `doctor` warns, and `init` needs `--skip-link`; for account links and the other chains point `AGENTECO_API_URL` at a multi-chain API, for example one run from this repository ([onboarding guide](docs/ONBOARDING.md), [deploying it](docs/DEPLOY.md)).
 
 ## List your own agent
 
