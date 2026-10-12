@@ -12,18 +12,13 @@ What exists today and stays as it is: the BNB edition (`agenteco-bnb.vercel.app`
 
 ## 2. Backend (Railway)
 
-Three processes, all from the `backend/` folder of this repository (Node 22.9 or newer). **The build needs two installs**: the backend imports code from `agent-runtime/`, which has its own dependencies, and a build that installs only `backend/` fails at start with `Cannot find package 'zod'` (checked on a fresh clone). Leave the host's **Root Directory empty** (the repository root) and set:
-
-- **Build command:** `cd backend && npm install --include=dev && npm install --prefix ../agent-runtime --omit=dev --no-audit --no-fund` (`npm install` in `backend/` also runs `prisma generate`; the start commands use `tsx`, a dev dependency, hence `--include=dev`).
-- **Start command:** one per service, from the table below, each prefixed with `cd backend && `.
-
-Create one service for each:
+Three processes, from the **repository root** (Node 22.9 or newer). The backend imports code from `agent-runtime/`, which has its own dependencies, so the backend cannot be built from `backend/` alone (a backend-only install fails at start with `Cannot find package 'zod'`, checked on a fresh clone). The root `package.json` was written for this: its `postinstall` installs `agent-runtime` and `backend`, and `npm start` starts the API. So on Railway or any similar host: **leave Root Directory empty**, keep the default install (`npm install`), and give each service only its start command:
 
 | Service | Start command | What it does |
 |---|---|---|
-| api | `cd backend && npm run start:api` | the REST API the website and the CLI talk to |
-| keeper | `cd backend && npm start` | claims timeouts (permissionless; needs a funded `KEEPER_PRIVATE_KEY`) |
-| host | `cd backend && npm run start:host` | hosted agents and the AI arbiter |
+| api | `npm start` | the REST API the website and the CLI talk to |
+| keeper | `npm run start:keeper` | claims timeouts (permissionless; needs a funded `KEEPER_PRIVATE_KEY`) |
+| host | `npm run start:host` | hosted agents and the AI arbiter |
 
 Look at how your existing BNB services are set up (Settings, Build and Deploy) before copying: they were built from another repository layout.
 
@@ -68,7 +63,7 @@ For the demo only the **api** is needed (the keeper and the host are optional, s
 - To keep it awake, a free uptime monitor (UptimeRobot, cron-job.org) can request `<api>/health` every 5 minutes. `/health` also queries the database, which keeps a free Supabase project from pausing for inactivity. Check Render's and the monitor's terms before relying on it.
 - Without the pinger, open the API's `/health` a minute before a demo or a video take.
 
-A paid Railway Hobby plan (about US$5 a month, check its page) avoids the sleep and uses the same build and start commands.
+A paid Railway Hobby plan (about US$5 a month, check its page) avoids the sleep and uses the same install and start commands.
 
 ## 3. Website (Vercel)
 

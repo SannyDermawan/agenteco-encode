@@ -5,9 +5,10 @@ services:
     name: agenteco-api
     runtime: node
     plan: free
-    # No rootDir: the backend imports ../agent-runtime, so the whole repository is needed and both are installed.
-    buildCommand: cd backend && npm install --include=dev && npm install --prefix ../agent-runtime --omit=dev --no-audit --no-fund
-    startCommand: cd backend && npm run start:api
+    # No rootDir: the backend imports ../agent-runtime, so the whole repository is needed. The root package.json's
+    # postinstall installs agent-runtime and backend, and its start script starts the API.
+    buildCommand: npm install
+    startCommand: npm start
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
