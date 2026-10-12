@@ -9,8 +9,16 @@ import { Remaining, useNow } from './DeadlineCountdown'
 import { forgetPendingReason, getDisputeReason, readPendingReason, submitDisputeReason, type ApiDispute } from '@/lib/api/disputes'
 import { useEscrowHashes, useIsArbiter } from '@/lib/chain/hooks'
 import { explorerTxUrl } from '@/lib/web3/escrowEvents'
+import { FAMILY } from '@/lib/web3/network'
 
-const DISPUTED = 4 // AgentEco.sol OrderStatus
+// AgentEco.sol OrderStatus (the Solana adapter reports the same numbers)
+const DISPUTED = 4
+const SETTLED = 5
+const REFUNDED = 6
+
+// The AI arbiter runs in the backend host, which serves EVM chains only; on Solana the
+// council rules directly and the ruling is not reported back to the API.
+const HAS_AI_ARBITER = FAMILY === 'evm'
 
 const DECIDED_BY: Record<NonNullable<ApiDispute['resolution']>, string> = {
   'ai-auto': 'AI arbiter (automatic)',
@@ -107,6 +115,8 @@ export function DisputeTimelineCard({ escrowId, status, buyer }: { escrowId: big
   const responded = !!responseHash && !/^0x0+$/.test(responseHash)
   const overrideDeadline = d?.overrideDeadline ? Math.floor(new Date(d.overrideDeadline).getTime() / 1000) : null
   const ruling = d ? rulingRationale(d) : null
+  // Final on-chain without a ruling record in the API (Solana): show the outcome the chain has.
+  const settledOnChain = !HAS_AI_ARBITER && !d?.resolution && (status === SETTLED || status === REFUNDED)
 
   return (
     <NeumorphicCard className="p-6">
@@ -174,7 +184,7 @@ export function DisputeTimelineCard({ escrowId, status, buyer }: { escrowId: big
         )}
       </Step>
 
-      <Step n={3} title="AI arbiter recommendation" done={!!d?.recVerdict}>
+      <Step n={3} title={HAS_AI_ARBITER ? 'AI arbiter recommendation' : 'AI arbiter (not on this network)'} done={!!d?.recVerdict}>
         {d?.recVerdict ? (
           <div className="space-y-1.5">
             <div className="text-[13px] text-[#F5F5F7]">
@@ -191,6 +201,8 @@ export function DisputeTimelineCard({ escrowId, status, buyer }: { escrowId: big
               )}
             </div>
           </div>
+        ) : !HAS_AI_ARBITER ? (
+          <p className={muted}>There is no AI arbiter on this network: the arbiter rules directly, or the dispute timeout refunds the buyer.</p>
         ) : d?.recUnavailable ? (
           <p className={muted}>AI recommendation unavailable — the arbiter decides manually, or the timeout refunds the buyer.</p>
         ) : (
@@ -198,7 +210,7 @@ export function DisputeTimelineCard({ escrowId, status, buyer }: { escrowId: big
         )}
       </Step>
 
-      <Step n={4} title="Ruling" done={!!d?.resolution}>
+      <Step n={4} title="Ruling" done={!!d?.resolution || settledOnChain}>
         {d?.resolution ? (
           <div className="space-y-1.5">
             <div className="text-[13px] text-[#F5F5F7]">
@@ -214,6 +226,19 @@ export function DisputeTimelineCard({ escrowId, status, buyer }: { escrowId: big
                 Ruling transaction ↗
               </a>
             )}
+          </div>
+        ) : settledOnChain ? (
+          <div className="space-y-1.5">
+            <div className="text-[13px] text-[#F5F5F7]">
+              {status === SETTLED ? 'Paid to the seller' : 'Refunded to the buyer'} ·{' '}
+              <span className="text-[#8B8D96]">final on-chain</span>
+            </div>
+            <p className={muted}>
+              {status === SETTLED
+                ? 'The arbiter ruled for the seller.'
+                : 'The arbiter ruled for the buyer, or the dispute timeout refunded them.'}{' '}
+              The ruling text is not reported to the API on this network.
+            </p>
           </div>
         ) : (
           <p className={muted}>Not decided yet.</p>
