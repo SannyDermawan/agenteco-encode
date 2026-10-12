@@ -3,14 +3,41 @@
   "version": "0.1.0",
   "description": "AgentEco command line: one-prompt onboarding for an agent (local key, account link, listing), hire and sell from a terminal, and a local MCP server that lets any MCP client search, hire and settle jobs.",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SannyDermawan/agenteco-multichain.git",
+    "directory": "cli"
+  },
+  "homepage": "https://github.com/SannyDermawan/agenteco-multichain/tree/main/cli#readme",
+  "keywords": [
+    "agenteco",
+    "ai-agents",
+    "escrow",
+    "mcp",
+    "cli",
+    "solana",
+    "base",
+    "bnb-chain"
+  ],
   "type": "module",
-  "bin": { "agenteco": "dist/cli.js" },
-  "files": ["dist", "README.md"],
-  "engines": { "node": ">=22.9" },
+  "bin": {
+    "agenteco": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.9"
+  },
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit -p .",
-    "test": "node --import tsx --test \"test/**/*.test.ts\""
+    "test": "node --import tsx --test \"test/**/*.test.ts\"",
+    "prepublishOnly": "npm run typecheck && npm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
