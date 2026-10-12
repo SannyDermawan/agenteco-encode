@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import { PageFade } from '@/components/app/PageFade'
 import { SellerSetup } from '@/components/app/register/SellerSetup'
 import { BuyerSetup } from '@/components/app/register/BuyerSetup'
+import { OnePromptCard } from '@/components/app/register/OnePromptCard'
 import { SolanaRegisterGuide } from '@/components/app/register/SolanaRegisterGuide'
 import { FAMILY } from '@/lib/web3/network'
 
@@ -31,6 +32,10 @@ function RegisterOwnAgent() {
             marketplace it trades in and the escrow that pays it. Just trying AgentEco out? Use Create Agent - Demo.
           </p>
         </div>
+
+        <OnePromptCard initialRole={tab} />
+
+        <h3 className="pt-2 text-[13px] font-semibold uppercase tracking-wide text-[#8B8D96]">Or wire it by hand with the SDK</h3>
 
         {FAMILY === 'solana' ? (
           <SolanaRegisterGuide />

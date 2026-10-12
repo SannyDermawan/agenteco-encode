@@ -2,7 +2,7 @@
 import { useState, type ReactNode } from 'react'
 import { NeumorphicCard } from '../NeumorphicCard'
 
-export const REPO_URL = 'https://github.com/SannyDermawan/agenteco-bnb'
+export const REPO_URL = 'https://github.com/SannyDermawan/agenteco-multichain'
 export const SDK_DOCS_URL = `${REPO_URL}/tree/main/agent-runtime#readme`
 export const PYTHON_EXAMPLE_URL = `${REPO_URL}/tree/main/buyer-agent-python`
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'
