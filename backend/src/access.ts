@@ -6,7 +6,7 @@ import { isAgentOwnerWallet, verifyOwnerAuth, type AuthResult } from './auth.ts'
 import { prisma } from './db.ts'
 import { canRule } from '../../agent-runtime/src/chain/evm.ts'
 import type { ArbiterSetup } from '../../agent-runtime/src/chain/types.ts'
-import { chainFamily, readAdapter, readChain, requestChain, servedChainIds, servedEvmChainIds, type ChainId } from './chains.ts'
+import { chainFamily, readAdapter, readChain, requestChain, servedChainIds, servedChainIdsOf, servedEvmChainIds, type ChainId } from './chains.ts'
 import { EscrowNotFoundError } from '../../agent-runtime/src/chain/solana.ts'
 import { FRONTEND_HOSTS } from './origins.ts'
 import { verifyReadSession } from './session.ts'
@@ -26,7 +26,7 @@ import { normalizeWallet } from '../../agent-runtime/src/shared/wallets.ts'
  */
 export async function authenticateViewer(req: Request): Promise<AuthResult | null> {
   const session = req.header(READ_SESSION_HEADER)
-  if (session) return verifyReadSession(session, { domains: FRONTEND_HOSTS, chainId: servedEvmChainIds() })
+  if (session) return verifyReadSession(session, { domains: FRONTEND_HOSTS, chainId: servedEvmChainIds(), solanaChainIds: servedChainIdsOf('solana') })
   if (req.header('x-owner-wallet')) return verifyOwnerAuth(req)
   return null
 }

@@ -173,6 +173,36 @@ describe('one API, a Solana chain first and an EVM chain second', { skip }, () =
     assert.equal(wrong.status, 400)
   })
 
+  test('a read session signed once with a Solana wallet shows that wallet its own order, and nobody else\'s', async () => {
+    const { createSolanaSessionMessage } = await import('../../agent-runtime/src/shared/session.ts')
+    const { READ_SESSION_HEADER, READ_SESSION_STATEMENT } = await import('../../agent-runtime/src/shared/session.ts')
+    const session = async (role: keyof Rig['signers'], overrides: Record<string, unknown> = {}) => {
+      const now = Date.now()
+      const message = createSolanaSessionMessage({
+        domain: 'localhost:3000',
+        address: as(role).address,
+        statement: READ_SESSION_STATEMENT,
+        uri: 'http://localhost:3000',
+        chainId: SOL,
+        nonce: 'abcdefgh12345678',
+        issuedAt: new Date(now),
+        expirationTime: new Date(now + 60 * 60 * 1000),
+        ...overrides,
+      })
+      const signature = await sol.solanaWalletAccount(as(role)).signMessage({ message })
+      return Buffer.from(JSON.stringify({ family: 'solana', message, signature })).toString('base64')
+    }
+    const read = async (header: string) => {
+      const res = await fetch(`${api}/escrow-results/1`, { headers: { [READ_SESSION_HEADER]: header } })
+      return res.status
+    }
+    assert.equal(await read(await session('buyer')), 200, 'the buyer, with one session instead of a signature per request')
+    assert.equal(await read(await session('seller')), 200)
+    assert.equal(await read(await session('other')), 403, 'a signed-in stranger is still no party')
+    assert.equal(await read(await session('buyer', { chainId: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp' })), 401, 'a session for another chain')
+    assert.equal(await read(await session('buyer', { domain: 'evil.example', uri: 'https://evil.example' })), 401, 'a session for another website')
+  })
+
   test('an escrow that does not exist is not found, not an error', async () => {
     const res = await call('GET', '/escrow-results/999', undefined, as('buyer'))
     assert.ok([403, 404].includes(res.status), `got ${res.status}`)

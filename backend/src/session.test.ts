@@ -2,7 +2,9 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { createSiweMessage } from 'viem/siwe'
-import { READ_SESSION_STATEMENT } from '../../agent-runtime/src/shared/session.ts'
+import { accountOf } from '../../agent-runtime/src/sdk/wallet.ts'
+import { generateSolanaSecretKey } from '../../agent-runtime/src/chain/solana-keys.ts'
+import { READ_SESSION_STATEMENT, createSolanaSessionMessage, parseSolanaSessionMessage, type SolanaSessionFields } from '../../agent-runtime/src/shared/session.ts'
 import { verifyReadSession } from './session.ts'
 
 const account = privateKeyToAccount(generatePrivateKey())
@@ -68,4 +70,78 @@ test('garbage is rejected, never thrown', async () => {
   assert.equal((await verifyReadSession('not base64 json', rules)).ok, false)
   assert.equal((await verifyReadSession(Buffer.from('{"message":1}').toString('base64'), rules)).ok, false)
   assert.equal((await verifyReadSession('x'.repeat(5000), rules)).ok, false)
+})
+
+// --- A Solana wallet signs the same session as text, once, with ed25519 ---
+
+const SOL = 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1'
+const solRules = { ...rules, solanaChainIds: [SOL] }
+const solSigner = await accountOf(generateSolanaSecretKey())
+const otherSolSigner = await accountOf(generateSolanaSecretKey())
+
+async function solSession(overrides: Partial<SolanaSessionFields> = {}, signer = solSigner, text?: (message: string) => string) {
+  const fields: SolanaSessionFields = {
+    domain: 'agenteco-bnb.vercel.app',
+    address: solSigner.address,
+    statement: READ_SESSION_STATEMENT,
+    uri: 'https://agenteco-bnb.vercel.app',
+    chainId: SOL,
+    nonce: 'abcdefgh12345678',
+    issuedAt: new Date(NOW - HOUR),
+    expirationTime: new Date(NOW + HOUR),
+    ...overrides,
+  }
+  const message = text ? text(createSolanaSessionMessage(fields)) : createSolanaSessionMessage(fields)
+  const signature = await signer.signMessage({ message })
+  return Buffer.from(JSON.stringify({ family: 'solana', message, signature })).toString('base64')
+}
+
+test('Solana: a valid session proves its wallet, and an EVM session still works beside it', async () => {
+  assert.deepEqual(await verifyReadSession(await solSession(), solRules), { ok: true, wallet: solSigner.address })
+  assert.deepEqual(await verifyReadSession(await session(), solRules), { ok: true, wallet: account.address })
+})
+
+test('Solana: the message round-trips, and only that exact text is read', () => {
+  const fields: SolanaSessionFields = {
+    domain: 'localhost:3000',
+    address: solSigner.address,
+    statement: READ_SESSION_STATEMENT,
+    uri: 'http://localhost:3000',
+    chainId: SOL,
+    nonce: 'abcdefgh12345678',
+    issuedAt: new Date(NOW),
+    expirationTime: new Date(NOW + HOUR),
+  }
+  const text = createSolanaSessionMessage(fields)
+  assert.deepEqual(parseSolanaSessionMessage(text), fields)
+  assert.equal(parseSolanaSessionMessage(`${text}\nResources: x`), null, 'an extra line is refused')
+  assert.equal(parseSolanaSessionMessage(text.replace('Version: 1', 'Version: 2')), null)
+  assert.equal(parseSolanaSessionMessage(text.replace(/Nonce: \w+/, 'Nonce: short')), null)
+  assert.equal(parseSolanaSessionMessage(text.replace(/Issued At: \S+/, 'Issued At: 2026-09-29')), null, 'only the exact ISO form is read')
+})
+
+test('Solana: a session signed by another key, for another website, chain, statement or lifetime is rejected', async () => {
+  assert.equal((await verifyReadSession(await solSession({}, otherSolSigner), solRules)).ok, false)
+  assert.deepEqual(await verifyReadSession(await solSession({ domain: 'evil.example', uri: 'https://evil.example' }), solRules), { ok: false, error: 'Session was signed for another website' })
+  assert.deepEqual(await verifyReadSession(await solSession({ chainId: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp' }), solRules), { ok: false, error: 'Session was signed for another chain' })
+  assert.deepEqual(await verifyReadSession(await solSession({ statement: 'Sign in to some other app.' }), solRules), { ok: false, error: 'Unexpected session statement' })
+  assert.deepEqual(await verifyReadSession(await solSession({ issuedAt: new Date(NOW - 3 * HOUR), expirationTime: new Date(NOW - HOUR) }), solRules), { ok: false, error: 'Session expired — sign in again' })
+  assert.deepEqual(await verifyReadSession(await solSession({ issuedAt: new Date(NOW - HOUR), expirationTime: new Date(NOW + 30 * HOUR) }), solRules), { ok: false, error: 'Session lasts too long' })
+  assert.deepEqual(await verifyReadSession(await solSession({ issuedAt: new Date(NOW + HOUR), expirationTime: new Date(NOW + 2 * HOUR) }), solRules), { ok: false, error: 'Session is issued in the future' })
+})
+
+test('Solana: a server that serves no Solana chain refuses a Solana session, and a lowercased address is another wallet', async () => {
+  assert.equal((await verifyReadSession(await solSession(), rules)).ok, false)
+  // The signature covers the exact text: the same message with the wallet lowercased is not the one that was signed.
+  const lowered = await solSession({ address: solSigner.address.toLowerCase() })
+  assert.equal((await verifyReadSession(lowered, solRules)).ok, false)
+})
+
+test('Solana: a payload that claims Solana but is not, is rejected, never thrown', async () => {
+  const bad = (payload: object) => Buffer.from(JSON.stringify(payload)).toString('base64')
+  assert.equal((await verifyReadSession(bad({ family: 'solana', message: 'hello', signature: 'abc' }), solRules)).ok, false)
+  assert.equal((await verifyReadSession(bad({ family: 'solana', message: 1, signature: 2 }), solRules)).ok, false)
+  // An EVM session whose payload says "solana" is read as a Solana one, and fails there.
+  const evm = JSON.parse(Buffer.from(await session(), 'base64').toString('utf8'))
+  assert.equal((await verifyReadSession(bad({ ...evm, family: 'solana' }), solRules)).ok, false)
 })
