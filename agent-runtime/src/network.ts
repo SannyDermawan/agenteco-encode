@@ -5,7 +5,7 @@ import { defineChain, fallback, http, isAddress, type Address, type Transport } 
  * buyer/seller agents) learns which network it's on and which AgentEco
  * deployment to talk to. Mirrors frontend/lib/web3/network.ts.
  *
- * Pick the network with NETWORK=bsc-testnet|bot-testnet|bot-mainnet|base-sepolia
+ * Pick the network with NETWORK=bsc-testnet|bot-testnet|bot-mainnet|base-sepolia|ethereum-sepolia|arbitrum-sepolia|tempo-moderato
  * (default bsc-testnet; "testnet"/"mainnet" still mean the BOT Chain presets).
  * This is the process's primary chain; ./chain/registry.ts serves several
  * chains at once (CHAINS) from the same presets. Chain
@@ -15,7 +15,7 @@ import { defineChain, fallback, http, isAddress, type Address, type Transport } 
  * AGENT_ECO_ADDRESS is set, instead of quietly pointing at another chain.
  */
 
-export type NetworkName = 'bsc-testnet' | 'bot-testnet' | 'bot-mainnet' | 'base-sepolia'
+export type NetworkName = 'bsc-testnet' | 'bot-testnet' | 'bot-mainnet' | 'base-sepolia' | 'ethereum-sepolia' | 'arbitrum-sepolia' | 'tempo-moderato'
 
 export interface NetworkPreset {
   chainId: number
@@ -27,7 +27,7 @@ export interface NetworkPreset {
   explorerName: string
   nativeSymbol: string
   testnet: boolean
-  /** Settlement token for this network — MockUSDT on BSC Testnet, USDT on BOT Chain, USDC on Base Sepolia. */
+  /** Settlement token for this network — MockUSDT on BSC Testnet, USDT on BOT Chain, Circle's USDC on the Sepolia testnets, a TIP-20 stablecoin on Tempo. */
   usdtAddress: Address
   /** What logs and API messages call the settlement token. */
   tokenSymbol: string
@@ -142,6 +142,60 @@ export const NETWORK_PRESETS: Record<NetworkName, NetworkPreset> = {
     // Official ERC-8004 registries (same checks as on BSC Testnet).
     erc8004: { identity: '0x8004A818BFB912233c491871b3d84c89A494BD9e', reputation: '0x8004B663056A597Dffe9eCcC1965A193B7388713' },
     // No AgentEco deployment yet: AGENT_ECO_ADDRESS (or AGENT_ECO_ADDRESS__eip155_84532) must be set.
+  },
+  'ethereum-sepolia': {
+    chainId: 11155111,
+    name: 'Ethereum Sepolia',
+    // PublicNode serves eth_getLogs over 10,000 blocks but only recent history (about 50,000 blocks back).
+    rpcUrl: 'https://ethereum-sepolia-rpc.publicnode.com',
+    explorerUrl: 'https://sepolia.etherscan.io',
+    explorerName: 'Etherscan Sepolia',
+    nativeSymbol: 'ETH',
+    testnet: true,
+    // Circle's test USDC (6 decimals).
+    usdtAddress: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
+    tokenSymbol: 'USDC',
+    hostedMinGas: '0.002',
+    lowGasWarn: '0.005',
+    logRange: BigInt(9000),
+    multicall3: '0xcA11bde05977b3631167028862bE2a173976CA11',
+    erc8004: { identity: '0x8004A818BFB912233c491871b3d84c89A494BD9e', reputation: '0x8004B663056A597Dffe9eCcC1965A193B7388713' },
+  },
+  'arbitrum-sepolia': {
+    chainId: 421614,
+    name: 'Arbitrum Sepolia',
+    // Blocks come four times a second: PublicNode serves 50,000 per eth_getLogs call, the official RPC far more.
+    rpcUrl: 'https://arbitrum-sepolia-rpc.publicnode.com',
+    fallbackRpcUrls: ['https://sepolia-rollup.arbitrum.io/rpc'],
+    explorerUrl: 'https://sepolia.arbiscan.io',
+    explorerName: 'Arbiscan Sepolia',
+    nativeSymbol: 'ETH',
+    testnet: true,
+    // Circle's test USDC (6 decimals).
+    usdtAddress: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
+    tokenSymbol: 'USDC',
+    hostedMinGas: '0.0005',
+    lowGasWarn: '0.002',
+    logRange: BigInt(45000),
+    multicall3: '0xcA11bde05977b3631167028862bE2a173976CA11',
+    erc8004: { identity: '0x8004A818BFB912233c491871b3d84c89A494BD9e', reputation: '0x8004B663056A597Dffe9eCcC1965A193B7388713' },
+  },
+  'tempo-moderato': {
+    chainId: 42431,
+    name: 'Tempo Testnet (Moderato)',
+    rpcUrl: 'https://rpc.moderato.tempo.xyz',
+    explorerUrl: 'https://explore.testnet.tempo.xyz',
+    explorerName: 'Tempo Explorer',
+    // Tempo has no native gas token: fees are paid in a stablecoin (TIP-20), so there is no gas balance to watch.
+    nativeSymbol: 'USD',
+    testnet: true,
+    // A TIP-20 test stablecoin (6 decimals); see docs/MULTICHAIN.md for why it is not the fee token.
+    usdtAddress: '0x20c0000000000000000000000000000000000001',
+    tokenSymbol: 'AlphaUSD',
+    hostedMinGas: '0',
+    lowGasWarn: '0',
+    logRange: BigInt(90000),
+    multicall3: '0xcA11bde05977b3631167028862bE2a173976CA11',
   },
 }
 

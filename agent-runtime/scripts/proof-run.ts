@@ -1,6 +1,6 @@
 /**
  * A proof run on a live testnet: real escrow deals through the chain-neutral ChainAdapter, on
- * Base Sepolia or Solana devnet. Three deals, nothing mocked:
+ * Base Sepolia, Ethereum Sepolia, Arbitrum Sepolia, Tempo Moderato or Solana devnet. Three deals, nothing mocked:
  *
  *   1. settle        create+fund, start, deliver, accept: fee to the treasury, rest to the seller, a rating
  *   2. dispute, buyer wins    deliver, dispute, the seller answers, the arbiter rules for the buyer: refund, no fee
@@ -10,7 +10,7 @@
  * .proof/results-<chain>.json. Test wallets come from .proof/wallets.json (created by hand, git-ignored);
  * the arbiter of Base Sepolia is a member of its council (ARBITER_PRIVATE_KEY in backend/.env).
  *
- *   cd agent-runtime && npx tsx scripts/proof-run.ts base-sepolia
+ *   cd agent-runtime && npx tsx scripts/proof-run.ts base-sepolia | ethereum-sepolia | arbitrum-sepolia | tempo-moderato
  *   cd agent-runtime && npx tsx scripts/proof-run.ts solana-devnet
  *
  * Keys are read from local files and never printed. Testnet and devnet only.
@@ -19,23 +19,35 @@ import assert from 'node:assert/strict'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { keccak256, toHex, type Hex } from 'viem'
 
+/** The EVM deployments of this repository (AgentEco v3 + ArbiterCouncil, first escrow id 1, deployer = treasury). */
+const EVM = {
+  'base-sepolia': { chain: 'eip155:84532', eco: '0xF8448762AeCE0039f1072Da74477fbFAD629fDB8', block: '48021794', rpc: 'https://sepolia.base.org' },
+  'ethereum-sepolia': { chain: 'eip155:11155111', eco: '0x3048b1a3CeeE4f1AF09485e49f059d094EF6f865', block: '11901363', rpc: undefined },
+  'arbitrum-sepolia': { chain: 'eip155:421614', eco: '0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea', block: '318529770', rpc: 'https://sepolia-rollup.arbitrum.io/rpc' },
+  'tempo-moderato': { chain: 'eip155:42431', eco: '0x2620424C73A39624bDcd3fa43aABF425d6Da997e', block: '39319911', rpc: undefined },
+} as const
+type EvmName = keyof typeof EVM
+
 const which = process.argv[2]
-if (which !== 'base-sepolia' && which !== 'solana-devnet') {
-  console.error('usage: proof-run.ts base-sepolia | solana-devnet')
+if (which !== 'solana-devnet' && !(which && which in EVM)) {
+  console.error(`usage: proof-run.ts ${Object.keys(EVM).join(' | ')} | solana-devnet`)
   process.exit(2)
 }
-
-const BASE = { chain: 'eip155:84532', eco: '0xF8448762AeCE0039f1072Da74477fbFAD629fDB8', block: '48021794' }
+const evm = which === 'solana-devnet' ? null : EVM[which as EvmName]
+// A deployment's address and block can also come from the environment (PROOF_ECO, PROOF_BLOCK), for a fresh one.
+const evmEco = (process.env.PROOF_ECO || evm?.eco) as string
+const evmBlock = (process.env.PROOF_BLOCK || evm?.block) as string
 const SOLANA = { chain: 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1', program: '3GEEC3dQH1tP2YTZD9Jv915Yj8hcSN6WE8nQZiLJcgHE' }
 const ROOT = new URL('../../', import.meta.url)
 const wallets = JSON.parse(readFileSync(new URL('.proof/wallets.json', ROOT), 'utf8'))
 
-if (which === 'base-sepolia') {
-  process.env.CHAINS = BASE.chain
-  process.env.AGENT_ECO_ADDRESS__eip155_84532 = BASE.eco
-  process.env.DEPLOYMENT_BLOCK__eip155_84532 = BASE.block
-  // One backend per request: the load-balanced public node can answer a simulation from a node that lags a block.
-  process.env.RPC_URL__eip155_84532 = 'https://sepolia.base.org'
+if (evm) {
+  const suffix = evm.chain.replace(/[^A-Za-z0-9]/g, '_')
+  process.env.CHAINS = evm.chain
+  process.env[`AGENT_ECO_ADDRESS__${suffix}`] = evmEco
+  process.env[`DEPLOYMENT_BLOCK__${suffix}`] = evmBlock
+  // One backend per request where the public node is load-balanced: it can answer a simulation from a node that lags a block.
+  if (evm.rpc) process.env[`RPC_URL__${suffix}`] = evm.rpc
   process.env.EVM_STALE_RETRIES = '10'
 } else {
   process.env.CHAINS = SOLANA.chain
@@ -48,16 +60,16 @@ const unit = BigInt(1_000_000) // both USDC mints have 6 decimals
 type Adapter = import('../src/chain/types.ts').ChainAdapter
 
 async function adapters(): Promise<{ buyer: Adapter; seller: Adapter; arbiter: Adapter; treasury: string; chainId: string }> {
-  if (which === 'base-sepolia') {
+  if (evm) {
     const { signerChain } = await import('../src/chain/registry.ts')
     const backendEnv = readFileSync(new URL('backend/.env', ROOT), 'utf8')
     const arbiterKey = /^ARBITER_PRIVATE_KEY=(\S+)/m.exec(backendEnv)![1].replace(/^['"]|['"]$/g, '')
     const hex = (k: string) => (k.startsWith('0x') ? k : `0x${k}`) as Hex
     return {
-      chainId: BASE.chain,
-      buyer: signerChain(BASE.chain, wallets.evm.buyer.privateKey),
-      seller: signerChain(BASE.chain, wallets.evm.seller.privateKey),
-      arbiter: signerChain(BASE.chain, hex(arbiterKey)),
+      chainId: evm.chain,
+      buyer: signerChain(evm.chain, wallets.evm.buyer.privateKey),
+      seller: signerChain(evm.chain, wallets.evm.seller.privateKey),
+      arbiter: signerChain(evm.chain, hex(arbiterKey)),
       treasury: '0xFC2F38db21394C2dF0f1A690a154ad303311B644',
     }
   }
@@ -114,7 +126,7 @@ async function main() {
     await eventually(() => bal(treasury), expected.treasury, `treasury balance ${when}`)
   }
   const status = (id: bigint, want: number, what: string) => eventually(() => buyer.getEscrowStatus(id), want, `escrow #${id} ${what}`)
-  const results: Record<string, unknown> = { chain: chainId, program: which === 'base-sepolia' ? BASE.eco : SOLANA.program, ranAt: new Date().toISOString(), deals: [] as unknown[] }
+  const results: Record<string, unknown> = { chain: chainId, program: evm ? evmEco : SOLANA.program, ranAt: new Date().toISOString(), deals: [] as unknown[] }
   const deals = results.deals as Record<string, unknown>[]
 
   const open = async (label: string, amount: string) => {

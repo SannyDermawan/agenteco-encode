@@ -19,7 +19,15 @@ interface ServedChain {
   erc8004?: { identity: string; reputation: string } | null
 }
 
-const PRESET_NAME: Record<number, string> = { 97: 'bsc-testnet', 968: 'bot-testnet', 677: 'bot-mainnet', 84532: 'base-sepolia' }
+const PRESET_NAME: Record<number, string> = {
+  97: 'bsc-testnet',
+  968: 'bot-testnet',
+  677: 'bot-mainnet',
+  84532: 'base-sepolia',
+  11155111: 'ethereum-sepolia',
+  421614: 'arbitrum-sepolia',
+  42431: 'tempo-moderato',
+}
 
 /**
  * A preset that already ships this deployment keeps it: setting the address would switch the SDK

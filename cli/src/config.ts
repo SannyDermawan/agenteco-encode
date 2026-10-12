@@ -44,7 +44,7 @@ export function apiUrl(config: Config, env: NodeJS.ProcessEnv = process.env): st
 /** A CAIP-2 id for whatever the person typed (`base-sepolia`, `84532`, `eip155:84532`, `solana-devnet`); throws when unknown. */
 export function resolveChain(input: string): string {
   const id = normalizeAnyChainId(input)
-  if (!id) throw new Error(`Unknown chain "${input}". Known: bsc-testnet, base-sepolia, bot-testnet, bot-mainnet, solana-devnet.`)
+  if (!id) throw new Error(`Unknown chain "${input}". Known: bsc-testnet, base-sepolia, ethereum-sepolia, arbitrum-sepolia, tempo-moderato, bot-testnet, bot-mainnet, solana-devnet.`)
   return id
 }
 

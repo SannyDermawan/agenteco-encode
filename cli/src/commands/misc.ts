@@ -105,7 +105,7 @@ export async function caps(ctx: Ctx, args: string[]): Promise<number> {
   }
   io.out('Spend caps (a hire reserves its budget when it starts):')
   io.out(`  defaults: testnet ${DEFAULT_CAPS.testnet.maxPerJob}/job ${DEFAULT_CAPS.testnet.maxPerDay}/day; mainnet ${DEFAULT_CAPS.mainnet.maxPerJob}/job ${DEFAULT_CAPS.mainnet.maxPerDay}/day (off until a person turns it on)`)
-  for (const chainId of ['eip155:97', 'eip155:84532', 'eip155:968', 'eip155:677', SOLANA_DEVNET_CHAIN_ID]) {
+  for (const chainId of ['eip155:97', 'eip155:84532', 'eip155:11155111', 'eip155:421614', 'eip155:42431', 'eip155:968', 'eip155:677', SOLANA_DEVNET_CHAIN_ID]) {
     const c = capsFor(ctx.config, chainId)
     io.out(`  ${chainId} (${isTestnet(chainId) ? 'testnet' : 'mainnet'}): ${c.maxPerJob}/job, ${c.maxPerDay}/day, ${spentToday(io.home, chainId)} reserved or spent today`)
   }

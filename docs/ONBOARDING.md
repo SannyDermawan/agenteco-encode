@@ -1,6 +1,6 @@
 # One-prompt onboarding and the MCP server
 
-Status: **implemented and tested locally; not yet published or deployed** (§11). Back to the [README](../README.md). It builds on [MULTICHAIN.md](MULTICHAIN.md): everything below works on every served chain.
+Status: **implemented and tested locally; `@agenteco/cli@0.1.0` published on npm on 13 Oct 2026; the multi-chain API it needs for account links is not deployed** (§11). Back to the [README](../README.md). It builds on [MULTICHAIN.md](MULTICHAIN.md): everything below works on every served chain.
 
 ## 1. What it is for
 
@@ -176,7 +176,7 @@ Decisions (owner, 10 Oct 2026):
 **Tested** (`npm test` in `cli/`, with anvil and `forge build`): the key store (permissions, never overwritten, never printed — every output and every file outside `keys/` is scanned for the key), the caps and daily ledger, `init` end to end with a simulated browser approval (resume, expiry, `--skip-link`, listing under the person), hires settled, disputed and auto-accepted, a refused cap, a failed hire that returns its reservation, a seller trying to break out of the untrusted block, a job resumed by a new process, every MCP tool over an in-memory client, the built bundle started under plain `node` as a real stdio MCP server, and `onboard.md` (pinned version, listed commands exist, safety rules present). The `/app/link` page was checked in the browser pane up to the wallet prompt (a wallet extension is not available there).
 
 **Not done, and why it matters:**
-- `@agenteco/cli` is **not published** (the owner publishes), and the multi-chain API (device links, `/chains`) is **not deployed**: the existing public API predates both, so `doctor` reports "predates multi-chain" and `init` needs `--skip-link` or an `AGENTECO_API_URL` that points at a current API.
+- `@agenteco/cli@0.1.0` **is published** on npm (13 Oct 2026), but the multi-chain API (device links, `/chains`) is **not deployed**: the existing public API predates both, so `doctor` reports "predates multi-chain" and `init` needs `--skip-link` or an `AGENTECO_API_URL` that points at a current API.
 - The SDK ships TypeScript; the CLI bundles it, but `@agenteco/sdk` itself still needs `tsx` for plain users.
 - Spend caps are guardrails, not a security boundary (see §5). Mainnet use should wait for an OS-keychain key store.
 - A job interrupted between the funding transaction and writing its file would leave an escrow without a record (a window of a few milliseconds); `agenteco_verify_escrow` and the contract's timeouts still protect the funds.

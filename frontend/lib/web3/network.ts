@@ -31,7 +31,7 @@ import { SOLANA_PRESETS, type SolanaPreset } from '@runtime/chain/solana-presets
  * needs a redeploy.
  */
 
-export type EvmNetworkName = 'bsc-testnet' | 'bot-testnet' | 'bot-mainnet' | 'base-sepolia'
+export type EvmNetworkName = 'bsc-testnet' | 'bot-testnet' | 'bot-mainnet' | 'base-sepolia' | 'ethereum-sepolia' | 'arbitrum-sepolia' | 'tempo-moderato'
 export type SolanaNetworkName = 'solana-devnet'
 export type NetworkName = EvmNetworkName | SolanaNetworkName
 
@@ -183,6 +183,76 @@ const PRESETS: Record<EvmNetworkName, NetworkPreset> = {
     multicall3: '0xcA11bde05977b3631167028862bE2a173976CA11',
     // No AgentEco deployment yet: NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_84532 and _DEPLOY_BLOCK__ must be set.
   },
+  'ethereum-sepolia': {
+    chainId: 11155111,
+    name: 'Ethereum Sepolia',
+    label: 'Ethereum Sepolia',
+    // PublicNode serves eth_getLogs over 10,000 blocks but only about 50,000 blocks of history.
+    rpcUrl: 'https://ethereum-sepolia-rpc.publicnode.com',
+    explorerUrl: 'https://sepolia.etherscan.io',
+    explorerName: 'Etherscan Sepolia',
+    nativeSymbol: 'ETH',
+    testnet: true,
+    // Circle's test USDC (6 decimals).
+    usdtAddress: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
+    tokenSymbol: 'USDC',
+    tokenHasFaucet: false,
+    gasFaucets: [
+      { label: 'Google Cloud Web3 faucet (Sepolia ETH)', url: 'https://cloud.google.com/application/web3/faucet/ethereum/sepolia' },
+      { label: 'Circle faucet (test USDC on Ethereum Sepolia)', url: 'https://faucet.circle.com' },
+    ],
+    agentGasTopup: '0.005',
+    logHistory: BigInt(50000),
+    logRange: BigInt(9000),
+    multicall3: '0xcA11bde05977b3631167028862bE2a173976CA11',
+    // No AgentEco deployment yet: NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_11155111 and _DEPLOY_BLOCK__ must be set.
+  },
+  'arbitrum-sepolia': {
+    chainId: 421614,
+    name: 'Arbitrum Sepolia',
+    label: 'Arbitrum Sepolia',
+    // Blocks come four times a second: PublicNode serves 50,000 per eth_getLogs call, the official RPC far more.
+    rpcUrl: 'https://arbitrum-sepolia-rpc.publicnode.com',
+    fallbackRpcUrls: ['https://sepolia-rollup.arbitrum.io/rpc'],
+    explorerUrl: 'https://sepolia.arbiscan.io',
+    explorerName: 'Arbiscan Sepolia',
+    nativeSymbol: 'ETH',
+    testnet: true,
+    // Circle's test USDC (6 decimals).
+    usdtAddress: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
+    tokenSymbol: 'USDC',
+    tokenHasFaucet: false,
+    gasFaucets: [
+      { label: 'Arbitrum docs: faucets and the Ethereum Sepolia bridge', url: 'https://docs.arbitrum.io/build-decentralized-apps/reference/node-providers#faucets' },
+      { label: 'Circle faucet (test USDC on Arbitrum Sepolia)', url: 'https://faucet.circle.com' },
+    ],
+    agentGasTopup: '0.001',
+    logHistory: null,
+    logRange: BigInt(45000),
+    multicall3: '0xcA11bde05977b3631167028862bE2a173976CA11',
+    // No AgentEco deployment yet: NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_421614 and _DEPLOY_BLOCK__ must be set.
+  },
+  'tempo-moderato': {
+    chainId: 42431,
+    name: 'Tempo Testnet (Moderato)',
+    label: 'Tempo Moderato',
+    rpcUrl: 'https://rpc.moderato.tempo.xyz',
+    explorerUrl: 'https://explore.testnet.tempo.xyz',
+    explorerName: 'Tempo Explorer',
+    // No native gas token: fees are paid in a TIP-20 stablecoin, so a wallet needs test stablecoins and nothing else.
+    nativeSymbol: 'USD',
+    testnet: true,
+    // AlphaUSD, a TIP-20 test stablecoin (6 decimals); the fee token is pathUSD (docs/MULTICHAIN.md).
+    usdtAddress: '0x20c0000000000000000000000000000000000001',
+    tokenSymbol: 'AlphaUSD',
+    tokenHasFaucet: false,
+    gasFaucets: [{ label: 'Tempo faucet (pathUSD, AlphaUSD, BetaUSD, ThetaUSD)', url: 'https://tempo.xyz/developers/docs/quickstart/faucet' }],
+    agentGasTopup: '0',
+    logHistory: null,
+    logRange: BigInt(90000),
+    multicall3: '0xcA11bde05977b3631167028862bE2a173976CA11',
+    // No AgentEco deployment yet: NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_42431 and _DEPLOY_BLOCK__ must be set.
+  },
 }
 
 // Names from before the BSC Testnet deployment.
@@ -278,6 +348,30 @@ const SUFFIXED_ENV: Record<EvmNetworkName, DeploymentEnv> = {
     usdt: process.env.NEXT_PUBLIC_USDT_ADDRESS__eip155_84532,
     deployBlock: process.env.NEXT_PUBLIC_DEPLOY_BLOCK__eip155_84532,
     agentGasTopup: process.env.NEXT_PUBLIC_AGENT_GAS_TOPUP__eip155_84532,
+  },
+  'ethereum-sepolia': {
+    rpcUrl: process.env.NEXT_PUBLIC_RPC_URL__eip155_11155111,
+    rpcFallbacks: process.env.NEXT_PUBLIC_RPC_FALLBACK_URLS__eip155_11155111,
+    agentEco: process.env.NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_11155111,
+    usdt: process.env.NEXT_PUBLIC_USDT_ADDRESS__eip155_11155111,
+    deployBlock: process.env.NEXT_PUBLIC_DEPLOY_BLOCK__eip155_11155111,
+    agentGasTopup: process.env.NEXT_PUBLIC_AGENT_GAS_TOPUP__eip155_11155111,
+  },
+  'arbitrum-sepolia': {
+    rpcUrl: process.env.NEXT_PUBLIC_RPC_URL__eip155_421614,
+    rpcFallbacks: process.env.NEXT_PUBLIC_RPC_FALLBACK_URLS__eip155_421614,
+    agentEco: process.env.NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_421614,
+    usdt: process.env.NEXT_PUBLIC_USDT_ADDRESS__eip155_421614,
+    deployBlock: process.env.NEXT_PUBLIC_DEPLOY_BLOCK__eip155_421614,
+    agentGasTopup: process.env.NEXT_PUBLIC_AGENT_GAS_TOPUP__eip155_421614,
+  },
+  'tempo-moderato': {
+    rpcUrl: process.env.NEXT_PUBLIC_RPC_URL__eip155_42431,
+    rpcFallbacks: process.env.NEXT_PUBLIC_RPC_FALLBACK_URLS__eip155_42431,
+    agentEco: process.env.NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_42431,
+    usdt: process.env.NEXT_PUBLIC_USDT_ADDRESS__eip155_42431,
+    deployBlock: process.env.NEXT_PUBLIC_DEPLOY_BLOCK__eip155_42431,
+    agentGasTopup: process.env.NEXT_PUBLIC_AGENT_GAS_TOPUP__eip155_42431,
   },
 }
 

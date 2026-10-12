@@ -1,6 +1,6 @@
 # Multi-chain
 
-Status: **implemented for EVM chains** (BSC Testnet, BOT Chain, Base Sepolia presets). Solana: the escrow program and `SolanaAdapter` are built and tested locally ([SOLANA.md](SOLANA.md)), the backend can serve a Solana chain for self-hosted agents (§5), the SDK, CLI and MCP server trade on it, and the website connects a Solana wallet and hires, settles, disputes and rates on it; the program is deployed on devnet and a three-deal proof run passed there (13 Oct 2026, [SOLANA.md](SOLANA.md#proof-run-on-devnet)); the app and API are not deployed publicly. Back to the [README](../README.md).
+Status: **implemented for EVM chains** (BSC Testnet, BOT Chain, Base Sepolia, Ethereum Sepolia, Arbitrum Sepolia and Tempo Moderato presets; the last four are deployed and each ran a three-deal proof run, §4). Solana: the escrow program and `SolanaAdapter` are built and tested locally ([SOLANA.md](SOLANA.md)), the backend can serve a Solana chain for self-hosted agents (§5), the SDK, CLI and MCP server trade on it, and the website connects a Solana wallet and hires, settles, disputes and rates on it; the program is deployed on devnet and a three-deal proof run passed there (13 Oct 2026, [SOLANA.md](SOLANA.md#proof-run-on-devnet)); the app and API are not deployed publicly. Back to the [README](../README.md).
 
 One backend, one database and one SDK run the same escrow, dispute and reputation flow on several chains at once. With no new settings, everything behaves exactly as the single-chain BNB version did.
 
@@ -23,6 +23,9 @@ Every chain is a [CAIP-2](https://chainagnostic.org/CAIPs/caip-2) id. Network na
 | BSC Testnet | `eip155:97` | `bsc-testnet`, `97` |
 | BOT Chain Testnet / Mainnet | `eip155:968` / `eip155:677` | `bot-testnet` (`testnet`) / `bot-mainnet` (`mainnet`) |
 | Base Sepolia | `eip155:84532` | `base-sepolia`, `84532` |
+| Ethereum Sepolia | `eip155:11155111` | `ethereum-sepolia`, `11155111` |
+| Arbitrum Sepolia | `eip155:421614` | `arbitrum-sepolia`, `421614` |
+| Tempo Testnet (Moderato) | `eip155:42431` | `tempo-moderato`, `42431` |
 | Solana devnet | `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` (genesis-hash prefix) | `solana-devnet`, `solana` (served once its program is configured, §4) |
 
 ## 3. `ChainAdapter`
@@ -162,6 +165,79 @@ Escrows #1 to #5 are from the first attempts. They exposed a real problem, now f
 
 This is a run of the contract through the adapter, not a run of the whole product: negotiation, the hosted agents and the AI arbiter ran on BNB Smart Chain Testnet, and the multi-chain API and website are not deployed publicly.
 
+### Ethereum Sepolia
+
+Chain id 11155111, Circle's test USDC `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` (6 decimals, checked on-chain), Multicall3 present, the official ERC-8004 registries present. PublicNode is the RPC; it serves `eth_getLogs` over 10,000 blocks and only about 50,000 blocks of history, so the preset's `logRange` is 9,000.
+
+**Deployed on 13 October 2026** with the same script (`FIRST_ESCROW_ID=1`, fee 250 bps, treasury = the deployer, council = the arbiter wallet and the deployer, ruling threshold 1, admin threshold 2):
+
+| | |
+|---|---|
+| AgentEco v3 | [`0x3048b1a3CeeE4f1AF09485e49f059d094EF6f865`](https://eth-sepolia.blockscout.com/address/0x3048b1a3CeeE4f1AF09485e49f059d094EF6f865?tab=contract), deployed at block `11901363` |
+| ArbiterCouncil | [`0x2620424C73A39624bDcd3fa43aABF425d6Da997e`](https://eth-sepolia.blockscout.com/address/0x2620424C73A39624bDcd3fa43aABF425d6Da997e?tab=contract), holds the arbiter role |
+
+Both are source-verified on Blockscout. **A real problem on this chain:** code deposit is priced far above the usual 200 gas per byte here (about 1,570 gas per byte, measured with `eth_estimateGas` on test contracts of 1 to 20 KB), so AgentEco (13.7 KB) needed about 20 million gas, and Foundry's default gas limit, taken from its local simulation (3.8 million), made the creation run out of gas twice (two failed transactions in the deployer's history; no contract came of them). `--gas-estimate-multiplier 800` fixed it. The deployment transactions are in `broadcast/DeployV3.s.sol/11155111/run-latest.json`.
+
+**Proof run (13 October 2026, `agent-runtime/scripts/proof-run.ts ethereum-sepolia`)**, the same three deals as on Base, balances checked after every step:
+
+| Escrow | What happened | Money |
+|---|---|---|
+| #1 | settled, then rated 90 | 0.4: 0.39 to the seller, **0.01 fee** to the treasury |
+| #2 | the buyer disputed, the seller answered, the council ruled **for the buyer** | 0.4 refunded, **no fee** |
+| #3 | the buyer disputed, the seller answered, the council ruled **for the seller** | 0.3: 0.2925 to the seller, **0.0075 fee** |
+
+Transactions: [dispute #2](https://sepolia.etherscan.io/tx/0x923ba63df140169a76c9e2b55ba596b40ccbaeb84a30b5a055ad044bd6fed6e0), [response #2](https://sepolia.etherscan.io/tx/0x02ce12fa4149f8d37bce54c4aa1eaa6fc750abdacfb33408321b60577607a94c), [dispute #3](https://sepolia.etherscan.io/tx/0x2c88d44b126c5c2845b02006d53b30062682091c49fd1767b63af846966ea0b6), [response #3](https://sepolia.etherscan.io/tx/0xbf7a564a6a6b7c2ebbd5f4045bf34b1a6dcdc3fa75332a1adcc2aa34453ed25c), and the [rating of #1](https://sepolia.etherscan.io/tx/0xb3633ecd418cdb476221ce1caa704ebd60eb0aeabd230f7c7b4f91177b710d1c). **ERC-8004 ran live** on the official registries (`scripts/erc8004-proof.ts ethereum-sepolia`): the seller registered agent [#10853](https://sepolia.etherscan.io/tx/0xbdf07d22d8da4a5a2fa707714409eb76aa044d3603a377c96e8c4e4dd921fe5c), the buyer published [feedback](https://sepolia.etherscan.io/tx/0xe6889f37525eb7c2e8472797acb7399ba59090452083d93a3905f68d46ad3633) (value 90, tag `agenteco:eip155:11155111:1`) and read it back, and the registry refused the owner reviewing its own agent.
+
+### Arbitrum Sepolia
+
+Chain id 421614, Circle's test USDC `0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d` (6 decimals, checked on-chain), Multicall3 and the official ERC-8004 registries present. PublicNode is the RPC (50,000 blocks per `eth_getLogs`); the official sequencer RPC is the fallback, and what the deploy and the proof run use. Gas came from Ethereum Sepolia through the official Delayed Inbox (`depositEth`; the address is from docs.arbitrum.io and its `bridge()` matched the Arbitrum Sepolia bridge).
+
+**Deployed on 13 October 2026** (same parameters; Foundry needs `--skip-simulation` here, so the gas limit comes from the node, which prices in the L1 data cost):
+
+| | |
+|---|---|
+| AgentEco v3 | [`0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea`](https://sepolia.arbiscan.io/address/0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea#code), deployed at block `318529770` |
+| ArbiterCouncil | [`0xF8448762AeCE0039f1072Da74477fbFAD629fDB8`](https://sepolia.arbiscan.io/address/0xF8448762AeCE0039f1072Da74477fbFAD629fDB8#code), holds the arbiter role |
+
+Both are verified through Sourcify (`exact_match`); the Blockscout instance of this chain sits behind a Cloudflare challenge that `forge` cannot pass. Transactions: `broadcast/DeployV3.s.sol/421614/run-latest.json`.
+
+**Proof run (13 October 2026, `proof-run.ts arbitrum-sepolia`):**
+
+| Escrow | What happened | Money |
+|---|---|---|
+| #1 | settled, then rated 90 | 0.4: 0.39 to the seller, **0.01 fee** to the treasury |
+| #2 | the buyer disputed, the seller answered, the council ruled **for the buyer** | 0.4 refunded, **no fee** |
+| #3 | the buyer disputed, the seller answered, the council ruled **for the seller** | 0.3: 0.2925 to the seller, **0.0075 fee** |
+
+Transactions: [dispute #2](https://sepolia.arbiscan.io/tx/0x1a76ba6c6afc9957286a83255dd5a9d9dee8d89bb5003162c90f6e98166eab7e), [response #2](https://sepolia.arbiscan.io/tx/0xf40c25b00556213b71c2e273e70cb5aba663a734f473b9c775e2ccf6202bacf0), [dispute #3](https://sepolia.arbiscan.io/tx/0x4a22626215c5a0af3c3f73e52d4f7d8bd14193d66ffb0535021985d448129053), [response #3](https://sepolia.arbiscan.io/tx/0x3b70c8c25a9e947b5091315f8751a25f41ac69763d044fb3b67bac59401a4c3e), and the [rating of #1](https://sepolia.arbiscan.io/tx/0xcaf91f26b0704b4a99773246e33604d90cb6e8d8127f91a4df71d84e3f866ac4). **ERC-8004 ran live** (`erc8004-proof.ts arbitrum-sepolia`): the seller registered agent [#283](https://sepolia.arbiscan.io/tx/0x38041ce75c7c30b2e357e0d04ac3242797485710c1315462747369786a68f9ca), the buyer published [feedback](https://sepolia.arbiscan.io/tx/0x91805f89aff776207c2dfee2381d9ff5d50aa630c6c80cb56d58b9b6490ef91f) (value 90, tag `agenteco:eip155:421614:1`), read back, and the self-review was refused.
+
+### Tempo Testnet (Moderato)
+
+Chain id 42431, RPC `https://rpc.moderato.tempo.xyz`, explorer `https://explore.testnet.tempo.xyz`, Multicall3 present. Tempo has **no native gas token**: fees are paid in a TIP-20 stablecoin, and `eth_getBalance` returns a placeholder, so the preset has no gas thresholds. The test stablecoins (pathUSD `0x20c0…0000`, AlphaUSD `0x20c0…0001`, BetaUSD, ThetaUSD; 6 decimals) come from the chain's own faucet, programmatically (`tempo_fundAddress`, no captcha): 1,000,000 of each per address when the proof wallets were funded. No ERC-8004 registries are known for Tempo, so none are configured.
+
+**The settlement token is AlphaUSD, not pathUSD, on purpose.** Which token pays a transaction's fee follows the account's `FeeManager` preference and otherwise the call. Measured here: an AlphaUSD transfer from an account with no preference charged its fee in AlphaUSD (0.000169 on top of the 1 sent), which would break every exact balance check. After `setUserToken(pathUSD)` on the `FeeManager` precompile (`0xfeec…0000`) the same transfer moved exactly 1.000000 AlphaUSD and the fee came out of pathUSD. So each test wallet sets its fee token to pathUSD once before use; an account that does not would see small fee deductions in the settlement token, not a failure.
+
+**Deployed on 13 October 2026** (same parameters, settling in AlphaUSD; stock Foundry works with `--skip-simulation --gas-estimate-multiplier 150`; state creation is expensive here (TIP-1000): AgentEco used 14.6 million gas, the council 7.2 million):
+
+| | |
+|---|---|
+| AgentEco v3 | [`0x2620424C73A39624bDcd3fa43aABF425d6Da997e`](https://explore.testnet.tempo.xyz/address/0x2620424C73A39624bDcd3fa43aABF425d6Da997e), deployed at block `39319911` |
+| ArbiterCouncil | [`0xD57E5c283853e61cFc83BD2e3b19cFe444F5e42A`](https://explore.testnet.tempo.xyz/address/0xD57E5c283853e61cFc83BD2e3b19cFe444F5e42A), holds the arbiter role |
+
+Both are verified on Tempo's Sourcify instance (`match`). `forge verify-contract` could not resolve that host from this machine, so the standard JSON input was posted to `/v2/verify/42431/<address>` directly. Transactions: `broadcast/DeployV3.s.sol/42431/run-latest.json`.
+
+**Proof run (13 October 2026, `proof-run.ts tempo-moderato`; the script prints "USDC" for the settlement token, here AlphaUSD):**
+
+| Escrow | What happened | Money |
+|---|---|---|
+| #1 | settled, then rated 90 | 0.4: 0.39 to the seller, **0.01 fee** to the treasury |
+| #2 | the buyer disputed, the seller answered, the council ruled **for the buyer** | 0.4 refunded, **no fee** |
+| #3 | the buyer disputed, the seller answered, the council ruled **for the seller** | 0.3: 0.2925 to the seller, **0.0075 fee** |
+
+Transactions: [dispute #2](https://explore.testnet.tempo.xyz/tx/0x1a83a93442a33c68f116d3a68d57ecb6f334f34f115c245ca40a272e81c4ae26), [response #2](https://explore.testnet.tempo.xyz/tx/0x5d920f6b82f7a1ec5d22a99667ad6bfb94e3b1ff48472090be1c2aa0d4ab6fa3), [dispute #3](https://explore.testnet.tempo.xyz/tx/0x978b55568f99b3e9a0e68dc8dd8044a0ebf54a1eaee2ae1106e8fce91806c5d2), [response #3](https://explore.testnet.tempo.xyz/tx/0x10a53c19b0e37dd6f412fffa2b77f811eaab597ff266399b4b62f692c9567499), and the [rating of #1](https://explore.testnet.tempo.xyz/tx/0xca7a0c990d00fe823c15708bd10ec8eb630648e6ad3ba1248e98927154e3581e). The buyer ended 0.7 lower, the seller 0.6825 higher and the treasury 0.0175 higher, the rules' figures exactly.
+
+These runs, like Base's, are the contract through the adapter: negotiation, hosted agents and the AI arbiter ran on BNB Smart Chain Testnet, and the multi-chain API and website are not deployed publicly.
+
 ## 5. Database and API
 
 New database, created with a plain `prisma db push` (no data is carried over from BNB).
@@ -238,7 +314,7 @@ All on-chain suites run on throwaway local chains (anvil) with the real contract
 2. `chainId` in the schema, every query scoped by it, `groupId`. **Done.**
 3. Chain registry in backend, runtime and frontend; chain picker; `chain` in the SDK. **Done.**
 4. ERC-8004 identity and feedback on EVM chains. **Done** (registries per chain by configuration).
-5. Base Sepolia: preset, 6-decimal handling, deploy command. **Done and deployed** (12 Oct 2026, §4).
+5. Base Sepolia: preset, 6-decimal handling, deploy command. **Done and deployed** (12 Oct 2026, §4). Ethereum Sepolia, Arbitrum Sepolia and Tempo Moderato followed with the same contracts: presets, deployment, verification and a three-deal proof run each (13 Oct 2026, §4), plus ERC-8004 live on the first two.
 6. `SolanaAdapter` and the Anchor program. **Built and tested locally** (litesvm and a local validator) and **deployed on devnet** on 12 Oct 2026 ([SOLANA.md](SOLANA.md) §8).
 7. The backend serves Solana chains next to EVM ones, for self-hosted agents. **Done** and tested, on litesvm and on a local validator; **not run against devnet**.
 8. The SDK (`hire` and its stages, `createSellerAgent`, `registerCapability`), the CLI and the MCP server on Solana. **Done** and tested the same way ([SOLANA.md](SOLANA.md) §11); **not run against devnet**.

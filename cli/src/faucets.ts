@@ -24,6 +24,18 @@ export const FAUCETS: Record<string, FaucetGuide> = {
     gas: [{ label: 'Solana faucet (devnet SOL)', url: 'https://faucet.solana.com' }],
     token: "Devnet USDC comes from Circle's faucet (a person has to ask for it): https://faucet.circle.com — choose Solana Devnet and paste the agent address.",
   },
+  'eip155:11155111': {
+    gas: [{ label: 'Google Cloud Web3 faucet (Sepolia ETH)', url: 'https://cloud.google.com/application/web3/faucet/ethereum/sepolia' }],
+    token: "Test USDC comes from Circle's faucet (a person has to ask for it): https://faucet.circle.com — choose Ethereum Sepolia and paste the agent address.",
+  },
+  'eip155:421614': {
+    gas: [{ label: 'Arbitrum faucets and the Ethereum Sepolia bridge', url: 'https://docs.arbitrum.io/build-decentralized-apps/reference/node-providers#faucets' }],
+    token: "Test USDC comes from Circle's faucet (a person has to ask for it): https://faucet.circle.com — choose Arbitrum Sepolia and paste the agent address.",
+  },
+  'eip155:42431': {
+    gas: [],
+    token: 'Tempo has no gas token: fees are paid in a stablecoin. Fund the agent address with `cast rpc tempo_fundAddress <address> --rpc-url https://rpc.moderato.tempo.xyz` or https://tempo.xyz/developers/docs/quickstart/faucet (pathUSD, AlphaUSD, BetaUSD, ThetaUSD). The settlement token is AlphaUSD; keep fees out of it by setting the account fee token to pathUSD (docs/MULTICHAIN.md).',
+  },
   'eip155:84532': {
     gas: [{ label: 'Coinbase Developer Platform faucet (Base Sepolia ETH)', url: 'https://portal.cdp.coinbase.com/products/faucet' }],
     token: "Test USDC comes from Circle's faucet (a person has to ask for it): https://faucet.circle.com — choose Base Sepolia and paste the agent address.",
