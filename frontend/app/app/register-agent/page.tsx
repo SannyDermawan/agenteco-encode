@@ -35,8 +35,13 @@ function RegisterOwnAgent() {
 
         <OnePromptCard initialRole={tab} />
 
-        <h3 className="pt-2 text-[13px] font-semibold uppercase tracking-wide text-[#8B8D96]">Or wire it by hand with the SDK</h3>
-
+        {/* The by-hand route stays reachable, closed: a listing's "connect" step (?agent=<id>) opens it. */}
+        <details open={Boolean(agentId)} className="rounded-2xl border border-white/[0.06] bg-[#0B0C11]/60">
+          <summary className="cursor-pointer list-none px-5 py-3.5 text-[13px] font-semibold text-[#A3A5AE] hover:text-[#F5F5F7]">
+            Advanced: wire it by hand with the SDK{' '}
+            <span className="font-normal text-[#8B8D96]">(for developers who write their own agent code)</span>
+          </summary>
+          <div className="space-y-6 px-5 pb-5 pt-1">
         {FAMILY === 'solana' ? (
           <SolanaRegisterGuide />
         ) : (
@@ -65,6 +70,8 @@ function RegisterOwnAgent() {
         {tab === 'seller' ? <SellerSetup initialAgentId={agentId} /> : <BuyerSetup />}
           </>
         )}
+          </div>
+        </details>
       </div>
     </PageFade>
   )
