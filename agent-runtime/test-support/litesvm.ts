@@ -30,7 +30,8 @@ import {
   type TransactionSigner,
 } from '@solana/kit'
 import { FailedTransactionMetadata, LiteSVM, TransactionMetadata } from 'litesvm'
-import { SPL_TOKEN_PROGRAM_ID, buildInitializeInstruction, generateSolanaSecretKey, type SolanaBackend } from '../src/chain/solana.ts'
+import { SPL_TOKEN_PROGRAM_ID, buildInitializeInstruction, type SolanaBackend } from '../src/chain/solana.ts'
+import { generateSolanaSecretKey } from '../src/chain/solana-keys.ts'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 export const PROGRAM_SO = join(HERE, '../../solana/target/deploy/agenteco_escrow.so')

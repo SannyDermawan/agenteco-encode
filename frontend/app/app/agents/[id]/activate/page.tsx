@@ -6,9 +6,11 @@ import { NeumorphicCard } from '@/components/app/NeumorphicCard'
 import { ActivateAgentCard } from '@/components/app/ActivateAgentCard'
 import { getAgent, type ApiAgent } from '@/lib/api/agents'
 import { SessionGate } from '@/components/app/SessionGate'
+import { FAMILY } from '@/lib/web3/network'
+import { UnsupportedOnSolana } from '@/components/app/solana/UnsupportedOnSolana'
 
 // A hosted agent (and its deposit address) is visible to its owner only.
-export default function ActivateAgentPage() {
+function ActivateAgentPageEvm() {
   return (
     <SessionGate what="this agent">
       <ActivateAgentContent />
@@ -66,4 +68,8 @@ function ActivateAgentContent() {
       <ActivateAgentCard agent={agent} />
     </PageFade>
   )
+}
+
+export default function ActivateAgentPage() {
+  return FAMILY === 'solana' ? <UnsupportedOnSolana title="Activate a hosted agent" why="Hosted agents hold their key with AgentEco and run on the EVM networks only." instead={{ href: '/app/marketplace', label: 'Browse the marketplace' }} /> : <ActivateAgentPageEvm />
 }

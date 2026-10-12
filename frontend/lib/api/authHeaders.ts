@@ -1,17 +1,18 @@
-export interface WalletSigner {
-  address: `0x${string}`
-  signMessageAsync: (args: { message: string }) => Promise<`0x${string}`>
-}
+import { normalizeWallet } from '@shared/wallets'
+import type { WalletSigner } from '@/lib/wallet/types'
+
+export type { WalletSigner }
 
 /**
  * Signs proof of wallet ownership for a request — see backend/src/auth.ts
- * for what the server does with these headers. `signMessageAsync` is
- * wagmi's `useSignMessage().signMessageAsync`, so this triggers a MetaMask
- * signature prompt (free — not a transaction).
+ * for what the server does with these headers. `signer.signMessageAsync` is
+ * the connected wallet's: wagmi's `useSignMessage().signMessageAsync` (a MetaMask
+ * prompt) or a Solana wallet's `signMessage` — free either way, not a transaction.
+ * The signed text names the wallet in its stored form: lowercase for EVM, as is for Solana.
  */
 export async function buildAuthHeaders(signer: WalletSigner): Promise<Record<string, string>> {
   const timestamp = Date.now()
-  const message = `AgentEco:${signer.address.toLowerCase()}:${timestamp}`
+  const message = `AgentEco:${normalizeWallet(signer.address)}:${timestamp}`
   const signature = await signer.signMessageAsync({ message })
   return {
     'x-owner-wallet': signer.address,

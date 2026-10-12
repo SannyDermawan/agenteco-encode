@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
-import { useAccount, useSignMessage } from 'wagmi'
+import { sameWallet } from '@shared/wallets'
+import { useWallet } from '@/lib/wallet/useWallet'
 import { FIELD_CLASS } from '../FormField'
 import { FlagIcon } from '../icons'
 import { REPORT_CATEGORIES, reportAgent, type ReportCategory } from '@/lib/api/moderation'
@@ -11,8 +12,7 @@ import { REPORT_CATEGORIES, reportAgent, type ReportCategory } from '@/lib/api/m
  * agent or dismiss the report. Not shown to the agent's own owner.
  */
 export function ReportAgent({ agentId, ownerWallet, walletAddress }: { agentId: string; ownerWallet: string; walletAddress?: string | null }) {
-  const { address, isConnected } = useAccount()
-  const { signMessageAsync } = useSignMessage()
+  const { address, isConnected, signer } = useWallet()
   const [open, setOpen] = useState(false)
   const [category, setCategory] = useState<ReportCategory>('fake_results')
   const [reason, setReason] = useState('')
@@ -20,15 +20,15 @@ export function ReportAgent({ agentId, ownerWallet, walletAddress }: { agentId: 
   const [done, setDone] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const own = !!address && [ownerWallet, walletAddress].some((w) => w?.toLowerCase() === address.toLowerCase())
+  const own = !!address && [ownerWallet, walletAddress].some((w) => !!w && sameWallet(w, address))
   if (own) return null
 
   async function submit() {
-    if (!address) return
+    if (!address || !signer) return
     setBusy(true)
     setError(null)
     try {
-      const r = await reportAgent({ address, signMessageAsync }, { agentId, category, reason: reason.trim() })
+      const r = await reportAgent(signer, { agentId, category, reason: reason.trim() })
       setDone(r.hadOrder ? 'Reported. You hired this seller, so the council sees your report first.' : 'Reported. The arbiter council will review it.')
       setOpen(false)
     } catch (err) {

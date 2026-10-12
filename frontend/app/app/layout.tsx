@@ -8,7 +8,10 @@ import { AppSidebar } from '@/components/app/AppSidebar'
 import { AppTopbar } from '@/components/app/AppTopbar'
 import { DemoModeBanner } from '@/components/app/DemoModeBanner'
 import { FaucetStrip } from '@/components/app/FaucetStrip'
+import { SolanaFundingStrip } from '@/components/app/SolanaFunding'
 import { SessionSync } from '@/components/app/SessionGate'
+import { SolanaWalletProvider } from '@/lib/solana/wallet'
+import { FAMILY, SOLANA_OFFERED } from '@/lib/web3/network'
 
 const noSubscription = () => () => {}
 
@@ -21,20 +24,24 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const mounted = useSyncExternalStore(noSubscription, () => true, () => false)
   if (!mounted) return <div className="min-h-screen bg-[#08090D]" />
 
+  const shell = (
+    <>
+      <SessionSync />
+      <div className="min-h-screen bg-[#08090D] text-[#F5F5F7]">
+        <AppSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <div className="lg:pl-[248px]">
+          <AppTopbar onMenuClick={() => setSidebarOpen(true)} />
+          <DemoModeBanner />
+          {FAMILY === 'solana' ? <SolanaFundingStrip /> : <FaucetStrip />}
+          <main className="mx-auto max-w-[1400px] px-4 py-6 md:px-7 md:py-8">{children}</main>
+        </div>
+      </div>
+    </>
+  )
+
   return (
     <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>
-        <SessionSync />
-        <div className="min-h-screen bg-[#08090D] text-[#F5F5F7]">
-          <AppSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-          <div className="lg:pl-[248px]">
-            <AppTopbar onMenuClick={() => setSidebarOpen(true)} />
-            <DemoModeBanner />
-            <FaucetStrip />
-            <main className="mx-auto max-w-[1400px] px-4 py-6 md:px-7 md:py-8">{children}</main>
-          </div>
-        </div>
-      </QueryClientProvider>
+      <QueryClientProvider client={queryClient}>{SOLANA_OFFERED ? <SolanaWalletProvider>{shell}</SolanaWalletProvider> : shell}</QueryClientProvider>
     </WagmiProvider>
   )
 }

@@ -3,9 +3,10 @@ import { usePathname } from 'next/navigation'
 import { formatUnits } from 'viem'
 import { useAccount, useConnect, useDisconnect, useSwitchChain } from 'wagmi'
 import { appChain } from '@/lib/web3/chain'
-import { AVAILABLE_NETWORKS, NETWORK, NETWORK_LABEL, TOKEN_SYMBOL, selectNetwork, type NetworkName } from '@/lib/web3/network'
+import { AVAILABLE_NETWORKS, FAMILY, NETWORK, NETWORK_LABEL, TOKEN_SYMBOL, selectNetwork, type NetworkName } from '@/lib/web3/network'
 import { useUsdtBalance, useUsdtDecimals } from '@/lib/web3/hooks'
 import { MenuIcon, WalletIcon } from './icons'
+import { SolanaWalletControl } from './SolanaWalletControl'
 
 const TITLES: Record<string, string> = {
   '/app/dashboard': 'Dashboard',
@@ -32,7 +33,7 @@ function truncateAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`
 }
 
-function WalletControl() {
+function EvmWalletControl() {
   const { address, isConnected, chainId } = useAccount()
   const { connect, connectors, isPending: isConnecting } = useConnect()
   const { disconnect } = useDisconnect()
@@ -91,6 +92,9 @@ function WalletControl() {
     </>
   )
 }
+
+/** The wallet control of the selected network's family (fixed for a page load). */
+const WalletControl = FAMILY === 'solana' ? SolanaWalletControl : EvmWalletControl
 
 /**
  * The network badge — a picker when the app offers several networks. Picking one reloads

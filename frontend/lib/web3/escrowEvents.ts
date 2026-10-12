@@ -13,9 +13,7 @@ export const AGENT_ECO_DEPLOY_BLOCK = DEPLOY_BLOCK
 // 50,000 blocks), so every scan walks the chain in chunks. See ./network.ts.
 const LOG_CHUNK = LOG_RANGE
 
-export function explorerTxUrl(hash: string): string {
-  return `${appChain.blockExplorers.default.url}/tx/${hash}`
-}
+export { explorerTxUrl } from './network'
 
 type PublicClient = NonNullable<ReturnType<typeof usePublicClient>>
 

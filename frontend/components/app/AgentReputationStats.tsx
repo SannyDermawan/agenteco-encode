@@ -1,6 +1,6 @@
 'use client'
 import { NeumorphicCard } from './NeumorphicCard'
-import { useReputation } from '@/lib/web3/hooks'
+import { useReputation } from '@/lib/chain/hooks'
 import { displayStars, onchainRawTooltip } from '@/lib/web3/reputation'
 import { useSellerRating } from '@/lib/useSellerRating'
 import { TOKEN_SYMBOL } from '@/lib/web3/network'

@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useAccount, useSignMessage } from 'wagmi'
+import { useWallet } from '@/lib/wallet/useWallet'
 import { SessionGate, useReadSession } from '@/components/app/SessionGate'
 import { NeumorphicCard } from '@/components/app/NeumorphicCard'
 import { AgentStatus } from '@/components/app/AgentStatus'
@@ -39,10 +39,9 @@ function TaskStatusBadge({ status }: { status: HostedTaskStatus }) {
 }
 
 export default function MyAgentsPage() {
-  const { address } = useAccount()
+  const { address, signer } = useWallet()
   // Buyer agents and private settings come back only with a read session.
   const { signedIn } = useReadSession()
-  const { signMessageAsync } = useSignMessage()
   const [agents, setAgents] = useState<ApiAgent[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -71,22 +70,22 @@ export default function MyAgentsPage() {
   }, [load])
 
   async function handleStatusChange(id: string, next: AgentStatusValue) {
-    if (!address) return
+    if (!address || !signer) return
     const isOnline = next === 'online'
     setAgents((prev) => prev.map((a) => (a.id === id ? { ...a, isOnline } : a)))
     try {
-      await updateAgent(id, { address, signMessageAsync }, { isOnline })
+      await updateAgent(id, signer, { isOnline })
     } catch {
       setAgents((prev) => prev.map((a) => (a.id === id ? { ...a, isOnline: !isOnline } : a)))
     }
   }
 
   async function handleDelete(id: string) {
-    if (!address) return
+    if (!address || !signer) return
     setDeletingId(id)
     setDeleteErrors((prev) => ({ ...prev, [id]: '' }))
     try {
-      await deleteAgent(id, { address, signMessageAsync })
+      await deleteAgent(id, signer)
       setAgents((prev) => prev.filter((a) => a.id !== id))
       setConfirmingDeleteId(null)
     } catch (err) {

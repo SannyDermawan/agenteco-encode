@@ -1,10 +1,11 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useAccount } from 'wagmi'
+import { sameWallet } from '@shared/wallets'
+import { useWallet } from '@/lib/wallet/useWallet'
 import { NeumorphicCard } from './NeumorphicCard'
 import { getEscrowRating, reportRating } from '@/lib/api/judging'
-import { useEscrowDisputeInfo, useRateSeller } from '@/lib/web3/hooks'
+import { useEscrowDisputeInfo, useRateSeller } from '@/lib/chain/hooks'
 import { explorerTxUrl } from '@/lib/web3/escrowEvents'
 
 // AgentEco.sol OrderStatus: final states
@@ -50,7 +51,7 @@ export function RateSellerCard({
   buyer: string
   deliveredAt: bigint
 }) {
-  const { address } = useAccount()
+  const { address } = useWallet()
   const queryClient = useQueryClient()
   const final = status === SETTLED || status === REFUNDED
   const eligible = final && deliveredAt > BigInt(0)
@@ -81,7 +82,7 @@ export function RateSellerCard({
   }, [rate.isSuccess, rate.hash])
 
   if (!eligible) return null
-  const isBuyer = !!address && address.toLowerCase() === buyer.toLowerCase()
+  const isBuyer = !!address && sameWallet(address, buyer)
   if (!rated && !isBuyer && !rating) return null
 
   const busy = rate.isPending || rate.isConfirming

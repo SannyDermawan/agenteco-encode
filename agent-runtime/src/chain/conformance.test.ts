@@ -205,6 +205,44 @@ describe('SolanaAdapter helpers (litesvm)', { skip: solanaUnavailable() ?? false
     assert.equal(await buyer.nativeBalance(newcomer.address), before - BigInt(5000))
     assert.equal(await buyer.sweepNative(newcomer.address), null, 'nothing left to sweep')
   })
+
+  test('the fee rate is readable: the platform\'s now, and the one an escrow was created with', async () => {
+    const chain = await startSolanaTestChain({ feeBps: FEE_BPS })
+    const config = {
+      chainId: SOLANA_DEVNET_CHAIN_ID,
+      programId: chain.programId,
+      mint: chain.mint,
+      tokenSymbol: 'USDC',
+      nativeSymbol: 'SOL',
+      explorerUrl: 'https://explorer.solana.com',
+      explorerName: 'Solana Explorer',
+      executionWindow: BigInt(EXECUTION_WINDOW),
+      reviewWindow: BigInt(REVIEW_WINDOW),
+      firstEscrowId: BigInt(1),
+    }
+    const buyer = new SolanaAdapter(config, chain.backend, chain.signers.buyer)
+    assert.equal(await buyer.platformFeeBps(), FEE_BPS)
+    await chain.mintTo(chain.signers.buyer.address, BigInt(2_000_000))
+    const escrowId = await buyer.createAndFundEscrow({ seller: chain.signers.seller.address, amount: '1', taskHash: `0x${'11'.repeat(32)}` })
+    assert.equal(await buyer.escrowFeeBps(escrowId), FEE_BPS)
+    await assert.rejects(buyer.escrowFeeBps(BigInt(999)), /999/)
+
+    // A seller that has never held the token has no token account: the escrow's own transaction creates it.
+    const fresh = await generateKeyPairSigner()
+    assert.equal(await chain.svm.getAccount(fresh.address).exists, false, 'precondition: no account at all yet')
+    await chain.mintTo(chain.signers.buyer.address, BigInt(1_000_000))
+    await buyer.createAndFundEscrow({ seller: fresh.address, amount: '1', taskHash: `0x${'33'.repeat(32)}` })
+    assert.equal((await buyer.ensureTokenAccount(fresh.address)).created, false, 'the seller got its token account in the funding transaction')
+
+    // The five raw counters, in AgentEco.sol's order, move with a settled job (volume is the escrow's amount).
+    const seller = new SolanaAdapter(config, chain.backend, chain.signers.seller)
+    assert.deepEqual(await buyer.reputationCounters(chain.signers.seller.address), [0n, 0n, 0n, 0n, 0n])
+    await seller.startExecution(escrowId)
+    await seller.markDelivered(escrowId, `0x${'22'.repeat(32)}`)
+    await buyer.acceptAndSettle(escrowId)
+    await buyer.rateSeller(escrowId, 80)
+    assert.deepEqual(await buyer.reputationCounters(chain.signers.seller.address), [1n, 0n, 1_000_000n, 80n, 1n])
+  })
 })
 
 describe('Solana chain ids and addresses', () => {

@@ -1,6 +1,6 @@
 'use client'
 import { formatUnits, parseUnits } from 'viem'
-import { useEscrowFee, usePlatformFee } from '@/lib/web3/hooks'
+import { useEscrowFee, usePlatformFee } from '@/lib/chain/hooks'
 import { TOKEN_SYMBOL } from '@/lib/web3/network'
 
 /** 250 → "2.5%". */

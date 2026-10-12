@@ -1,9 +1,12 @@
 import { address, createKeyPairSignerFromBytes, type TransactionSigner } from '@solana/kit'
 import { readFileSync } from 'node:fs'
 import { EXECUTION_WINDOW_SECONDS, REVIEW_WINDOW_SECONDS } from '../durations.ts'
-import { SOLANA_DEVNET_CHAIN_ID, SolanaAdapter, isSolanaChainId, type SolanaBackend, type SolanaChainConfig } from './solana.ts'
+import { SolanaAdapter, isSolanaChainId, type SolanaBackend, type SolanaChainConfig } from './solana.ts'
+import { SOLANA_PRESETS } from './solana-presets.ts'
 import { SolanaRpcBackend } from './solana-rpc.ts'
 import type { ChainId } from './types.ts'
+
+export { SOLANA_PRESETS }
 
 /**
  * The Solana chains a process can talk to. Like the EVM registry (./registry.ts) a chain with a
@@ -17,37 +20,6 @@ import type { ChainId } from './types.ts'
  * Entries are built on first use (resetSolanaRegistry() in tests). Tests and embedders can register a
  * chain with its own backend (registerSolanaChain), e.g. the in-process litesvm one.
  */
-
-interface SolanaPreset {
-  name: string
-  aliases: string[]
-  chainId: ChainId
-  rpcUrl: string
-  tokenSymbol: string
-  defaultMint: string
-  nativeSymbol: string
-  explorerUrl: string
-  explorerName: string
-  explorerQuery: string
-  testnet: boolean
-}
-
-export const SOLANA_PRESETS: Record<string, SolanaPreset> = {
-  'solana-devnet': {
-    name: 'Solana Devnet',
-    aliases: ['solana', 'devnet-solana'],
-    chainId: SOLANA_DEVNET_CHAIN_ID,
-    rpcUrl: 'https://api.devnet.solana.com',
-    tokenSymbol: 'USDC',
-    // Circle's devnet USDC: an SPL Token mint with 6 decimals (checked on devnet, 11 Oct 2026).
-    defaultMint: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU',
-    nativeSymbol: 'SOL',
-    explorerUrl: 'https://explorer.solana.com',
-    explorerName: 'Solana Explorer',
-    explorerQuery: '?cluster=devnet',
-    testnet: true,
-  },
-}
 
 /** `solana-devnet`, `solana:EtWT…` — anything that names a Solana chain, known or not. */
 export function isSolanaChainRef(input: string | number): boolean {

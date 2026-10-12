@@ -2,7 +2,8 @@ import { existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Hex } from 'viem'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
-import { generateSolanaSecretKey, secretKeyFromBase58, secretKeyToBase58, solanaAddressOfSecretKey } from '../../agent-runtime/src/chain/solana.ts'
+import { secretKeyFromBase58, secretKeyToBase58, solanaAddressOfSecretKey } from '../../agent-runtime/src/chain/solana.ts'
+import { generateSolanaSecretKey } from '../../agent-runtime/src/chain/solana-keys.ts'
 import { ensureDir, isReadableByOthers, readJson, restrictToUser } from './home.ts'
 
 /**

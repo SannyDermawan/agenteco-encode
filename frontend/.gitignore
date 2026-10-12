@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# the browser end-to-end test builds here (see next.config.ts)
+/.next-e2e/

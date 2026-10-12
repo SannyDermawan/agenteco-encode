@@ -1,4 +1,5 @@
 import { isAddress, type Address } from 'viem'
+import { SOLANA_PRESETS, type SolanaPreset } from '@runtime/chain/solana-presets.ts'
 
 /**
  * Which networks the app serves, which one this browser is on, and which AgentEco
@@ -17,13 +18,25 @@ import { isAddress, type Address } from 'viem'
  *   The /app pages render in the browser only (see app/app/layout.tsx), so they never
  *   disagree with a server render; the landing page uses ./landingNetwork.ts instead.
  *
+ * Solana is offered the same way (`solana-devnet`, or its CAIP-2 id, in NEXT_PUBLIC_CHAINS) and is the one
+ * network of a different family: its settings are NEXT_PUBLIC_AGENT_ECO_PROGRAM__solana_<id> (required),
+ * NEXT_PUBLIC_TOKEN_MINT__…, NEXT_PUBLIC_RPC_URL__… and NEXT_PUBLIC_FIRST_ESCROW_ID__…. While a Solana network
+ * is selected the EVM exports below (contracts, RPC, wagmi's chain) stay those of the primary EVM network and
+ * are simply unused; every export that describes "the selected network" (CHAIN_KEY, TOKEN_SYMBOL, the
+ * explorer, FAMILY) is the Solana one.
+ *
  * A build that offers a network without a deployment fails loudly instead of silently
  * pointing users at another chain's contracts. NEXT_PUBLIC_* values are inlined at build
  * time, so each must be read with a literal `process.env.NEXT_PUBLIC_…` — and changing one
  * needs a redeploy.
  */
 
-export type NetworkName = 'bsc-testnet' | 'bot-testnet' | 'bot-mainnet' | 'base-sepolia'
+export type EvmNetworkName = 'bsc-testnet' | 'bot-testnet' | 'bot-mainnet' | 'base-sepolia'
+export type SolanaNetworkName = 'solana-devnet'
+export type NetworkName = EvmNetworkName | SolanaNetworkName
+
+/** Which kind of chain a network is: it decides the wallet, the signing and the way the chain is read. */
+export type NetworkFamily = 'evm' | 'solana'
 
 export interface FaucetLink {
   label: string
@@ -69,7 +82,7 @@ interface NetworkPreset {
 }
 
 // Each preset verified against its RPC's eth_chainId; faucet URLs checked live.
-const PRESETS: Record<NetworkName, NetworkPreset> = {
+const PRESETS: Record<EvmNetworkName, NetworkPreset> = {
   'bsc-testnet': {
     chainId: 97,
     name: 'BSC Testnet',
@@ -173,31 +186,46 @@ const PRESETS: Record<NetworkName, NetworkPreset> = {
 }
 
 // Names from before the BSC Testnet deployment.
-const ALIASES: Record<string, NetworkName> = { testnet: 'bot-testnet', mainnet: 'bot-mainnet' }
+const ALIASES: Record<string, EvmNetworkName> = { testnet: 'bot-testnet', mainnet: 'bot-mainnet' }
 
 function clean(value: string | undefined): string | undefined {
   const trimmed = value?.trim()
   return trimmed ? trimmed : undefined
 }
 
-/** A network name for a name, an alias, a CAIP-2 id or an EVM chain id; null when unknown. */
-function toNetworkName(raw: string): NetworkName | null {
+/** An EVM network name for a name, an alias, a CAIP-2 id or an EVM chain id; null when it is not an EVM network. */
+function toEvmNetworkName(raw: string): EvmNetworkName | null {
   const value = raw.trim().toLowerCase()
   const name = ALIASES[value] ?? value
-  if (name in PRESETS) return name as NetworkName
+  if (name in PRESETS) return name as EvmNetworkName
   const id = value.startsWith('eip155:') ? value.slice('eip155:'.length) : value
-  return (Object.keys(PRESETS) as NetworkName[]).find((n) => String(PRESETS[n].chainId) === id) ?? null
+  return (Object.keys(PRESETS) as EvmNetworkName[]).find((n) => String(PRESETS[n].chainId) === id) ?? null
 }
 
-function readNetwork(raw: string | undefined): NetworkName {
+/** A Solana network name for a preset's name, alias or CAIP-2 id (case-sensitive base58 in the id); null when unknown. */
+function toSolanaNetworkName(raw: string): SolanaNetworkName | null {
+  const value = raw.trim()
+  const lower = value.toLowerCase()
+  for (const [name, preset] of Object.entries(SOLANA_PRESETS)) {
+    if (lower === name || preset.aliases.includes(lower) || value === preset.chainId) return name as SolanaNetworkName
+  }
+  return null
+}
+
+/** A network name for a name, an alias, a CAIP-2 id or an EVM chain id; null when unknown. */
+function toNetworkName(raw: string): NetworkName | null {
+  return toEvmNetworkName(raw) ?? toSolanaNetworkName(raw)
+}
+
+function readNetwork(raw: string | undefined): EvmNetworkName {
   const value = clean(raw) ?? 'bsc-testnet'
-  const name = toNetworkName(value)
+  const name = toEvmNetworkName(value)
   if (!name) throw new Error(`NEXT_PUBLIC_NETWORK must be one of ${Object.keys(PRESETS).join(', ')}, got: ${value}`)
   return name
 }
 
-/** The primary network: the unsuffixed NEXT_PUBLIC_* deployment settings are its. */
-export const PRIMARY_NETWORK: NetworkName = readNetwork(process.env.NEXT_PUBLIC_NETWORK)
+/** The primary network (always an EVM one): the unsuffixed NEXT_PUBLIC_* deployment settings are its. */
+export const PRIMARY_NETWORK: EvmNetworkName = readNetwork(process.env.NEXT_PUBLIC_NETWORK)
 
 interface DeploymentEnv {
   rpcUrl?: string
@@ -218,7 +246,7 @@ const PRIMARY_ENV: DeploymentEnv = {
 }
 
 // Every other network's settings, suffixed with its CAIP-2 id — read literally (build-time inlining).
-const SUFFIXED_ENV: Record<NetworkName, DeploymentEnv> = {
+const SUFFIXED_ENV: Record<EvmNetworkName, DeploymentEnv> = {
   'bsc-testnet': {
     rpcUrl: process.env.NEXT_PUBLIC_RPC_URL__eip155_97,
     rpcFallbacks: process.env.NEXT_PUBLIC_RPC_FALLBACK_URLS__eip155_97,
@@ -263,7 +291,8 @@ function readNumber(name: string, raw: string | undefined, fallback: number): nu
 
 /** Everything the app needs to know about one network and its AgentEco deployment. */
 export interface NetworkConfig {
-  name: NetworkName
+  family: 'evm'
+  name: EvmNetworkName
   /** CAIP-2 id, as the API names chains (`?chain=`). */
   chainKey: string
   chainId: number
@@ -287,9 +316,14 @@ export interface NetworkConfig {
   deployBlock: bigint
   firstEscrowId: bigint
   legacyDeployments: { address: Address; firstEscrowId: bigint; endEscrowId: bigint }[]
+  /** The AgentEco contract (the Solana program, on Solana) and the link to an address on this network's explorer. */
+  contractAddress: string
+  explorerAddressUrl(address: string): string
+  /** Link to a transaction (hash) on the explorer. */
+  explorerTxUrl(hash: string): string
 }
 
-export function networkConfig(name: NetworkName): NetworkConfig {
+export function networkConfig(name: EvmNetworkName): NetworkConfig {
   const preset = PRESETS[name]
   const env = name === PRIMARY_NETWORK ? PRIMARY_ENV : SUFFIXED_ENV[name]
   const chainKey = `eip155:${preset.chainId}`
@@ -327,6 +361,7 @@ export function networkConfig(name: NetworkName): NetworkConfig {
   const firstEscrowId = ownDeployment ? BigInt(1) : (preset.deployment?.firstEscrowId ?? BigInt(1))
 
   return {
+    family: 'evm',
     name,
     chainKey,
     chainId: preset.chainId,
@@ -354,11 +389,110 @@ export function networkConfig(name: NetworkName): NetworkConfig {
       firstEscrowId: d.firstEscrowId,
       endEscrowId: legacyList[i + 1]?.firstEscrowId ?? firstEscrowId,
     })),
+    contractAddress: address('AGENT_ECO_ADDRESS', env.agentEco, preset.deployment?.agentEcoAddress),
+    explorerAddressUrl: (a) => `${preset.explorerUrl}/address/${a}`,
+    explorerTxUrl: (h) => `${preset.explorerUrl}/tx/${h}`,
+  }
+}
+
+/** A Solana network and its AgentEco escrow program. */
+export interface SolanaNetworkConfig {
+  family: 'solana'
+  name: SolanaNetworkName
+  /** CAIP-2 id, as the API names chains (`?chain=`). */
+  chainKey: string
+  /** The chain identifier wallets use (wallet-standard), e.g. `solana:devnet`. */
+  walletChain: string
+  chainName: string
+  label: string
+  isTestnet: boolean
+  rpcUrl: string
+  rpcUrls: string[]
+  explorerUrl: string
+  explorerName: string
+  /** Appended to explorer links (`?cluster=devnet`). */
+  explorerQuery: string
+  nativeSymbol: string
+  tokenSymbol: string
+  tokenHasFaucet: false
+  gasFaucets: FaucetLink[]
+  /** The escrow program (the "contract"). */
+  programId: string
+  /** The settlement token's mint. */
+  mint: string
+  firstEscrowId: bigint
+  contractAddress: string
+  explorerAddressUrl(address: string): string
+  /** Link to a transaction (its signature) on the explorer. */
+  explorerTxUrl(hash: string): string
+}
+
+export type AnyNetworkConfig = NetworkConfig | SolanaNetworkConfig
+
+// Read literally — Next inlines NEXT_PUBLIC_* at build time. The suffix is the CAIP-2 id, the colon as an underscore.
+const SOLANA_ENV: Record<SolanaNetworkName, DeploymentEnv & { program?: string; mint?: string; firstEscrowId?: string }> = {
+  'solana-devnet': {
+    rpcUrl: process.env.NEXT_PUBLIC_RPC_URL__solana_EtWTRABZaYq6iMfeYKouRu166VU2xqa1,
+    rpcFallbacks: process.env.NEXT_PUBLIC_RPC_FALLBACK_URLS__solana_EtWTRABZaYq6iMfeYKouRu166VU2xqa1,
+    program: process.env.NEXT_PUBLIC_AGENT_ECO_PROGRAM__solana_EtWTRABZaYq6iMfeYKouRu166VU2xqa1,
+    mint: process.env.NEXT_PUBLIC_TOKEN_MINT__solana_EtWTRABZaYq6iMfeYKouRu166VU2xqa1,
+    firstEscrowId: process.env.NEXT_PUBLIC_FIRST_ESCROW_ID__solana_EtWTRABZaYq6iMfeYKouRu166VU2xqa1,
+  },
+}
+
+const WALLET_CHAIN: Record<SolanaNetworkName, string> = { 'solana-devnet': 'solana:devnet' }
+const SOLANA_FAUCETS: Record<SolanaNetworkName, FaucetLink[]> = {
+  'solana-devnet': [
+    { label: 'Solana faucet (devnet SOL)', url: 'https://faucet.solana.com' },
+    { label: 'Circle faucet (devnet USDC — choose Solana Devnet)', url: 'https://faucet.circle.com' },
+  ],
+}
+const SOLANA_ADDRESS = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
+
+export function solanaNetworkConfig(name: SolanaNetworkName): SolanaNetworkConfig {
+  const preset: SolanaPreset = SOLANA_PRESETS[name]
+  const env = SOLANA_ENV[name]
+  const suffix = `__${preset.chainId.replace(':', '_')}`
+  const base58 = (setting: string, raw: string | undefined, fallback?: string): string => {
+    const value = clean(raw) ?? fallback
+    if (!value) throw new Error(`NEXT_PUBLIC_${setting}${suffix} must be set to offer ${preset.name} — there is no default deployment for it.`)
+    if (!SOLANA_ADDRESS.test(value)) throw new Error(`NEXT_PUBLIC_${setting}${suffix} is not a valid Solana address: ${value}`)
+    return value
+  }
+  const first = clean(env.firstEscrowId) ?? '1'
+  if (!/^\d+$/.test(first) || BigInt(first) < BigInt(1)) throw new Error(`NEXT_PUBLIC_FIRST_ESCROW_ID${suffix} must be a positive integer, got: ${first}`)
+  const rpcUrl = clean(env.rpcUrl) ?? preset.rpcUrl
+  const fallbacks = clean(env.rpcFallbacks)
+  const rpcUrls = [rpcUrl, ...(fallbacks?.toLowerCase() === 'none' ? [] : (fallbacks?.split(',').map((u) => u.trim()).filter(Boolean) ?? []))].filter((u, i, all) => all.indexOf(u) === i)
+  const programId = base58('AGENT_ECO_PROGRAM', env.program)
+  return {
+    family: 'solana',
+    name,
+    chainKey: preset.chainId,
+    walletChain: WALLET_CHAIN[name],
+    chainName: preset.name,
+    label: preset.name,
+    isTestnet: preset.testnet,
+    rpcUrl,
+    rpcUrls,
+    explorerUrl: preset.explorerUrl,
+    explorerName: preset.explorerName,
+    explorerQuery: preset.explorerQuery,
+    nativeSymbol: preset.nativeSymbol,
+    tokenSymbol: preset.tokenSymbol,
+    tokenHasFaucet: false,
+    gasFaucets: SOLANA_FAUCETS[name],
+    programId,
+    mint: base58('TOKEN_MINT', env.mint, preset.defaultMint),
+    firstEscrowId: BigInt(first),
+    contractAddress: programId,
+    explorerAddressUrl: (a) => `${preset.explorerUrl}/address/${a}${preset.explorerQuery}`,
+    explorerTxUrl: (h) => `${preset.explorerUrl}/tx/${h}${preset.explorerQuery}`,
   }
 }
 
 /** The networks this build offers, the default first (NEXT_PUBLIC_CHAINS; unset = the primary alone). */
-export const AVAILABLE_NETWORKS: NetworkConfig[] = (() => {
+export const AVAILABLE_NETWORKS: AnyNetworkConfig[] = (() => {
   const raw = clean(process.env.NEXT_PUBLIC_CHAINS)
   const names: NetworkName[] = []
   for (const item of raw ? raw.split(',').map((s) => s.trim()).filter(Boolean) : [PRIMARY_NETWORK]) {
@@ -367,7 +501,7 @@ export const AVAILABLE_NETWORKS: NetworkConfig[] = (() => {
     if (!names.includes(name)) names.push(name)
   }
   // Every offered network must be fully configured: the build fails here otherwise.
-  return names.map(networkConfig)
+  return names.map((name): AnyNetworkConfig => (name in SOLANA_PRESETS ? solanaNetworkConfig(name as SolanaNetworkName) : networkConfig(name as EvmNetworkName)))
 })()
 
 /** The network a visitor starts on. */
@@ -400,18 +534,55 @@ export function selectNetwork(name: NetworkName): void {
 }
 
 export const NETWORK: NetworkName = selectedNetwork()
-const active = AVAILABLE_NETWORKS.find((n) => n.name === NETWORK)!
+/** The selected network, of whichever family. */
+const selected = AVAILABLE_NETWORKS.find((n) => n.name === NETWORK)!
+/** Which kind of chain the selected network is. */
+export const FAMILY: NetworkFamily = selected.family
+/** Whether this build offers a Solana network at all (the Solana wallet provider is only mounted then). */
+export const SOLANA_OFFERED: boolean = AVAILABLE_NETWORKS.some((n) => n.family === 'solana')
+/** The Solana network when one is selected, else null. */
+export const SOLANA: SolanaNetworkConfig | null = selected.family === 'solana' ? selected : null
+/**
+ * The EVM network the EVM exports below describe: the selected one, or — while a Solana network is
+ * selected — the first EVM network offered (else the primary one). Nothing EVM runs on Solana, so
+ * this only keeps those modules loading.
+ */
+const active: NetworkConfig =
+  selected.family === 'evm' ? selected : ((AVAILABLE_NETWORKS.find((n) => n.family === 'evm') as NetworkConfig | undefined) ?? networkConfig(PRIMARY_NETWORK))
+/** The EVM network behind the EVM exports (wagmi's chain is built from it). */
+export const EVM_NETWORK = active
+
+// --- The selected network, of either family ---
 
 /** The selected network's CAIP-2 id — every API call names it (lib/api/base.ts). */
-export const CHAIN_KEY = active.chainKey
+export const CHAIN_KEY = selected.chainKey
+export const CHAIN_NAME = selected.chainName
+export const NETWORK_LABEL = selected.label
+export const IS_TESTNET = selected.isTestnet
+export const EXPLORER_URL = selected.explorerUrl
+export const EXPLORER_NAME = selected.explorerName
+export const NATIVE_SYMBOL = selected.nativeSymbol
+export const TOKEN_SYMBOL = selected.tokenSymbol
+export const TOKEN_HAS_FAUCET = selected.tokenHasFaucet
+export const GAS_FAUCETS = selected.gasFaucets
+/** The escrow contract (EVM) or program (Solana) of the selected network. */
+export const CONTRACT_ADDRESS = selected.contractAddress
+
+export function explorerAddressUrl(address: string): string {
+  return selected.explorerAddressUrl(address)
+}
+
+/** A transaction (EVM hash or Solana signature) on the selected network's explorer. */
+export function explorerTxUrl(hash: string): string {
+  return selected.explorerTxUrl(hash)
+}
+
+// --- The EVM network (see `active`) ---
+
 export const CHAIN_ID = active.chainId
-export const CHAIN_NAME = active.chainName
-export const NETWORK_LABEL = active.label
-export const IS_TESTNET = active.isTestnet
 export const RPC_URL = active.rpcUrl
 /** RPC_URL, then fallbacks (NEXT_PUBLIC_RPC_FALLBACK_URLS, comma-separated, or "none"). */
 export const RPC_URLS: string[] = active.rpcUrls
-export const EXPLORER_URL = active.explorerUrl
 /** Block span per eth_getLogs call for this network's RPC. */
 export const LOG_RANGE = active.logRange
 export const MULTICALL3 = active.multicall3
@@ -421,11 +592,6 @@ export const MULTICALL3 = active.multicall3
  * never reach further back; escrow discovery reads contract state instead.
  */
 export const LOG_HISTORY_BLOCKS = active.logHistory
-export const EXPLORER_NAME = active.explorerName
-export const NATIVE_SYMBOL = active.nativeSymbol
-export const TOKEN_SYMBOL = active.tokenSymbol
-export const TOKEN_HAS_FAUCET = active.tokenHasFaucet
-export const GAS_FAUCETS = active.gasFaucets
 
 /** Native gas sent to a hosted agent's wallet at activation (NEXT_PUBLIC_AGENT_GAS_TOPUP overrides). */
 export const AGENT_GAS_TOPUP = active.agentGasTopup
@@ -456,8 +622,4 @@ export function agentEcoFor(escrowId: bigint): Address {
 /** Whether this escrow pays the platform fee: only the current deployment (v3) has one. */
 export function hasPlatformFee(escrowId: bigint): boolean {
   return agentEcoFor(escrowId) === AGENT_ECO_ADDRESS
-}
-
-export function explorerAddressUrl(address: string): string {
-  return `${EXPLORER_URL}/address/${address}`
 }

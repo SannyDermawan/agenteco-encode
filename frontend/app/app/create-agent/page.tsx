@@ -12,8 +12,10 @@ import { EMPTY_BRIEF_DRAFT, TaskBriefForm, briefFromDraft, type BriefDraft } fro
 import { CAPABILITY_TEMPLATES } from '@/lib/capabilityTemplates'
 import { TOKEN_SYMBOL } from '@/lib/web3/network'
 import { LIMITS, type CapabilityId } from '@shared/capabilities/definitions'
+import { FAMILY } from '@/lib/web3/network'
+import { UnsupportedOnSolana } from '@/components/app/solana/UnsupportedOnSolana'
 
-export default function CreateAgentPage() {
+function CreateAgentPageEvm() {
   const { address, isConnected } = useAccount()
   const { signMessageAsync } = useSignMessage()
   const [role, setRole] = useState<'buyer' | 'seller'>('seller')
@@ -307,4 +309,8 @@ export default function CreateAgentPage() {
       </div>
     </PageFade>
   )
+}
+
+export default function CreateAgentPage() {
+  return FAMILY === 'solana' ? <UnsupportedOnSolana title="Create Agent — Demo" why="Demo agents are hosted by AgentEco with a key it keeps for them, and hosted agents run on the EVM networks only." instead={{ href: '/app/register-agent', label: 'Register your own agent' }} /> : <CreateAgentPageEvm />
 }

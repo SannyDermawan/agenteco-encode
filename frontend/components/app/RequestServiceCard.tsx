@@ -1,19 +1,18 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAccount, useSignMessage } from 'wagmi'
+import { useWallet } from '@/lib/wallet/useWallet'
 import { NeumorphicCard } from './NeumorphicCard'
-import { appChain } from '@/lib/web3/chain'
 import { EXECUTION_WINDOW_SECONDS, REVIEW_WINDOW_SECONDS, formatDuration } from '@/lib/web3/constants'
-import { useUsdtDecimals } from '@/lib/web3/hooks'
+import { useTokenDecimals } from '@/lib/chain/hooks'
 import { InsufficientTokenError } from '@/lib/web3/usdtBalance'
-import { HIRE_STEP_LABEL, hireWithTask, type HireStep } from '@/lib/web3/hireWithTask'
+import { HIRE_STEP_LABEL, hireWithTask, type HireStep } from '@/lib/chain/hire'
 import { GetTestTokensCard } from './GetTestTokensCard'
 import { EMPTY_BRIEF_DRAFT, TaskBriefForm, briefFromDraft, isBriefReady, type BriefDraft } from './TaskBriefForm'
 import type { AgentSummary } from '@/lib/agenteco-data'
 import { getAgent } from '@/lib/api/agents'
 import { ArrowRightIcon } from './icons'
-import { TOKEN_SYMBOL } from '@/lib/web3/network'
+import { CHAIN_NAME, TOKEN_SYMBOL } from '@/lib/web3/network'
 import { isCapabilityId } from '@shared/capabilities/definitions'
 import { exampleFromSchema } from '@shared/capabilities/custom'
 import { useCapabilities } from '@/lib/api/capabilities'
@@ -32,9 +31,8 @@ function Spinner() {
 
 export function RequestServiceCard({ agent }: { agent: AgentSummary }) {
   const router = useRouter()
-  const { address, isConnected, chainId } = useAccount()
-  const { signMessageAsync } = useSignMessage()
-  const { data: decimals } = useUsdtDecimals()
+  const { address, isConnected, onSelectedNetwork, signer, txSigner } = useWallet()
+  const { data: decimals } = useTokenDecimals()
 
   const [step, setStep] = useState<Step>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -56,11 +54,11 @@ export function RequestServiceCard({ agent }: { agent: AgentSummary }) {
   // enforced here and in the registry, so an offline seller is never hired.
   const [isOfflineNow, setIsOfflineNow] = useState(false)
   const isOffline = agent.status === 'offline' || isOfflineNow
-  const onCorrectChain = chainId === appChain.id
+  const onCorrectChain = onSelectedNetwork
   const busy = step !== 'idle' && step !== 'done'
 
   async function handleRequestService() {
-    if (!seller || isOffline || !address || decimals === undefined || (!capability && !community)) return
+    if (!seller || isOffline || !address || !signer || decimals === undefined || (!capability && !community)) return
     setError(null)
     setNeedsTokens(false)
 
@@ -95,7 +93,8 @@ export function RequestServiceCard({ agent }: { agent: AgentSummary }) {
 
       // No negotiation on a direct hire: the price is the listing price (spec §8.2).
       const { escrowId } = await hireWithTask({
-        signer: { address, signMessageAsync },
+        signer,
+        txSigner,
         decimals,
         seller,
         price: agent.price.toString(),
@@ -189,7 +188,7 @@ export function RequestServiceCard({ agent }: { agent: AgentSummary }) {
             </p>
           ) : !onCorrectChain ? (
             <p className="mt-5 rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/10 px-3 py-2.5 text-[12.5px] text-[#F59E0B]">
-              Switch to {appChain.name} from the top bar to continue.
+              Switch to {CHAIN_NAME} from the top bar to continue.
             </p>
           ) : (
             <button

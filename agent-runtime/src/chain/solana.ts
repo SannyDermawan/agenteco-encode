@@ -7,7 +7,7 @@
  * the API/SDK suites use. Chains are configured in ./solana-registry.ts. Nothing has run on devnet
  * yet: the program is not deployed (docs/SOLANA.md §9).
  */
-import { createHash, createPrivateKey, createPublicKey, randomBytes } from 'node:crypto'
+import { sha256 } from '@noble/hashes/sha2'
 import {
   AccountRole,
   address,
@@ -57,8 +57,7 @@ export const SPL_TOKEN_PROGRAM_ID = address('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss
 const SYSTEM_PROGRAM_ID = address('11111111111111111111111111111111')
 const RENT_SYSVAR_ID = address('SysvarRent111111111111111111111111111111111')
 
-/** CAIP-2 id of Solana devnet: `solana:` + the first 32 base58 characters of its genesis hash. */
-export const SOLANA_DEVNET_CHAIN_ID = 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1'
+export { SOLANA_DEVNET_CHAIN_ID } from './solana-presets.ts'
 
 /** Whether `chainId` has the shape of a Solana CAIP-2 id (`solana:` + 32 base58 characters). */
 export function isSolanaChainId(chainId: string): boolean {
@@ -100,17 +99,6 @@ export async function buildSolanaAuthHeaders(signer: MessagePartialSigner): Prom
 export function solanaAddressOfSecretKey(secretKey: Uint8Array): Address {
   if (secretKey.length !== 64) throw new Error(`A Solana secret key is 64 bytes (seed + public key), got ${secretKey.length}.`)
   return getAddressDecoder().decode(secretKey.slice(32))
-}
-
-// The fixed front of an ed25519 private key in PKCS#8 DER; the 32-byte seed follows.
-const ED25519_PKCS8_PREFIX = Buffer.from('302e020100300506032b657004220420', 'hex')
-
-/** A new random Solana secret key (64 bytes: seed, then public key), from the system's secure random source. */
-export function generateSolanaSecretKey(): Uint8Array {
-  const seed = randomBytes(32)
-  const privateKey = createPrivateKey({ key: Buffer.concat([ED25519_PKCS8_PREFIX, seed]), format: 'der', type: 'pkcs8' })
-  const spki = createPublicKey(privateKey).export({ format: 'der', type: 'spki' })
-  return new Uint8Array(Buffer.concat([seed, spki.subarray(spki.length - 32)]))
 }
 
 /** A Solana secret key as the base58 text wallets export (and `parseSolanaSecretKey` reads). */
@@ -179,11 +167,11 @@ function enc(s: string): Uint8Array {
 }
 
 function sighash(name: string): Uint8Array {
-  return new Uint8Array(createHash('sha256').update(`global:${name}`).digest()).slice(0, 8)
+  return sha256(enc(`global:${name}`)).slice(0, 8)
 }
 
 function assertDiscriminator(data: Uint8Array, accountName: string): void {
-  const expected = createHash('sha256').update(`account:${accountName}`).digest().subarray(0, 8)
+  const expected = sha256(enc(`account:${accountName}`)).subarray(0, 8)
   if (!Buffer.from(data).subarray(0, 8).equals(expected)) throw new Error(`not a ${accountName} account of this program`)
 }
 
@@ -452,7 +440,7 @@ function programEvents(logs: string[], programId: Address): Uint8Array[] {
   return events
 }
 
-const SELLER_RATED = createHash('sha256').update('event:SellerRated').digest().subarray(0, 8)
+const SELLER_RATED = sha256(enc('event:SellerRated')).subarray(0, 8)
 
 /** The SellerRated events among `events`: escrow_id u64, seller, buyer, score u8 (after the 8-byte discriminator). */
 function ratingEvents(events: Uint8Array[], txHash: string): RatingEvent[] {
@@ -657,6 +645,18 @@ export class SolanaAdapter implements ChainAdapter {
     const reputation = await reputationPda(this.programId, seller)
     const configAddr = await configPda(this.programId)
     const buyerAta = await this.ataFor(buyer.address)
+    // The seller is paid into its token account at settlement and the program never creates one: when the
+    // seller has none yet, the same transaction creates it (the buyer pays its rent, once).
+    const sellerAta = await this.ataFor(seller)
+    const createSellerAta: IInstruction[] = (await this.backend.getAccount(sellerAta))
+      ? []
+      : [
+          {
+            programAddress: ATA_PROGRAM_ID,
+            accounts: [writableSigner(buyer), writable(sellerAta), readonly(seller), readonly(this.mint), readonly(SYSTEM_PROGRAM_ID), readonly(SPL_TOKEN_PROGRAM_ID)],
+            data: new Uint8Array([1]), // create_idempotent
+          },
+        ]
 
     const data = Buffer.concat([
       sighash('create_and_fund_escrow'),
@@ -682,7 +682,7 @@ export class SolanaAdapter implements ChainAdapter {
       ],
       data: new Uint8Array(data),
     }
-    await this.backend.send([ix], buyer)
+    await this.backend.send([...createSellerAta, ix], buyer)
     return id
   }
 
@@ -878,6 +878,16 @@ export class SolanaAdapter implements ChainAdapter {
     return (await this.decodedEscrow(id)).status
   }
 
+  /** The platform fee, in basis points, that escrows created now pay when they settle to the seller (read from the program's config). */
+  async platformFeeBps(): Promise<number> {
+    return (await this.decodedConfig()).feeBps
+  }
+
+  /** The fee, in basis points, this escrow was created with — fixed for its lifetime. */
+  async escrowFeeBps(id: EscrowId): Promise<number> {
+    return (await this.decodedEscrow(id)).feeBps
+  }
+
   async getResultHash(id: EscrowId): Promise<Hash32> {
     return (await this.decodedEscrow(id)).resultHash
   }
@@ -938,6 +948,17 @@ export class SolanaAdapter implements ChainAdapter {
 
   async listEscrows(opts?: { currentOnly?: boolean }): Promise<EscrowBasic[]> {
     return this.readEscrowBasics(await this.escrowIds(opts))
+  }
+
+  /**
+   * A seller's five on-chain counters in the order AgentEco.sol's getReputation() returns them — completed
+   * jobs, failed jobs, settled volume (token base units), rating sum, rating count — all zero before the first job.
+   */
+  async reputationCounters(seller: string): Promise<readonly [bigint, bigint, bigint, bigint, bigint]> {
+    const acc = await this.backend.getAccount(await reputationPda(this.programId, address(seller)))
+    if (!acc) return [0n, 0n, 0n, 0n, 0n]
+    const r = decodeReputation(acc.data)
+    return [r.completedJobs, r.failedJobs, r.totalVolumeSettled, r.ratingSum, r.ratingCount]
   }
 
   async getReputation(seller: string): Promise<OnchainReputation> {

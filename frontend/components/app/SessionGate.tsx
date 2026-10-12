@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { useAccount, useSignMessage } from 'wagmi'
+import { normalizeWallet } from '@shared/wallets'
+import { useWallet } from '@/lib/wallet/useWallet'
 import { NeumorphicCard } from '@/components/app/NeumorphicCard'
 import {
   hasReadSession,
@@ -23,8 +24,7 @@ const MAX_AUTO_PROMPTS = 2
  * for the gate's "Try again". Mounted once in the app layout.
  */
 export function SessionSync() {
-  const { address, status } = useAccount()
-  const { signMessageAsync } = useSignMessage()
+  const { address, isConnected, signer } = useWallet()
   const prompts = useRef(new Map<string, number>())
   const version = useSyncExternalStore(subscribeSession, sessionVersion, () => 0)
 
@@ -33,23 +33,23 @@ export function SessionSync() {
   }, [address])
 
   useEffect(() => {
-    if (status !== 'connected' || !address) return
+    if (!isConnected || !address || !signer) return
     if (hasReadSession(address) || isSigningIn() || lastSignInError()) return
-    const key = address.toLowerCase()
+    const key = normalizeWallet(address)
     const count = prompts.current.get(key) ?? 0
     if (count >= MAX_AUTO_PROMPTS) return
     prompts.current.set(key, count + 1)
-    signInForReads({ address, signMessageAsync }).catch(() => {
+    signInForReads(signer).catch(() => {
       // Rejected or closed: the gate shows why and offers to try again.
     })
-  }, [address, status, signMessageAsync, version])
+  }, [address, isConnected, signer, version])
 
   return null
 }
 
 /** Re-renders when the session, a sign-in prompt or the connected wallet changes. */
 export function useReadSession() {
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useWallet()
   useSyncExternalStore(subscribeSession, sessionVersion, () => 0)
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
@@ -80,13 +80,13 @@ function GateCard({ title, children }: { title: string; children: ReactNode }) {
  */
 export function SessionGate({ children, what = 'your orders' }: { children: ReactNode; what?: string }) {
   const { address, isConnected, signedIn, signing, error } = useReadSession()
-  const { signMessageAsync } = useSignMessage()
+  const { signer } = useWallet()
 
   if (!isConnected || !address) {
     return <GateCard title="Connect your wallet">Connect a wallet to see {what}. Orders are private to their buyer and seller.</GateCard>
   }
 
-  if (signedIn) return <div key={address.toLowerCase()}>{children}</div>
+  if (signedIn) return <div key={normalizeWallet(address)}>{children}</div>
 
   if (signing || !error) {
     return (
@@ -95,7 +95,7 @@ export function SessionGate({ children, what = 'your orders' }: { children: Reac
         {!signing && (
           <button
             type="button"
-            onClick={() => signInForReads({ address, signMessageAsync }).catch(() => {})}
+            onClick={() => signer && signInForReads(signer).catch(() => {})}
             className="mt-4 block w-full text-[12.5px] text-[#5B5FEF] hover:underline"
           >
             No prompt? Open it again
@@ -113,7 +113,7 @@ export function SessionGate({ children, what = 'your orders' }: { children: Reac
       </p>
       <button
         type="button"
-        onClick={() => signInForReads({ address, signMessageAsync }).catch(() => {})}
+        onClick={() => signer && signInForReads(signer).catch(() => {})}
         className="mt-5 rounded-xl bg-[#5B5FEF] px-5 py-2.5 text-[13.5px] font-medium text-white transition hover:bg-[#4B4FDF]"
       >
         Try again

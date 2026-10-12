@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useQueryClient } from '@tanstack/react-query'
-import { useAccount, useSignMessage } from 'wagmi'
+import { useWallet } from '@/lib/wallet/useWallet'
 import { NeumorphicCard } from '../NeumorphicCard'
 import { reportCategoryLabel, voteOnAppeal, voteOnReport, type AppealCase, type ModerationQueue as Queue, type ReportCase } from '@/lib/api/moderation'
 
@@ -63,8 +63,7 @@ function VoteButtons<V extends string>({
 }
 
 function ReportRow({ r, threshold, me, refresh }: { r: ReportCase; threshold: number; me: string; refresh: () => Promise<void> }) {
-  const { address } = useAccount()
-  const { signMessageAsync } = useSignMessage()
+  const { address, signer } = useWallet()
   const mine = r.votes.find((v) => v.voter === me)?.vote
   return (
     <NeumorphicCard className="space-y-3 p-5">
@@ -87,7 +86,7 @@ function ReportRow({ r, threshold, me, refresh }: { r: ReportCase; threshold: nu
         </span>
         <Tally votes={r.votes} threshold={threshold} choices={[['delist', 'Delist'], ['dismiss', 'Dismiss']]} />
       </div>
-      {r.status === 'open' && address && (
+      {r.status === 'open' && address && signer && (
         <VoteButtons
           mine={mine}
           options={[
@@ -95,7 +94,7 @@ function ReportRow({ r, threshold, me, refresh }: { r: ReportCase; threshold: nu
             { vote: 'dismiss', label: 'Dismiss the report', tone: 'plain' },
           ]}
           onVote={async (vote) => {
-            await voteOnReport({ address, signMessageAsync }, r.id, vote)
+            await voteOnReport(signer, r.id, vote)
             await refresh()
           }}
         />
@@ -105,8 +104,7 @@ function ReportRow({ r, threshold, me, refresh }: { r: ReportCase; threshold: nu
 }
 
 function AppealRow({ a, threshold, me, refresh }: { a: AppealCase; threshold: number; me: string; refresh: () => Promise<void> }) {
-  const { address } = useAccount()
-  const { signMessageAsync } = useSignMessage()
+  const { address, signer } = useWallet()
   const mine = a.votes.find((v) => v.voter === me)?.vote
   return (
     <NeumorphicCard className="space-y-3 p-5">
@@ -125,7 +123,7 @@ function AppealRow({ a, threshold, me, refresh }: { a: AppealCase; threshold: nu
         </span>
         <Tally votes={a.votes} threshold={threshold} choices={[['reinstate', 'Reinstate'], ['uphold', 'Uphold']]} />
       </div>
-      {a.status === 'open' && address && (
+      {a.status === 'open' && address && signer && (
         <VoteButtons
           mine={mine}
           options={[
@@ -133,7 +131,7 @@ function AppealRow({ a, threshold, me, refresh }: { a: AppealCase; threshold: nu
             { vote: 'uphold', label: 'Keep delisted', tone: 'plain' },
           ]}
           onVote={async (vote) => {
-            await voteOnAppeal({ address, signMessageAsync }, a.id, vote)
+            await voteOnAppeal(signer, a.id, vote)
             await refresh()
           }}
         />

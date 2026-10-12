@@ -9,7 +9,8 @@ import { appChain } from '@/lib/web3/chain'
 import { MOCK_USDT_ABI, USDT_ADDRESS } from '@/lib/web3/abi'
 import { useUsdtBalance, useUsdtDecimals } from '@/lib/web3/hooks'
 import { explorerTxUrl } from '@/lib/web3/escrowEvents'
-import { GAS_FAUCETS, MIN_NATIVE_BALANCE, NATIVE_SYMBOL, TOKEN_HAS_FAUCET, TOKEN_SYMBOL } from '@/lib/web3/network'
+import { FAMILY, GAS_FAUCETS, MIN_NATIVE_BALANCE, NATIVE_SYMBOL, TOKEN_HAS_FAUCET, TOKEN_SYMBOL } from '@/lib/web3/network'
+import { SolanaFundingCard } from './SolanaFunding'
 
 function formatCountdown(ms: number): string {
   const totalMinutes = Math.max(1, Math.ceil(ms / 60_000))
@@ -23,7 +24,7 @@ function formatCountdown(ms: number): string {
  * and mUSDT from MockUSDT.faucet() right here — 100 per wallet every 24h.
  * Renders nothing on networks whose token has no faucet (BOT Chain).
  */
-export function GetTestTokensCard({ reason }: { reason?: string }) {
+function EvmGetTestTokensCard({ reason }: { reason?: string }) {
   const { address, isConnected, chainId } = useAccount()
   const { switchChain, isPending: isSwitching } = useSwitchChain()
   const { writeContractAsync } = useWriteContract()
@@ -167,3 +168,6 @@ export function GetTestTokensCard({ reason }: { reason?: string }) {
     </NeumorphicCard>
   )
 }
+
+/** Test tokens for the selected network, of either family. */
+export const GetTestTokensCard = FAMILY === 'solana' ? SolanaFundingCard : EvmGetTestTokensCard

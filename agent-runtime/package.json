@@ -44,6 +44,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@noble/hashes": "^1.8.0",
     "@solana/kit": "^8.4.0",
     "viem": "^2.56.8",
     "zod": "^4.6.5"
