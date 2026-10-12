@@ -20,12 +20,18 @@ export function schemaSql(): string {
   const key = createHash('sha256').update(schema).digest('hex').slice(0, 16)
   const dir = join(tmpdir(), 'agenteco-test-schema')
   const file = join(dir, `${key}.sql`)
-  if (existsSync(file)) return readFileSync(file, 'utf8')
+  if (existsSync(file)) {
+    const cached = readFileSync(file, 'utf8')
+    if (cached.includes('CREATE TABLE')) return cached
+  }
+  // prisma.config.ts only declares a datasource when DIRECT_URL is set, and the schema engine then
+  // exits 0 with no output on a checkout without a .env; a diff from nothing never connects.
   const out = spawnSync(process.execPath, [join(BACKEND, 'node_modules', 'prisma', 'build', 'index.js'), 'migrate', 'diff', '--from-empty', '--to-schema', SCHEMA, '--script'], {
     cwd: BACKEND,
     encoding: 'utf8',
+    env: { ...process.env, DIRECT_URL: process.env.DIRECT_URL || 'postgresql://diff:diff@127.0.0.1:1/diff' },
   })
-  if (out.status !== 0) throw new Error(`prisma migrate diff failed: ${out.stderr}`)
+  if (out.status !== 0 || !out.stdout.includes('CREATE TABLE')) throw new Error(`prisma migrate diff failed (status ${out.status}): ${out.stderr}`)
   mkdirSync(dir, { recursive: true })
   writeFileSync(file, out.stdout)
   return out.stdout
