@@ -132,7 +132,7 @@ const PRESETS: Record<EvmNetworkName, NetworkPreset> = {
     usdtAddress: '0x75edC9335175Fc0552D51D48439F229c10420fe3',
     tokenSymbol: 'USDT',
     tokenHasFaucet: false,
-    gasFaucets: [],
+    gasFaucets: [{ label: 'BOT Chain faucet (test BOT and test USDT; asks a person to pass a robot check)', url: 'https://faucet.botchain.ai' }],
     // BOT Chain gas is ~20 gwei.
     agentGasTopup: '0.08',
     logHistory: null,

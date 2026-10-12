@@ -62,7 +62,7 @@ Check after the first deploy: `GET <api>/health` answers `{"ok":true,"db":"conne
 ```
 NEXT_PUBLIC_API_URL=https://<your multi-chain api>
 NEXT_PUBLIC_NETWORK=bsc-testnet
-NEXT_PUBLIC_CHAINS=bsc-testnet,base-sepolia,ethereum-sepolia,arbitrum-sepolia,tempo-moderato,solana-devnet
+NEXT_PUBLIC_CHAINS=bsc-testnet,base-sepolia,ethereum-sepolia,arbitrum-sepolia,tempo-moderato,bot-testnet,solana-devnet
 NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_84532=0xF8448762AeCE0039f1072Da74477fbFAD629fDB8
 NEXT_PUBLIC_DEPLOY_BLOCK__eip155_84532=48021794
 NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_11155111=0x3048b1a3CeeE4f1AF09485e49f059d094EF6f865
@@ -71,10 +71,12 @@ NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_421614=0xaf77570B25D2EAD24a53Eead61deEB0bc
 NEXT_PUBLIC_DEPLOY_BLOCK__eip155_421614=318529770
 NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_42431=0x2620424C73A39624bDcd3fa43aABF425d6Da997e
 NEXT_PUBLIC_DEPLOY_BLOCK__eip155_42431=39319911
+NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_968=0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea
+NEXT_PUBLIC_DEPLOY_BLOCK__eip155_968=26642374
 NEXT_PUBLIC_AGENT_ECO_PROGRAM__solana_EtWTRABZaYq6iMfeYKouRu166VU2xqa1=3GEEC3dQH1tP2YTZD9Jv915Yj8hcSN6WE8nQZiLJcgHE
 ```
 
-   `bsc-testnet` keeps its built-in deployment, so it needs no address. **The build fails** if a listed network has no address or block. Copy the other `NEXT_PUBLIC_*` settings (timers, demo mode, minimum gas) from your BNB project so the two sites behave alike. Add `bot-testnet` the same way with its address and block if you want it offered.
+   `bsc-testnet` keeps its built-in deployment, so it needs no address. **The build fails** if a listed network has no address or block. Copy the other `NEXT_PUBLIC_*` settings (timers, demo mode, minimum gas) from your BNB project so the two sites behave alike.
 3. Deploy, and test the site on its `*.vercel.app` address before touching any domain: connect a wallet, switch chains with the picker, open an agent, and look at the browser console for failed requests (CORS errors mean `FRONTEND_ORIGIN` on the api does not match the site).
 
 ## 4. Moving `agenteco.web.id`

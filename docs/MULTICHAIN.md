@@ -244,7 +244,7 @@ The deployments of this repository, as the settings a backend and a website need
 
 ```
 # backend
-CHAINS=bsc-testnet,base-sepolia,ethereum-sepolia,arbitrum-sepolia,tempo-moderato,solana-devnet
+CHAINS=bsc-testnet,base-sepolia,ethereum-sepolia,arbitrum-sepolia,tempo-moderato,bot-testnet,solana-devnet
 AGENT_ECO_ADDRESS__eip155_84532=0xF8448762AeCE0039f1072Da74477fbFAD629fDB8
 DEPLOYMENT_BLOCK__eip155_84532=48021794
 AGENT_ECO_ADDRESS__eip155_11155111=0x3048b1a3CeeE4f1AF09485e49f059d094EF6f865
@@ -253,12 +253,14 @@ AGENT_ECO_ADDRESS__eip155_421614=0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea
 DEPLOYMENT_BLOCK__eip155_421614=318529770
 AGENT_ECO_ADDRESS__eip155_42431=0x2620424C73A39624bDcd3fa43aABF425d6Da997e
 DEPLOYMENT_BLOCK__eip155_42431=39319911
+AGENT_ECO_ADDRESS__eip155_968=0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea
+DEPLOYMENT_BLOCK__eip155_968=26642374
 AGENT_ECO_PROGRAM__solana_EtWTRABZaYq6iMfeYKouRu166VU2xqa1=3GEEC3dQH1tP2YTZD9Jv915Yj8hcSN6WE8nQZiLJcgHE
 RPC_URL__eip155_84532=https://sepolia.base.org   # the load-balanced PublicNode lagged transactions on Base
 EVM_STALE_RETRIES=3                              # retries a revert caused by such a lagging node
 
 # website (build-time, NEXT_PUBLIC_ prefix, same values)
-NEXT_PUBLIC_CHAINS=bsc-testnet,base-sepolia,ethereum-sepolia,arbitrum-sepolia,tempo-moderato,solana-devnet
+NEXT_PUBLIC_CHAINS=bsc-testnet,base-sepolia,ethereum-sepolia,arbitrum-sepolia,tempo-moderato,bot-testnet,solana-devnet
 NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_84532=0xF8448762AeCE0039f1072Da74477fbFAD629fDB8
 NEXT_PUBLIC_DEPLOY_BLOCK__eip155_84532=48021794
 NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_11155111=0x3048b1a3CeeE4f1AF09485e49f059d094EF6f865
@@ -267,6 +269,8 @@ NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_421614=0xaf77570B25D2EAD24a53Eead61deEB0bc
 NEXT_PUBLIC_DEPLOY_BLOCK__eip155_421614=318529770
 NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_42431=0x2620424C73A39624bDcd3fa43aABF425d6Da997e
 NEXT_PUBLIC_DEPLOY_BLOCK__eip155_42431=39319911
+NEXT_PUBLIC_AGENT_ECO_ADDRESS__eip155_968=0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea
+NEXT_PUBLIC_DEPLOY_BLOCK__eip155_968=26642374
 NEXT_PUBLIC_AGENT_ECO_PROGRAM__solana_EtWTRABZaYq6iMfeYKouRu166VU2xqa1=3GEEC3dQH1tP2YTZD9Jv915Yj8hcSN6WE8nQZiLJcgHE
 ```
 

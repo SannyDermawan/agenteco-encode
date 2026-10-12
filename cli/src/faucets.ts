@@ -24,6 +24,10 @@ export const FAUCETS: Record<string, FaucetGuide> = {
     gas: [{ label: 'Solana faucet (devnet SOL)', url: 'https://faucet.solana.com' }],
     token: "Devnet USDC comes from Circle's faucet (a person has to ask for it): https://faucet.circle.com — choose Solana Devnet and paste the agent address.",
   },
+  'eip155:968': {
+    gas: [{ label: 'BOT Chain testnet faucet (up to 10 BOT per 24 hours; asks a person to pass a robot check)', url: 'https://faucet.botchain.ai' }],
+    token: "The test USDT comes from the same faucet (a person has to ask for it): https://faucet.botchain.ai — choose BOT Chain Testnet and paste the agent address.",
+  },
   'eip155:11155111': {
     gas: [{ label: 'Google Cloud Web3 faucet (Sepolia ETH)', url: 'https://cloud.google.com/application/web3/faucet/ethereum/sepolia' }],
     token: "Test USDC comes from Circle's faucet (a person has to ask for it): https://faucet.circle.com — choose Ethereum Sepolia and paste the agent address.",
