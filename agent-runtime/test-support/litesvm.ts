@@ -8,6 +8,7 @@
  * (v0 runs too). See docs/SOLANA.md §6.
  */
 import { existsSync, readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -29,7 +30,8 @@ import {
   type Signature,
   type TransactionSigner,
 } from '@solana/kit'
-import { FailedTransactionMetadata, LiteSVM, TransactionMetadata } from 'litesvm'
+import type * as LiteSvmModule from 'litesvm'
+import type { LiteSVM } from 'litesvm'
 import { SPL_TOKEN_PROGRAM_ID, buildInitializeInstruction, type SolanaBackend } from '../src/chain/solana.ts'
 import { generateSolanaSecretKey } from '../src/chain/solana-keys.ts'
 
@@ -40,8 +42,31 @@ const LIB_RS = join(HERE, '../../solana/programs/agenteco_escrow/src/lib.rs')
 export const TEST_PROGRAM_ID = address(/declare_id!\("([1-9A-HJ-NP-Za-km-z]{32,44})"\)/.exec(readFileSync(LIB_RS, 'utf8'))![1])
 const ATA_PROGRAM_ID = address('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
 
+// litesvm is a native addon published for Linux and macOS only, so it is loaded lazily: on a
+// platform without a build (Windows) the suites skip with a reason instead of failing to import.
+const requireModule = createRequire(import.meta.url)
+let liteSvmModule: typeof LiteSvmModule | null | undefined
+function loadLiteSvm(): typeof LiteSvmModule | null {
+  if (liteSvmModule === undefined) {
+    try {
+      liteSvmModule = requireModule('litesvm') as typeof LiteSvmModule
+    } catch {
+      liteSvmModule = null
+    }
+  }
+  return liteSvmModule
+}
+function liteSvm(): typeof LiteSvmModule {
+  const lib = loadLiteSvm()
+  if (!lib) throw new Error(solanaUnavailable() ?? 'litesvm is not available')
+  return lib
+}
+
 /** Why the Solana tests cannot run here, or null when they can. */
 export function solanaUnavailable(): string | null {
+  if (!loadLiteSvm()) {
+    return `litesvm has no native build for ${process.platform}-${process.arch} (it ships Linux and macOS only) — run the Solana tests in WSL, Linux or macOS`
+  }
   if (!existsSync(PROGRAM_SO)) return 'missing solana/target/deploy/agenteco_escrow.so — run `cargo build-sbf --arch v3` in solana/programs/agenteco_escrow'
   return null
 }
@@ -72,6 +97,7 @@ export class LiteSvmBackend implements SolanaBackend {
       (tx) => signTransactionMessageWithSigners(tx)
     )
     const result = this.svm.sendTransaction(transaction)
+    const { FailedTransactionMetadata } = liteSvm()
     this.sent.push({ signature: getSignatureFromTransaction(transaction), slot: this.svm.getClock().slot, ok: !(result instanceof FailedTransactionMetadata) })
     // litesvm has no blocks: a new blockhash keeps two identical transactions from being "already processed".
     this.svm.expireBlockhash()
@@ -83,7 +109,7 @@ export class LiteSvmBackend implements SolanaBackend {
 
   async getTransactionLogs(signature: string) {
     const meta = this.svm.getTransaction(signature as Signature)
-    return meta instanceof TransactionMetadata ? meta.logs() : null
+    return meta instanceof liteSvm().TransactionMetadata ? meta.logs() : null
   }
 
   async listProgramTransactions(_programId: Address, range: { fromSlot: bigint; toSlot: bigint }) {
@@ -140,7 +166,7 @@ export async function startSolanaTestChain(opts: { decimals?: number; feeBps?: n
   const reason = solanaUnavailable()
   if (reason) throw new Error(reason)
   const decimals = opts.decimals ?? 6 // USDC-like
-  const svm = new LiteSVM()
+  const svm = new (liteSvm().LiteSVM)()
   svm.addProgramFromFile(TEST_PROGRAM_ID, PROGRAM_SO)
 
   // litesvm starts at unix time 0; the program (like AgentEco.sol) reads 0 as "never happened".

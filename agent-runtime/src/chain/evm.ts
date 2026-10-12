@@ -135,6 +135,9 @@ interface SellerRatedArgs {
   score: number
 }
 
+/** Reverts a lagging RPC node produces while the chain is already in the right state (see retryStale). */
+const STALE_STATE_REVERT = /Escrow not funded|Not executing|Result not delivered|Invalid escrow status|No active dispute|Nothing was delivered|Escrow not final|Escrow does not exist|transferFrom failed/i
+
 export class EvmAdapter implements ChainAdapter {
   readonly family = 'evm' as const
   readonly chainId: ChainId
@@ -225,7 +228,9 @@ export class EvmAdapter implements ChainAdapter {
   // --- Chain ---------------------------------------------------------------
 
   head(): Promise<bigint> {
-    return this.publicClient.getBlockNumber()
+    // Uncached: viem caches getBlockNumber for the client's pollingInterval (4 s by default), so
+    // a range ending at a cached head could stop short of a block that was just mined.
+    return this.publicClient.getBlockNumber({ cacheTime: 0 })
   }
 
   /** The chain id the RPC reports (to refuse an RPC that points at another chain). */
@@ -335,32 +340,63 @@ export class EvmAdapter implements ChainAdapter {
         account,
       })
       await publicClient.waitForTransactionReceipt({ hash: approveHash })
+      // A load-balanced public RPC can answer the next call from a node that has not seen the approval
+      // yet (fundEscrow then reverts in simulation with "transferFrom failed"): wait until it is visible.
+      for (let i = 0; i < 40; i++) {
+        const seen = await publicClient.readContract({ address: usdt, abi: ERC20_ABI, functionName: 'allowance', args: [account.address, agentEco] })
+        if (seen >= amount) break
+        await new Promise((resolve) => setTimeout(resolve, 500))
+      }
     }
 
-    const fundHash = await wallet.writeContract({
-      address: agentEco,
-      abi: AGENT_ECO_ABI,
-      functionName: 'fundEscrow',
-      args: [escrowId],
-      chain: wallet.chain,
-      account,
-    })
+    const fundHash = await this.retryStale(() =>
+      wallet.writeContract({
+        address: agentEco,
+        abi: AGENT_ECO_ABI,
+        functionName: 'fundEscrow',
+        args: [escrowId],
+        chain: wallet.chain,
+        account,
+      })
+    )
     await publicClient.waitForTransactionReceipt({ hash: fundHash })
 
     return escrowId
   }
 
+  /**
+   * Public RPC endpoints are often load balanced: the node that simulates a call can lag the one that
+   * mined the previous transaction, so a call that depends on it reverts in simulation ("Not executing",
+   * "Escrow does not exist", "transferFrom failed") although the chain is already in the right state.
+   * With EVM_STALE_RETRIES=n such a revert is retried up to n times, one second apart. Off (0) by default,
+   * so a genuine wrong-state call still fails at once.
+   */
+  private async retryStale<T>(send: () => Promise<T>): Promise<T> {
+    const retries = Number(process.env.EVM_STALE_RETRIES ?? 0)
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await send()
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        if (attempt >= retries || !STALE_STATE_REVERT.test(message)) throw err
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+      }
+    }
+  }
+
   /** Send a call on the escrow's contract and wait for it, without checking the receipt's status. */
   private async sendAndWait(id: bigint, functionName: 'startExecution' | 'markDelivered' | 'acceptAndSettle', args: readonly unknown[]): Promise<void> {
     const { wallet, account } = this.signing()
-    const hash = await wallet.writeContract({
-      address: this.agentEcoFor(id),
-      abi: AGENT_ECO_ABI,
-      functionName,
-      args,
-      chain: wallet.chain,
-      account,
-    } as never)
+    const hash = await this.retryStale(() =>
+      wallet.writeContract({
+        address: this.agentEcoFor(id),
+        abi: AGENT_ECO_ABI,
+        functionName,
+        args,
+        chain: wallet.chain,
+        account,
+      } as never)
+    )
     await this.publicClient.waitForTransactionReceipt({ hash })
   }
 
@@ -382,14 +418,16 @@ export class EvmAdapter implements ChainAdapter {
     args: readonly [bigint, ...unknown[]]
   ): Promise<Hex> {
     const { wallet, account } = this.signing()
-    const hash = await wallet.writeContract({
-      address: this.agentEcoFor(args[0]),
-      abi: AGENT_ECO_ABI,
-      functionName,
-      args,
-      chain: wallet.chain,
-      account,
-    } as never)
+    const hash = await this.retryStale(() =>
+      wallet.writeContract({
+        address: this.agentEcoFor(args[0]),
+        abi: AGENT_ECO_ABI,
+        functionName,
+        args,
+        chain: wallet.chain,
+        account,
+      } as never)
+    )
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash })
     if (receipt.status !== 'success') throw new Error(`${functionName} reverted (tx ${hash})`)
     return hash
