@@ -15,6 +15,7 @@ import {
 import { solanaEntry } from '../../agent-runtime/src/chain/solana-registry.ts'
 import { SolanaRpcBackend } from '../../agent-runtime/src/chain/solana-rpc.ts'
 import type { ChainId } from '../../agent-runtime/src/chain/types.ts'
+import { log } from './log.ts'
 
 // The chains this backend serves (CHAINS, default: NETWORK alone), of either family — see
 // agent-runtime/src/chain/multi.ts. `readAdapter` works on any of them; `readChain` is the EVM-only
@@ -104,13 +105,24 @@ export function chainSummaries() {
  * Refuses to run against an RPC that reports another chain than the one it is configured
  * for — e.g. a mainnet process accidentally given a testnet RPC. Checks every served chain.
  */
+/**
+ * Throws when a served chain's RPC answers for another chain (a misconfiguration). An RPC that cannot be
+ * reached at all is only logged: a public node being down for a minute must not keep the whole backend, and
+ * every other chain it serves, from starting.
+ */
 export async function assertServedChainsMatchRpc(): Promise<void> {
   for (const id of servedChainIds()) {
     if (chainFamily(id) === 'solana') {
       const backend = solanaEntry(id).backend
       // Only an RPC backend can be asked; an in-process one has no genesis to mismatch.
       if (backend instanceof SolanaRpcBackend) {
-        const genesis = await backend.getGenesisHash()
+        let genesis: string
+        try {
+          genesis = await backend.getGenesisHash()
+        } catch (error) {
+          log(`RPC check skipped for ${id}: the node did not answer (${error instanceof Error ? error.message : String(error)})`, 'CHAINS')
+          continue
+        }
         if (!genesis.startsWith(id.slice('solana:'.length))) {
           throw new Error(`The RPC for ${id} reports genesis ${genesis}, which is another cluster.`)
         }
@@ -118,7 +130,13 @@ export async function assertServedChainsMatchRpc(): Promise<void> {
       continue
     }
     const chain = readEvm(id)
-    const actual = await chain.rpcChainId()
+    let actual: number
+    try {
+      actual = await chain.rpcChainId()
+    } catch (error) {
+      log(`RPC check skipped for ${id}: the node did not answer (${error instanceof Error ? error.message : String(error)})`, 'CHAINS')
+      continue
+    }
     if (actual !== chain.config.chain.id) {
       throw new Error(`The RPC for ${id} reports chain id ${actual}, but ${chain.config.chain.name} is ${chain.config.chain.id}.`)
     }

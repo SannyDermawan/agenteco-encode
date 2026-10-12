@@ -12,15 +12,20 @@ What exists today and stays as it is: the BNB edition (`agenteco-bnb.vercel.app`
 
 ## 2. Backend (Railway)
 
-Three processes, all from the `backend/` folder of this repository (Node 22.9 or newer; `npm install` runs `prisma generate`). Create one Railway service for each, with **Root Directory** `backend`:
+Three processes, all from the `backend/` folder of this repository (Node 22.9 or newer). **The build needs two installs**: the backend imports code from `agent-runtime/`, which has its own dependencies, and a build that installs only `backend/` fails at start with `Cannot find package 'zod'` (checked on a fresh clone). Leave the host's **Root Directory empty** (the repository root) and set:
+
+- **Build command:** `cd backend && npm install --include=dev && npm install --prefix ../agent-runtime --omit=dev --no-audit --no-fund` (`npm install` in `backend/` also runs `prisma generate`; the start commands use `tsx`, a dev dependency, hence `--include=dev`).
+- **Start command:** one per service, from the table below, each prefixed with `cd backend && `.
+
+Create one service for each:
 
 | Service | Start command | What it does |
 |---|---|---|
-| api | `npm run start:api` | the REST API the website and the CLI talk to |
-| keeper | `npm start` | claims timeouts (permissionless; needs a funded `KEEPER_PRIVATE_KEY`) |
-| host | `npm run start:host` | hosted agents and the AI arbiter |
+| api | `cd backend && npm run start:api` | the REST API the website and the CLI talk to |
+| keeper | `cd backend && npm start` | claims timeouts (permissionless; needs a funded `KEEPER_PRIVATE_KEY`) |
+| host | `cd backend && npm run start:host` | hosted agents and the AI arbiter |
 
-Copy the Root Directory and start-command settings of your existing BNB services if they differ from the above.
+Look at how your existing BNB services are set up (Settings, Build and Deploy) before copying: they were built from another repository layout.
 
 Settings every service needs (public values, from MULTICHAIN.md):
 
@@ -53,6 +58,17 @@ Per service, on top of the above:
 All secrets stay in Railway's variables; nothing above is to be committed. `backend/.env.example` lists every setting with its comment.
 
 Check after the first deploy: `GET <api>/health` answers `{"ok":true,"db":"connected"}`, `GET <api>/chains` lists the chains you set (it answers 404 on the BNB-only API), and `GET <api>/device-links` answers something other than 404 (the one-prompt CLI needs it).
+
+### A free route for the api only: Render
+
+For the demo only the **api** is needed (the keeper and the host are optional, see above). Render's free web service needs no card; the figures below come from comparison sites in October 2026, so check Render's pricing page:
+
+- It **sleeps after 15 minutes without traffic** and takes about a minute to wake on the next request; 750 free instance hours a month, enough for one service to stay up all month.
+- `render.yaml` at the root of this repository describes the service (**New, Blueprint**, pick the repository). It lists the public settings; the secrets (`DATABASE_URL`, `DIRECT_URL`, `AGENT_KEY_ENCRYPTION_SECRET`) are asked for in the dashboard and never stored in the file. After the first deploy, set `FRONTEND_ORIGIN` and `PUBLIC_API_URL` to the real addresses.
+- To keep it awake, a free uptime monitor (UptimeRobot, cron-job.org) can request `<api>/health` every 5 minutes. `/health` also queries the database, which keeps a free Supabase project from pausing for inactivity. Check Render's and the monitor's terms before relying on it.
+- Without the pinger, open the API's `/health` a minute before a demo or a video take.
+
+A paid Railway Hobby plan (about US$5 a month, check its page) avoids the sleep and uses the same build and start commands.
 
 ## 3. Website (Vercel)
 

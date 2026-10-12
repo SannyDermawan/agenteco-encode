@@ -1,0 +1,56 @@
+# Render Blueprint for the AgentEco API (docs/DEPLOY.md, "A free route for the api only").
+# Public settings only. The secrets are asked for in the Render dashboard (sync: false) and are never stored here.
+services:
+  - type: web
+    name: agenteco-api
+    runtime: node
+    plan: free
+    # No rootDir: the backend imports ../agent-runtime, so the whole repository is needed and both are installed.
+    buildCommand: cd backend && npm install --include=dev && npm install --prefix ../agent-runtime --omit=dev --no-audit --no-fund
+    startCommand: cd backend && npm run start:api
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.12.0
+      # The new database (docs/DEPLOY.md section 1).
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      # Long random secret; never change it afterwards (hosted agents' keys are encrypted with it).
+      - key: AGENT_KEY_ENCRYPTION_SECRET
+        sync: false
+      # Comma-separated origins of the website: https://agenteco.web.id,https://www.agenteco.web.id,https://agenteco-multichain.vercel.app
+      - key: FRONTEND_ORIGIN
+        sync: false
+      # This API's own public URL, once Render has given it one.
+      - key: PUBLIC_API_URL
+        sync: false
+      - key: CHAINS
+        value: bsc-testnet,base-sepolia,ethereum-sepolia,arbitrum-sepolia,tempo-moderato,bot-testnet,solana-devnet
+      - key: AGENT_ECO_ADDRESS__eip155_84532
+        value: "0xF8448762AeCE0039f1072Da74477fbFAD629fDB8"
+      - key: DEPLOYMENT_BLOCK__eip155_84532
+        value: "48021794"
+      - key: AGENT_ECO_ADDRESS__eip155_11155111
+        value: "0x3048b1a3CeeE4f1AF09485e49f059d094EF6f865"
+      - key: DEPLOYMENT_BLOCK__eip155_11155111
+        value: "11901363"
+      - key: AGENT_ECO_ADDRESS__eip155_421614
+        value: "0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea"
+      - key: DEPLOYMENT_BLOCK__eip155_421614
+        value: "318529770"
+      - key: AGENT_ECO_ADDRESS__eip155_42431
+        value: "0x2620424C73A39624bDcd3fa43aABF425d6Da997e"
+      - key: DEPLOYMENT_BLOCK__eip155_42431
+        value: "39319911"
+      - key: AGENT_ECO_ADDRESS__eip155_968
+        value: "0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea"
+      - key: DEPLOYMENT_BLOCK__eip155_968
+        value: "26642374"
+      - key: AGENT_ECO_PROGRAM__solana_EtWTRABZaYq6iMfeYKouRu166VU2xqa1
+        value: "3GEEC3dQH1tP2YTZD9Jv915Yj8hcSN6WE8nQZiLJcgHE"
+      - key: RPC_URL__eip155_84532
+        value: https://sepolia.base.org
+      - key: EVM_STALE_RETRIES
+        value: "3"
