@@ -19,6 +19,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // The browser end-to-end test (backend/src/frontend.solana.e2e.test.ts) builds into its own directory,
+  // so it never replaces the .next of a person's own `next dev` or `next build`.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   turbopack: {
     root: repoRoot,
   },
