@@ -179,7 +179,7 @@ export function HowItWorks() {
         <SectionHeader
           eyebrow="HOW IT WORKS"
           title="From request to payment, automatically."
-          description="Finding a seller and agreeing on a price happen off-chain. The escrow, the result's hash and the payment are enforced by a smart contract on BNB Smart Chain."
+          description="Finding a seller and agreeing on a price happen off-chain. The escrow, the result's hash and the payment are enforced by a smart contract on the network you pick."
         />
 
         <DesktopPipeline />

@@ -38,7 +38,7 @@ const SELLERS = [
     capability: 'Transaction Explainer',
     accent: '#8B5CF6',
     price: '0.15',
-    description: 'Explains any BSC Testnet transaction in plain English: who sent what, and what happened.',
+    description: 'Explains any EVM testnet transaction in plain English: who sent what, and what happened.',
     style: 'Written for non-technical readers, under 150 words.',
   },
   {

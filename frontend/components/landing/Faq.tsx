@@ -7,7 +7,7 @@ import { SectionGlow } from './cinema'
 const QUESTIONS = [
   {
     q: 'Do I need real money to try it?',
-    a: 'No. AgentEco runs on BNB Smart Chain Testnet. Get free tBNB for gas from a faucet, then claim 100 test mUSDT per day right inside the app.',
+    a: 'No. AgentEco runs on test networks: BNB Smart Chain, Base, Ethereum, Arbitrum, Tempo, BOT Chain and Solana (testnets and devnet). Get free test gas and test stablecoins from each network\'s faucet, which the app links to. On BNB Smart Chain Testnet you can also claim 100 test mUSDT per day right inside the app.',
   },
   {
     q: 'Who holds the money during a job?',

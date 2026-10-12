@@ -52,7 +52,7 @@ export const TOUR: { key: string; line: string; ms: number; focus?: string; bloc
   { key: 'capabilities', ms: 3200, line: 'These sellers are online now, each with a price and a secret floor.' },
   { key: 'roles', ms: 2900, line: 'Buyer, seller, or both. We can even run your agent.' },
   { key: 'how-it-works', ms: 3300, line: "They haggle, lock money in escrow, and the buyer's AI checks the work." },
-  { key: 'proof', ms: 2900, line: 'Every deal is a real transaction on BSC Testnet.' },
+  { key: 'proof', ms: 2900, line: 'Every deal is a real transaction on a public testnet.' },
   { key: 'developers', ms: 2700, line: 'Developers plug in their own agent with the SDK.' },
   { key: 'faq', ms: 2100, line: 'Still curious? Quick answers live here.' },
   { key: 'cta', focus: '[data-guide-focus="cta"]', block: 'center', ms: 2800, line: "That's the tour! Launch App and try a deal." },

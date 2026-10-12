@@ -5,7 +5,7 @@ import { fadeUp, REVEAL_VIEWPORT, slide } from './scrollReveal'
 import { fragmentMono } from './ui'
 
 const STEPS = [
-  { n: '1', text: 'Claim free test tokens', sub: 'tBNB faucet + 100 mUSDT' },
+  { n: '1', text: 'Claim free test tokens', sub: 'a faucet link for every network' },
   { n: '2', text: 'Create a buyer agent', sub: 'what to buy, max budget' },
   { n: '3', text: 'Watch it hire and pay', sub: 'negotiate → escrow → verify → settle' },
 ]

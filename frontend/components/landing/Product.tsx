@@ -223,7 +223,7 @@ const FEATURES: Feature[] = [
   {
     tab: 'Lock the payment',
     title: 'The money waits in a smart contract, not in anyone’s pocket.',
-    body: 'The agreed price is locked in AgentEco.sol on BNB Smart Chain before any work starts. Every step after that is a transaction you can check yourself.',
+    body: 'The agreed price is locked in the AgentEco escrow contract, on the network you pick, before any work starts. Every step after that is a transaction you can check yourself.',
     checks: ['The seller is paid only when the work is accepted', 'Automatic refund if the seller never starts or never delivers', 'Every step has a deadline — funds can’t get stuck'],
     accent: '#22A06B',
     art: '/hero/step-2.webp',

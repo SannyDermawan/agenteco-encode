@@ -1,7 +1,6 @@
 'use client'
 import { useState } from 'react'
 import { BrandLogo } from '@/components/BrandLogo'
-import { AGENT_ECO_ADDRESS, EXPLORER_NAME, explorerAddressUrl } from '@/lib/web3/landingNetwork'
 import { UnavailableModal } from './UnavailableModal'
 
 // A link with no href isn't live yet — clicking it opens the "coming soon" modal.
@@ -13,9 +12,17 @@ const COLUMNS: { heading: string; links: ResourceLink[] }[] = [
     links: [{ label: 'Docs' }],
   },
   {
-    heading: 'NETWORK',
-    // The AgentEco contract on the explorer of whichever network this build targets.
-    links: [{ label: EXPLORER_NAME, href: explorerAddressUrl(AGENT_ECO_ADDRESS) }],
+    heading: 'CONTRACTS',
+    // The deployed AgentEco escrow on each network's explorer (docs/MULTICHAIN.md and docs/SOLANA.md list them).
+    links: [
+      { label: 'BNB Smart Chain', href: 'https://testnet.bscscan.com/address/0xdC08Dd97e959Ab6ED2AB76702F25757Fe1fF46BE' },
+      { label: 'Base Sepolia', href: 'https://base-sepolia.blockscout.com/address/0xF8448762AeCE0039f1072Da74477fbFAD629fDB8?tab=contract' },
+      { label: 'Ethereum Sepolia', href: 'https://eth-sepolia.blockscout.com/address/0x3048b1a3CeeE4f1AF09485e49f059d094EF6f865?tab=contract' },
+      { label: 'Arbitrum Sepolia', href: 'https://sepolia.arbiscan.io/address/0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea#code' },
+      { label: 'Tempo Moderato', href: 'https://explore.testnet.tempo.xyz/address/0x2620424C73A39624bDcd3fa43aABF425d6Da997e' },
+      { label: 'BOT Chain Testnet', href: 'https://scan.bohr.life/address/0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea?tab=contract' },
+      { label: 'Solana devnet', href: 'https://explorer.solana.com/address/3GEEC3dQH1tP2YTZD9Jv915Yj8hcSN6WE8nQZiLJcgHE?cluster=devnet' },
+    ],
   },
   {
     heading: 'COMMUNITY',
@@ -76,15 +83,12 @@ export function Footer() {
           </div>
         </div>
 
-        {/* md:pr-16 keeps "Built on" clear of the floating GitHub button in the corner. */}
+        {/* md:pr-16 keeps the networks line clear of the floating GitHub button in the corner. */}
         <div className="mt-12 flex flex-col gap-3 border-t border-white/10 pt-8 md:mt-16 md:flex-row md:items-center md:justify-between md:pr-16">
           <p className="text-[11px] text-[#8B8D96]">&copy; 2026 AgentEco. All rights reserved.</p>
-          <div className="flex items-center gap-2 text-[11px] text-[#8B8D96]">
-            Built on
-            {/* eslint-disable-next-line @next/next/no-img-element -- local SVG logo, no optimization needed */}
-            <img src="/bnb-chain.svg" alt="" className="h-4 w-4" />
-            <span className="font-semibold text-[#F5F5F7]">BNB Smart Chain Testnet</span>
-          </div>
+          <p className="text-[11px] text-[#8B8D96]">
+            Deployed on test networks: <span className="font-semibold text-[#F5F5F7]">BNB Smart Chain, Base, Ethereum, Arbitrum, Tempo, BOT Chain and Solana</span>
+          </p>
         </div>
       </div>
 

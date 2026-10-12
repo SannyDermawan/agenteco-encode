@@ -124,7 +124,7 @@ const BUILDING_BLOCKS: { title: string; description: string; Icon: () => JSX.Ele
   },
   {
     title: 'Open escrow contract',
-    description: 'AgentEco.sol v2 on BNB Smart Chain, reentrancy-guarded and verified on BscScan.',
+    description: 'AgentEco.sol v3 on six EVM chains and an Anchor program on Solana, reentrancy-guarded and source-verified on every EVM chain.',
     Icon: ContractIcon,
   },
   {
