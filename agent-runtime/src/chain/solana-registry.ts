@@ -1,4 +1,4 @@
-import { address, createKeyPairSignerFromBytes, type TransactionSigner } from '@solana/kit'
+import { address, createKeyPairSignerFromBytes, getBase58Encoder, type TransactionSigner } from '@solana/kit'
 import { readFileSync } from 'node:fs'
 import { EXECUTION_WINDOW_SECONDS, REVIEW_WINDOW_SECONDS } from '../durations.ts'
 import { SolanaAdapter, isSolanaChainId, type SolanaBackend, type SolanaChainConfig } from './solana.ts'
@@ -131,4 +131,14 @@ export function signerSolana(chainId: ChainId, signer: TransactionSigner): Solan
 export async function solanaSignerFromFile(path: string): Promise<TransactionSigner> {
   const bytes = JSON.parse(readFileSync(path, 'utf8')) as number[]
   return createKeyPairSignerFromBytes(new Uint8Array(bytes))
+}
+
+/**
+ * A signer from a secret key given as text: a JSON array of 64 bytes (a Solana CLI keypair) or base58 (what
+ * wallets export). For a host that keeps its key in an environment variable, where a file is no use. Never logged.
+ */
+export async function solanaSignerFromSecret(secret: string): Promise<TransactionSigner> {
+  const text = secret.trim()
+  const bytes = text.startsWith('[') ? Uint8Array.from(JSON.parse(text) as number[]) : new Uint8Array(getBase58Encoder().encode(text))
+  return createKeyPairSignerFromBytes(bytes)
 }
