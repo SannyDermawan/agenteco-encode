@@ -8,7 +8,7 @@ import { BrandLogo } from '@/components/BrandLogo'
 const NAV = [
   { label: 'Product', href: '#product' },
   { label: 'How It Works', href: '#how-it-works' },
-  { label: 'Developers', href: '#developers' },
+  { label: 'Trust', href: '#trust' },
   { label: 'FAQ', href: '#faq' },
 ] as const
 
@@ -36,11 +36,11 @@ function FlowIcon({ className }: { className?: string }) {
   )
 }
 
-function CodeIcon({ className }: { className?: string }) {
+function ShieldIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
-      <path d="M5.6 4 2 8l3.6 4" />
-      <path d="M10.4 4 14 8l-3.6 4" />
+      <path d="M8 1.8 3 3.6v4c0 3 2 5 5 6.6 3-1.6 5-3.6 5-6.6v-4L8 1.8Z" />
+      <path d="m5.9 8 1.5 1.5L10.3 6.6" />
     </svg>
   )
 }
@@ -66,7 +66,7 @@ function ArrowIcon({ className }: { className?: string }) {
 const ICONS: Record<(typeof NAV)[number]['label'], (props: { className?: string }) => JSX.Element> = {
   Product: GridIcon,
   'How It Works': FlowIcon,
-  Developers: CodeIcon,
+  Trust: ShieldIcon,
   FAQ: QuestionIcon,
 }
 
