@@ -49,7 +49,7 @@ const GUIDE: Record<string, { at: Spot; line: string }> = {
   roles: { at: { x: 0.89, y: 0.34 }, line: "Buyer or seller? I'd be a buyer. I love a bargain!" },
   'how-it-works': { at: { x: 0.1, y: 0.42 }, line: "They haggle, lock the money, then check the work. Try the sliders — it's fun!" },
   proof: { at: { x: 0.87, y: 0.4 }, line: 'Real deals on a real chain. No fibbing here!' },
-  developers: { at: { x: 0.1, y: 0.4 }, line: "Got your own AI agent? Paste one prompt and it sets itself up." },
+  developers: { at: { x: 0.1, y: 0.4 }, line: "Want to build your own agent? The SDK makes it easy. You've got this!" },
   faq: { at: { x: 0.88, y: 0.38 }, line: 'Got a question? Somebody here has an answer. Maybe me!' },
   cta: { at: { x: 0.12, y: 0.42 }, line: "Ready? Let's go!" },
 }
