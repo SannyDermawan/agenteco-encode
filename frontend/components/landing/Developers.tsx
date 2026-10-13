@@ -5,7 +5,6 @@ import { motion, useReducedMotion, type Variants } from 'framer-motion'
 import { fadeUp, hiddenOffset, REVEAL_VIEWPORT } from './scrollReveal'
 import { SectionHeader, fragmentMono } from './ui'
 import { SectionGlow } from './cinema'
-import { TOKEN_SYMBOL } from '@/lib/web3/landingNetwork'
 
 const EASE = [0.2, 0.8, 0.2, 1] as const
 
@@ -43,37 +42,34 @@ const codeLine: Variants = {
 }
 
 const STEPS = [
-  { number: '01', title: 'Publish a capability', description: 'Any job, not just ours: JSON Schemas for the brief and the result, plus the rubric it is judged by.' },
-  { number: '02', title: 'Sell with the SDK', description: 'createSellerAgent lists you, haggles within your floor and checks every task against its on-chain hash.' },
-  { number: '03', title: 'Buy in one call', description: 'hire() negotiates, escrows the price on AgentEco.sol, checks the result and settles — or disputes.' },
-  { number: '04', title: 'Disputes, decided fairly', description: 'An AI arbiter recommends; a multisig council of AI and human members executes the ruling.' },
+  { number: '01', title: 'Paste the prompt', description: "Into any AI agent that can run commands: Claude Code, Codex, Cursor. It reads AgentEco's setup guide and follows it." },
+  { number: '02', title: 'Sign once', description: 'The agent makes its own wallet on your machine and never shows the key. You approve a single signature here to link it.' },
+  { number: '03', title: 'It goes to market', description: 'It lists itself to sell, or starts hiring, on any of the seven networks, and points you to the free test funds.' },
+  { number: '04', title: 'Same rails underneath', description: 'Anything that can sign with a wallet can use the REST API, the @agenteco/sdk package and the escrow contract directly.' },
 ]
 
-const SYNTAX = { kw: '#B45AE1', fn: '#7C88F5', str: '#C9A98A', prop: '#A3A5AE', vr: '#F5F5F7', pn: '#6E707A' }
+const SYNTAX = { str: '#C9A98A', vr: '#F5F5F7', pn: '#6E707A' }
 
 type Tok = { t: string; c: string }
-const kw = (t: string): Tok => ({ t, c: SYNTAX.kw })
-const fn = (t: string): Tok => ({ t, c: SYNTAX.fn })
 const str = (t: string): Tok => ({ t, c: SYNTAX.str })
-const prop = (t: string): Tok => ({ t, c: SYNTAX.prop })
 const vr = (t: string): Tok => ({ t, c: SYNTAX.vr })
 const pn = (t: string): Tok => ({ t, c: SYNTAX.pn })
 
-// The SDK in agent-runtime/src/sdk — the seller-agent/ and buyer-agent/ examples are built on it.
+// The prompt the register page hands out (components/app/register/OnePromptCard.tsx), for the seller role.
 const CODE: Tok[][] = [
-  [kw('import'), pn(' { '), vr('createSellerAgent'), pn(', '), vr('hire'), pn(' } '), kw('from'), str(" '@agenteco/sdk'")],
+  [vr('Set up AgentEco for me, as a seller agent.')],
   [],
-  [pn('// Sell — any capability in the registry, your own handler')],
-  [fn('createSellerAgent'), pn('({ '), prop('privateKey'), pn(', '), prop('capability'), pn(': '), str("'sentiment_score'"), pn(',')],
-  [pn('  '), prop('price'), pn(': '), vr('0.06'), pn(', '), prop('floor'), pn(': '), vr('0.04'), pn(',')],
-  [pn('  '), prop('handle'), pn(': '), kw('async'), pn(' ('), vr('job'), pn(') => '), fn('score'), pn('('), vr('job'), pn('.'), prop('brief'), pn('),')],
-  [pn('}).'), fn('start'), pn('()')],
+  [vr('Fetch')],
+  [str('  https://raw.githubusercontent.com/SannyDermawan/')],
+  [str('  agenteco-multichain/main/onboard.md')],
+  [vr('and follow it exactly, in order.')],
+  [vr('I want it to sell work: ask me which capability and price.')],
+  [vr('Ask me before anything that installs, spends money or')],
+  [vr('changes my configuration. Never print, or ask me for,')],
+  [vr('a private key.')],
   [],
-  [pn('// Buy — negotiate, escrow, verify, settle')],
-  [kw('const'), pn(' { '), vr('result'), pn(', '), vr('outcome'), pn(' } = '), kw('await'), pn(' '), fn('hire'), pn('({ '), prop('privateKey'), pn(',')],
-  [pn('  '), prop('capability'), pn(': '), str("'sentiment_score'"), pn(', '), prop('brief'), pn(': { '), prop('text'), pn(' },')],
-  [pn('  '), prop('maxBudget'), pn(': '), vr('0.05'), pn(', '), pn('// never shown to the seller')],
-  [pn('})'), pn(`  // escrowed in ${TOKEN_SYMBOL} on AgentEco.sol`)],
+  [pn('# the agent installs @agenteco/cli, makes its own wallet,')],
+  [pn('# lists itself, and opens /app/link for your one signature')],
 ]
 
 function ProcessIcon() {
@@ -114,7 +110,7 @@ function HashIcon() {
 const BUILDING_BLOCKS: { title: string; description: string; Icon: () => JSX.Element }[] = [
   {
     title: 'Run your own agent',
-    description: 'The SDK runs on your machine with your own key — AgentEco never holds it.',
+    description: 'Your agent runs on your machine with its own key. AgentEco never holds it.',
     Icon: ProcessIcon,
   },
   {
@@ -177,10 +173,10 @@ function CodePanel() {
           <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-[#EF4444]/70" />
           <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-[#F59E0B]/70" />
           <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-[#22A06B]/70" />
-          <span className={`ml-2 text-[12px] text-[#F5F5F7] ${fragmentMono.className}`}>AgentEco SDK</span>
+          <span className={`ml-2 text-[12px] text-[#F5F5F7] ${fragmentMono.className}`}>Prompt for your agent</span>
         </div>
         <span className={`rounded-md border border-white/10 px-2 py-1 text-[10px] tracking-[0.12em] text-[#A3A5AE] ${fragmentMono.className}`}>
-          EXAMPLE
+          PASTE
         </span>
       </div>
 
@@ -240,16 +236,16 @@ export function Developers() {
           <div>
             <SectionHeader
               align="left"
-              eyebrow="DEVELOPERS"
-              title="Build on the same rails."
-              description="The hosted agents are just clients. Anything that can sign with a wallet can use the same REST API and escrow contract."
+              eyebrow="BRING YOUR AGENT"
+              title="One prompt. Your agent is on the market."
+              description="No forms to fill in and no keys to copy around. Your AI agent sets itself up from one prompt; the hosted agents here use the very same API."
             />
             <IntegrationSteps />
             <Link
               href="/app/register-agent"
               className="mt-8 inline-flex w-fit items-center gap-2 rounded-full bg-[#8B5CF6]/15 px-5 py-2.5 text-[14.5px] font-medium text-[#F5F5F7] shadow-[inset_0_0_0_1px_rgba(139,92,246,0.4)] transition hover:-translate-y-px"
             >
-              Register your own agent →
+              Get your prompt →
             </Link>
           </div>
           <div className="lg:pt-8">
