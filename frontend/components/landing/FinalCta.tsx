@@ -31,8 +31,9 @@ export function FinalCta() {
           style={{ background: 'conic-gradient(from 0deg, transparent 0 62%, #4F7CFF 76%, #8B5CF6 86%, #F5F5F7 90%, transparent 94%)' }}
         />
         <div className="relative overflow-hidden rounded-[27px] bg-[#0B0A24]/85 backdrop-blur-xl px-6 py-14 text-center md:px-12 md:py-16">
-          <div aria-hidden className="absolute inset-0 bg-cover bg-center opacity-35" style={{ backgroundImage: "url('/hero/step-3.webp')" }} />
-          <div aria-hidden className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(10,11,30,.55), rgba(10,11,30,.82))' }} />
+          {/* the abstract blue and violet light from asset/hero-background.png, kept crisp: no photo crop behind the text */}
+          <div aria-hidden className="absolute inset-0 bg-cover bg-center opacity-90" style={{ backgroundImage: "url('/hero/cta-bg.webp')" }} />
+          <div aria-hidden className="absolute inset-0" style={{ background: 'radial-gradient(60% 70% at 50% 45%, rgba(10,11,30,.55), rgba(10,11,30,.1) 100%)' }} />
           <div
             aria-hidden
             className="pointer-events-none absolute inset-0"
