@@ -73,7 +73,7 @@ export async function initArbiter(): Promise<void> {
   const next = new Map<ChainId, ChainArbiter>()
   if (!key) {
     for (const chainId of servedChainIdsOf('evm')) next.set(chainId, { signer: null, rulable: new Set() })
-    log('Arbiter: no ARBITER_PRIVATE_KEY — AI recommendations only, no automatic rulings on the EVM chains.', 'HOST')
+    log('Arbiter: no ARBITER_PRIVATE_KEY. AI recommendations only, no automatic rulings on the EVM chains.', 'HOST')
   } else {
     const account = privateKeyToAccount(key)
     for (const chainId of servedChainIdsOf('evm')) {
@@ -82,7 +82,7 @@ export async function initArbiter(): Promise<void> {
       if (!canRule(setup, account.address)) {
         next.set(chainId, { signer: null, rulable: new Set() })
         const who = setup.council ? `a member of the arbiter council ${setup.council.address}` : `the contract's arbiter (${setup.arbiter})`
-        log(`Arbiter (${chainId}): ARBITER_PRIVATE_KEY is ${account.address}, which is not ${who} — recommendations only.`, 'HOST')
+        log(`Arbiter (${chainId}): ARBITER_PRIVATE_KEY is ${account.address}, which is not ${who}, recommendations only.`, 'HOST')
         continue
       }
       const rulable = new Set([reader.config.agentEco.toLowerCase()])
@@ -98,7 +98,7 @@ export async function initArbiter(): Promise<void> {
         ? `, voting in ArbiterCouncil ${setup.council.address} (${setup.council.rulingThreshold} of ${setup.council.members.length} votes rule)`
         : ''
       log(
-        `Arbiter (${chainId}): ${account.address}${via} — auto-rules at confidence ≥ ${ARBITER_AUTO_MIN_CONFIDENCE} after a ${ARBITER_OVERRIDE_WINDOW_SECONDS}s override window.`,
+        `Arbiter (${chainId}): ${account.address}${via}, auto-rules at confidence ≥ ${ARBITER_AUTO_MIN_CONFIDENCE} after a ${ARBITER_OVERRIDE_WINDOW_SECONDS}s override window.`,
         'HOST'
       )
     }
@@ -131,18 +131,18 @@ async function initSolanaArbiters(next: Map<ChainId, ChainArbiter>): Promise<voi
   for (const chainId of chains) {
     if (!signer) {
       next.set(chainId, { signer: null, rulable: new Set() })
-      log(`Arbiter (${chainId}): no SOLANA_ARBITER_SECRET_KEY or SOLANA_ARBITER_KEYPAIR — recommendations only.`, 'HOST')
+      log(`Arbiter (${chainId}): no SOLANA_ARBITER_SECRET_KEY or SOLANA_ARBITER_KEYPAIR, recommendations only.`, 'HOST')
       continue
     }
     const setup = await readAdapter(chainId).getArbiterSetup()
     if (setup.arbiter !== signer.address) {
       next.set(chainId, { signer: null, rulable: new Set() })
-      log(`Arbiter (${chainId}): the Solana arbiter key is ${signer.address}, which is not the program's arbiter (${setup.arbiter}) — recommendations only.`, 'HOST')
+      log(`Arbiter (${chainId}): the Solana arbiter key is ${signer.address}, which is not the program's arbiter (${setup.arbiter}), recommendations only.`, 'HOST')
       continue
     }
     next.set(chainId, { signer: signerSolana(chainId, signer), rulable: new Set([SOLANA_ECO]) })
     log(
-      `Arbiter (${chainId}): ${signer.address}, the program's arbiter — auto-rules at confidence ≥ ${ARBITER_AUTO_MIN_CONFIDENCE} after a ${ARBITER_OVERRIDE_WINDOW_SECONDS}s override window.`,
+      `Arbiter (${chainId}): ${signer.address}, the program's arbiter, auto-rules at confidence ≥ ${ARBITER_AUTO_MIN_CONFIDENCE} after a ${ARBITER_OVERRIDE_WINDOW_SECONDS}s override window.`,
       'HOST'
     )
   }
@@ -187,7 +187,7 @@ async function recommend(chain: ChainAdapter, escrow: EscrowBasic, disputedAt: n
     prisma.task.findUnique({ where: where(chainId, id) }),
     prisma.escrowResult.findUnique({ where: where(chainId, id) }),
   ])
-  // Platform or community capability — a community one is judged by its published rubric.
+  // Platform or community capability, a community one is judged by its published rubric.
   const capability = task ? await getCapability(task.capability) : null
   const rec =
     task && result?.resultJson && capability
@@ -209,7 +209,7 @@ async function recommend(chain: ChainAdapter, escrow: EscrowBasic, disputedAt: n
   const recommendedAt = new Date()
   if (!rec) {
     await prisma.dispute.update({ where: where(chainId, id), data: { recUnavailable: true, recommendedAt } })
-    log(`[arbiter] ${chainId} escrow #${id}: AI recommendation unavailable — waiting for the arbiter or the timeout.`)
+    log(`[arbiter] ${chainId} escrow #${id}: AI recommendation unavailable, waiting for the arbiter or the timeout.`)
     return
   }
   await prisma.dispute.update({
@@ -239,7 +239,7 @@ async function autoResolve(chain: ChainAdapter, escrow: EscrowBasic, disputeDead
   if (!arbiter?.signer) return
   const eco = chain.family === 'evm' ? (chain as EvmAdapter).agentEcoFor(escrow.id) : SOLANA_ECO
   if (!arbiter.rulable.has(eco.toLowerCase())) {
-    logOnce(chainId, id, 'not-rulable', `[arbiter] ${chainId} escrow #${id}: this key is not the arbiter of ${eco} — left to its arbiter or the timeout.`)
+    logOnce(chainId, id, 'not-rulable', `[arbiter] ${chainId} escrow #${id}: this key is not the arbiter of ${eco}, left to its arbiter or the timeout.`)
     return
   }
 
@@ -251,9 +251,9 @@ async function autoResolve(chain: ChainAdapter, escrow: EscrowBasic, disputeDead
   })
   if (!decision.ok) {
     if (decision.reason === 'low-confidence')
-      logOnce(chainId, id, 'low-confidence', `[arbiter] ${chainId} escrow #${id}: confidence ${row.recConfidence}% is below ${ARBITER_AUTO_MIN_CONFIDENCE}% — left to the arbiter or the timeout.`)
+      logOnce(chainId, id, 'low-confidence', `[arbiter] ${chainId} escrow #${id}: confidence ${row.recConfidence}% is below ${ARBITER_AUTO_MIN_CONFIDENCE}%, left to the arbiter or the timeout.`)
     if (decision.reason === 'too-late')
-      logOnce(chainId, id, 'too-late', `[arbiter] ${chainId} escrow #${id}: too close to the dispute deadline to rule — the timeout refunds the buyer.`)
+      logOnce(chainId, id, 'too-late', `[arbiter] ${chainId} escrow #${id}: too close to the dispute deadline to rule, the timeout refunds the buyer.`)
     return
   }
 
@@ -273,7 +273,7 @@ async function autoResolve(chain: ChainAdapter, escrow: EscrowBasic, disputeDead
       chainId,
       id,
       'council-vote',
-      `[arbiter] ${chainId} escrow #${id}: AI voted ${rationale.verdict} in the arbiter council (${outcome.votes}/${outcome.needed}) — waiting for another member.`
+      `[arbiter] ${chainId} escrow #${id}: AI voted ${rationale.verdict} in the arbiter council (${outcome.votes}/${outcome.needed}), waiting for another member.`
     )
     return
   }

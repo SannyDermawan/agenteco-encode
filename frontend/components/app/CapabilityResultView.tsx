@@ -27,7 +27,7 @@ function Prose({ text }: { text: string }) {
     <div className="space-y-2">
       {text.includes(AI_UNAVAILABLE) && (
         <span className="inline-block rounded-full border border-[#F59E0B]/35 bg-[#F59E0B]/10 px-2 py-0.5 text-[10.5px] font-medium text-[#F59E0B]">
-          AI unavailable — data only
+          AI unavailable, data only
         </span>
       )}
       <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-[#F5F5F7]">{text}</p>
@@ -36,8 +36,8 @@ function Prose({ text }: { text: string }) {
 }
 
 const num = (n: number | null | undefined, digits = 2) =>
-  n === null || n === undefined ? '—' : n.toLocaleString('en-US', { maximumFractionDigits: digits })
-const pct = (n: number | null) => (n === null ? '—' : `${n > 0 ? '+' : ''}${n.toFixed(2)}%`)
+  n === null || n === undefined ? '-' : n.toLocaleString('en-US', { maximumFractionDigits: digits })
+const pct = (n: number | null) => (n === null ? '-' : `${n > 0 ? '+' : ''}${n.toFixed(2)}%`)
 const short = (a: string) => `${a.slice(0, 8)}…${a.slice(-6)}`
 
 function Table({ head, rows }: { head: string[]; rows: ReactNode[][] }) {

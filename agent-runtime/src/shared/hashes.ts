@@ -44,7 +44,7 @@ export function normalizePrice(price: string | number): string {
 }
 
 // -------------------------------------------------------------------------
-// taskHash — committed by createEscrow
+// taskHash, committed by createEscrow
 // -------------------------------------------------------------------------
 
 export interface TaskPreimageInput {
@@ -80,7 +80,7 @@ export function taskHash(input: TaskPreimageInput): Hex {
 }
 
 // -------------------------------------------------------------------------
-// resultHash — committed by markDelivered (unchanged convention)
+// resultHash, committed by markDelivered (unchanged convention)
 // -------------------------------------------------------------------------
 
 /** The exact JSON string whose hash is the escrow's resultHash. */
@@ -93,7 +93,7 @@ export function resultHash(result: unknown): Hex {
 }
 
 // -------------------------------------------------------------------------
-// reasonHash / responseHash — raw dispute texts
+// reasonHash / responseHash, raw dispute texts
 // -------------------------------------------------------------------------
 
 /** Hash of a raw text (buyer's dispute reason, seller's response). */
@@ -102,7 +102,7 @@ export function textHash(text: string): Hex {
 }
 
 // -------------------------------------------------------------------------
-// rationaleHash — committed by resolveDisputeFor*
+// rationaleHash, committed by resolveDisputeFor*
 // -------------------------------------------------------------------------
 
 export type ArbiterVerdict = 'seller' | 'buyer'

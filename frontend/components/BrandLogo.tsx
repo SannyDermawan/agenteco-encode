@@ -1,7 +1,7 @@
 /**
  * The AgentEco mark shown beside the "AgentEco" wordmark. Source art lives in
  * asset/agenteco-logo.png; public/agenteco-logo.png is a trimmed 175×96 copy.
- * Size it by height (e.g. `h-6`) — the width follows the logo's aspect ratio.
+ * Size it by height (e.g. `h-6`), the width follows the logo's aspect ratio.
  */
 export function BrandLogo({ className = 'h-[26px]' }: { className?: string }) {
   return (

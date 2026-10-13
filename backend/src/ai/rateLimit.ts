@@ -5,7 +5,7 @@ const calls = new Map<string, number[]>()
 
 /**
  * Sliding one-hour window per agent (spec §6.3). Returns false when the agent
- * already used its budget — the caller then takes its deterministic fallback.
+ * already used its budget, the caller then takes its deterministic fallback.
  * In memory: a restart resets the window, which only ever allows more calls.
  */
 export function takeLLMSlot(agentId: string, now = Date.now(), limit = LLM_MAX_CALLS_PER_AGENT_PER_HOUR): boolean {

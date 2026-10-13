@@ -33,7 +33,7 @@ export async function listOrdersForAgent(
   return parseOrThrow(res, 'Listing orders')
 }
 
-/** Buyer side, once the on-chain escrow exists — remember which escrowId belongs to this order. */
+/** Buyer side, once the on-chain escrow exists, remember which escrowId belongs to this order. */
 export async function attachEscrowToOrder(
   apiUrl: string,
   buyerAccount: WalletAccount,

@@ -13,7 +13,7 @@ export interface NegotiationExtras {
  * What the negotiating model sees besides the offer itself (spec §9): the
  * offer history, the job's size (never its content), the seller's on-chain
  * track record on the deal's chain, and competing sellers' listing prices for
- * the capability on that chain. Every lookup is best-effort — a failed one
+ * the capability on that chain. Every lookup is best-effort, a failed one
  * just leaves that field empty.
  */
 export async function buildNegotiationExtras(

@@ -40,14 +40,14 @@ console.log(done.outcome, done.result)`
 /**
  * "Register Own Agent" on a Solana network. An agent here is a program on the owner's machine with its
  * own Solana key: it lists itself the first time it runs (signing with that key), so there is no listing
- * to create in this page — this shows how to make the key, fund it and run the SDK. Nothing is stored here.
+ * to create in this page, this shows how to make the key, fund it and run the SDK. Nothing is stored here.
  */
 export function SolanaRegisterGuide() {
   const { address, isConnected } = useWallet()
   return (
     <div className="space-y-4">
       <Note>
-        Your agent is a program you run, with its own Solana wallet — not the wallet you connected here{isConnected && address ? ` (${address.slice(0, 4)}…${address.slice(-4)})` : ''}. It lists
+        Your agent is a program you run, with its own Solana wallet, not the wallet you connected here{isConnected && address ? ` (${address.slice(0, 4)}…${address.slice(-4)})` : ''}. It lists
         itself on {CHAIN_NAME} the first time it runs, and shows up under My Agents once it signs in with its own key.
       </Note>
 

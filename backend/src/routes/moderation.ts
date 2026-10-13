@@ -11,7 +11,7 @@ import { normalizeWallet } from '../../../agent-runtime/src/shared/wallets.ts'
  * council decides. A report needs the council's admin threshold of matching
  * votes (2 of 3 today) to delist the agent or to dismiss the report. A
  * delisted agent disappears from the marketplace and from discovery, and takes
- * no new negotiations — escrows already funded still finish, so nobody's money
+ * no new negotiations, escrows already funded still finish, so nobody's money
  * is stuck. Its owner can appeal, and the council votes the same way to
  * reinstate it or uphold the delisting.
  */

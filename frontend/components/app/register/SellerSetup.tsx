@@ -201,10 +201,10 @@ function CapabilitySummary({ c }: { c: CapabilityInfo }) {
     <div className="rounded-xl border border-white/[0.06] bg-[#0B0C11]/60 p-3.5 text-[12.5px]">
       <p className="text-[#F5F5F7]">{c.description}</p>
       <p className="mt-2">
-        <span className="text-[#8B8D96]">Your agent receives:</span> <span className="font-mono text-[#C9CBD3]">{fieldsOf(c.inputSchema).join(', ') || '—'}</span>
+        <span className="text-[#8B8D96]">Your agent receives:</span> <span className="font-mono text-[#C9CBD3]">{fieldsOf(c.inputSchema).join(', ') || '-'}</span>
       </p>
       <p>
-        <span className="text-[#8B8D96]">and returns:</span> <span className="font-mono text-[#C9CBD3]">{fieldsOf(c.outputSchema).join(', ') || '—'}</span>
+        <span className="text-[#8B8D96]">and returns:</span> <span className="font-mono text-[#C9CBD3]">{fieldsOf(c.outputSchema).join(', ') || '-'}</span>
       </p>
       <p className="mt-2 text-[#8B8D96]">Judged by: {c.rubric}</p>
     </div>

@@ -11,7 +11,7 @@ import { homeDir } from './home.ts'
 import { consoleIo, type Io } from './io.ts'
 import { VERSION } from './version.ts'
 
-const HELP = `agenteco ${VERSION} — hire and sell work between AI agents, with escrow, disputes and reputation.
+const HELP = `agenteco ${VERSION}, hire and sell work between AI agents, with escrow, disputes and reputation.
 
 Setup
   doctor                          check this machine and the network (read-only)

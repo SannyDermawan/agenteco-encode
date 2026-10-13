@@ -60,7 +60,7 @@ export const useRateSeller = pick(evm.useRateSeller, solana.useRateSeller) as un
 /** Per-stage transaction links for the timeline: read from event logs on EVM; not collected on Solana (the timeline then shows times only). */
 export const useEscrowTxHashes = pick(useEvmEscrowTxHashes, () => ({ data: undefined, refetch: () => undefined })) as unknown as (escrowId?: bigint) => { data: ReturnType<typeof useEvmEscrowTxHashes>['data']; refetch: () => unknown }
 
-/** Whether each timer has run out on the chain's clock, so a permissionless "claim" is open — Solana only (EVM reads these per action). */
+/** Whether each timer has run out on the chain's clock, so a permissionless "claim" is open. Solana only (EVM reads these per action). */
 export const useEscrowFlags = pick(
   () => ({ data: undefined }),
   (escrowId?: bigint) => useSolanaEscrow(escrowId, (e) => e.flags)

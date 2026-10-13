@@ -105,7 +105,7 @@ deviceLinksRouter.post('/', async (req, res) => {
 deviceLinksRouter.get('/by-code/:code', async (req, res) => {
   const code = normalizeCode(req.params.code)
   const link = code ? await prisma.deviceLink.findUnique({ where: { userCode: code } }) : null
-  if (!link || effectiveStatus(link) !== 'pending') return res.status(404).json({ error: 'No pending link with that code — it may have expired. Start again from the terminal.' })
+  if (!link || effectiveStatus(link) !== 'pending') return res.status(404).json({ error: 'No pending link with that code, it may have expired. Start again from the terminal.' })
 
   const info = { userCode: link.userCode, agentWallet: link.agentWallet, chainId: link.chainId, role: link.role, label: link.label, expiresAt: link.expiresAt }
   const address = typeof req.query.address === 'string' ? req.query.address : undefined
@@ -163,7 +163,7 @@ deviceLinksRouter.post('/by-code/:code/approve', async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const code = normalizeCode(req.params.code)
   const link = code ? await prisma.deviceLink.findUnique({ where: { userCode: code } }) : null
-  if (!link || effectiveStatus(link) !== 'pending') return res.status(404).json({ error: 'No pending link with that code — it may have expired. Start again from the terminal.' })
+  if (!link || effectiveStatus(link) !== 'pending') return res.status(404).json({ error: 'No pending link with that code, it may have expired. Start again from the terminal.' })
   if (link.attempts >= MAX_ATTEMPTS) return res.status(429).json({ error: 'Too many wrong attempts for this code. Start again from the terminal.' })
 
   const problem = await approvalProblem(link, parsed.data)

@@ -28,7 +28,7 @@ export function Field({
   )
 }
 
-/** "123 / 500" — turns red past the limit. */
+/** "123 / 500", turns red past the limit. */
 export function CharCount({ value, max }: { value: string; max: number }) {
   return <span className={value.length > max ? 'text-[#EF4444]' : undefined}>{value.length} / {max}</span>
 }

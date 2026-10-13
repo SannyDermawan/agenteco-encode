@@ -39,7 +39,7 @@ export async function getDispute(apiUrl: string, escrowId: string, reader: Walle
   return parseOrThrow(res, 'Reading dispute')
 }
 
-/** Buyer: the reason text behind raiseDispute's reasonHash — must be the exact hashed string. */
+/** Buyer: the reason text behind raiseDispute's reasonHash, must be the exact hashed string. */
 export async function submitDisputeReason(apiUrl: string, buyer: WalletAccount, escrowId: string, reason: string, chainId?: string): Promise<RegistryDispute> {
   const res = await fetch(withChain(`${apiUrl}/disputes/${escrowId}`, chainId), {
     method: 'PUT',

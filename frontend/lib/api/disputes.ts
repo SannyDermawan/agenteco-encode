@@ -57,7 +57,7 @@ export async function listDisputeReasons(): Promise<ApiDispute[]> {
   return parseOrThrow(res)
 }
 
-/** The buyer's side of the story for the arbiter — signed, since only the escrow's buyer may write it. */
+/** The buyer's side of the story for the arbiter, signed, since only the escrow's buyer may write it. */
 export async function submitDisputeReason(signer: WalletSigner, escrowId: string, reason: string): Promise<ApiDispute> {
   const authHeaders = await buildAuthHeaders(signer)
   const res = await fetch(`${API_URL}/disputes/${escrowId}`, {

@@ -66,7 +66,7 @@ export async function getOrder(id: string): Promise<ApiOrder | null> {
 
 /**
  * Beyond "funded", AgentEco.sol is the source of truth for status (see
- * schema comment on the Order model) — this DB record only distinguishes
+ * schema comment on the Order model), this DB record only distinguishes
  * agreed-but-not-yet-funded from funded. The on-chain order page reads the
  * real live status once `escrowId` is set.
  */
@@ -96,7 +96,7 @@ export function toNegotiationEntries(order: ApiOrder): NegotiationEntry[] {
 }
 
 /**
- * Off-chain half of the activity feed (§20) — built from real negotiation
+ * Off-chain half of the activity feed (§20), built from real negotiation
  * messages, not synthetic "discovered"/"quote requested" lines we have no
  * record of. The on-chain half (escrow funded/executing/delivered/settled)
  * is merged in by the page itself once it has batched on-chain timestamps.

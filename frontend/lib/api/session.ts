@@ -72,7 +72,7 @@ export function hasReadSession(address: string | null | undefined): boolean {
   return load(address) !== null
 }
 
-/** Headers for a read of the connected wallet's own data — empty when not signed in (or on the server). */
+/** Headers for a read of the connected wallet's own data, empty when not signed in (or on the server). */
 export function readHeaders(): Record<string, string> {
   if (!activeAddress || typeof window === 'undefined') return {}
   const stored = load(activeAddress)
@@ -86,7 +86,7 @@ export function dropReadSession() {
   try {
     window.localStorage.removeItem(storageKey(activeAddress))
   } catch {
-    // Storage unavailable — nothing was kept anyway.
+    // Storage unavailable, nothing was kept anyway.
   }
   notify()
 }
@@ -177,7 +177,7 @@ export function sessionVersion(): number {
 
 /** Thrown by reads the API refused because the viewer is not a party to the order. */
 export class PrivateOrderError extends Error {
-  constructor(message = 'This order is private — only its buyer, seller and the arbiter can see it.') {
+  constructor(message = 'This order is private, only its buyer, seller and the arbiter can see it.') {
     super(message)
     this.name = 'PrivateOrderError'
   }

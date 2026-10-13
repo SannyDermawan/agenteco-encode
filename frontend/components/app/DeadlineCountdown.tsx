@@ -20,7 +20,7 @@ export function useNow(): number {
   return now
 }
 
-/** "4m 12s left" or "passed" — the one line every deadline uses. */
+/** "4m 12s left" or "passed", the one line every deadline uses. */
 export function Remaining({ deadline, now }: { deadline: number; now: number }) {
   const left = deadline - now
   return left > 0 ? (

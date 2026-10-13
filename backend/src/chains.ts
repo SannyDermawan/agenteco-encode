@@ -17,7 +17,7 @@ import { SolanaRpcBackend } from '../../agent-runtime/src/chain/solana-rpc.ts'
 import type { ChainId } from '../../agent-runtime/src/chain/types.ts'
 import { log } from './log.ts'
 
-// The chains this backend serves (CHAINS, default: NETWORK alone), of either family — see
+// The chains this backend serves (CHAINS, default: NETWORK alone), of either family, see
 // agent-runtime/src/chain/multi.ts. `readAdapter` works on any of them; `readChain` is the EVM-only
 // adapter (hosted agents, ERC-8004, viem clients) and refuses a Solana chain.
 export {
@@ -39,7 +39,7 @@ export type { ChainId } from '../../agent-runtime/src/chain/types.ts'
 
 /**
  * The chain a request is about: a `chainId` in the JSON body, else a `?chain=` query
- * parameter (CAIP-2 id, network name or EVM chain id), else the default chain — so a
+ * parameter (CAIP-2 id, network name or EVM chain id), else the default chain, so a
  * client that never names a chain keeps working against the primary one. An unknown or
  * unserved chain is answered with 400 and undefined is returned.
  */
@@ -58,7 +58,7 @@ export function requestChain(req: Request, res: Response): ChainId | undefined {
   }
 }
 
-/** EVM chain ids of every served EVM chain — what a website sign-in may be signed for. */
+/** EVM chain ids of every served EVM chain, what a website sign-in may be signed for. */
 export function servedEvmChainIds(): number[] {
   return servedChainIdsOf('evm').map((id) => chainConfig(id).chain.id)
 }
@@ -103,7 +103,7 @@ export function chainSummaries() {
 
 /**
  * Refuses to run against an RPC that reports another chain than the one it is configured
- * for — e.g. a mainnet process accidentally given a testnet RPC. Checks every served chain.
+ * for, e.g. a mainnet process accidentally given a testnet RPC. Checks every served chain.
  */
 /**
  * Throws when a served chain's RPC answers for another chain (a misconfiguration). An RPC that cannot be

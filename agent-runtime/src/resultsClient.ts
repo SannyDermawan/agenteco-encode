@@ -18,7 +18,7 @@ export interface EscrowResult {
 /**
  * Publishes the plaintext result behind an on-chain markDelivered hash.
  * The backend verifies `keccak256(JSON.stringify(result))` matches what's
- * already committed on-chain for this escrow before storing it — so this
+ * already committed on-chain for this escrow before storing it, so this
  * call must happen *after* markDelivered succeeds, with the exact same
  * result object used to build that hash.
  */

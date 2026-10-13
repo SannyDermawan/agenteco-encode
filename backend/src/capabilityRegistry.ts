@@ -60,7 +60,7 @@ export async function unknownCapabilities(ids: string[]): Promise<string[]> {
 
 /**
  * Every capability with its marketplace statistics. `top` (default) puts the
- * best-rated, least-disputed, most-used and available ones first — see rankScore;
+ * best-rated, least-disputed, most-used and available ones first, see rankScore;
  * `new` lists the newest first, platform ones last.
  */
 export async function listCapabilities(sort: 'top' | 'new' = 'top'): Promise<CapabilityInfo[]> {

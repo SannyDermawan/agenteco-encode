@@ -5,7 +5,7 @@ export function DemoModeBanner() {
   if (!DEMO_MODE) return null
   return (
     <div className="border-b border-[#F59E0B]/20 bg-[#F59E0B]/[0.07] px-4 py-2 text-center text-[12px] text-[#F5C26B] md:px-7">
-      <span className="font-medium">Demo mode — timers shortened.</span>{' '}
+      <span className="font-medium">Demo mode: timers shortened.</span>{' '}
       <span className="text-[#C9A15A]">
         Execution {formatDuration(EXECUTION_WINDOW_SECONDS)}, review {formatDuration(REVIEW_WINDOW_SECONDS)}; production uses days.
       </span>

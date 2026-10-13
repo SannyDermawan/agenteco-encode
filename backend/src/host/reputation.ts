@@ -5,7 +5,7 @@ import type { OnchainReputation } from '../../../agent-runtime/src/chain/types.t
 export type { OnchainReputation }
 
 /**
- * Raw on-chain reputation, as AgentEco.sol reports it — summed over the
+ * Raw on-chain reputation, as AgentEco.sol reports it, summed over the
  * current deployment and every legacy one, so a seller keeps its history.
  */
 export function getOnchainReputation(publicClient: PublicClient, address: Address): Promise<OnchainReputation> {

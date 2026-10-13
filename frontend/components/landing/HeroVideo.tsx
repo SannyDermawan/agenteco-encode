@@ -8,7 +8,7 @@ import { animate, motion, useReducedMotion, useSpring } from 'framer-motion'
  * Made from asset/Background-Hero.mp4 (720p, 7 s): the generator's marks cropped
  * off (top 48 px and bottom 80 px), the last second cross-faded into the first so
  * the loop has no jump, every frame AI-upscaled 2x with Real-ESRGAN
- * (realesr-animevideov3), then encoded at 1920x888 with ffmpeg — AV1 (SVT-AV1,
+ * (realesr-animevideov3), then encoded at 1920x888 with ffmpeg. AV1 (SVT-AV1,
  * 10-bit, ~1 MB) where it plays, H.264 (x264, ~1 MB) elsewhere. A visitor
  * downloads just one. The poster is the first frame, so the scene is there
  * before the video arrives.

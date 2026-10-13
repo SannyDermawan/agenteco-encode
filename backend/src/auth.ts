@@ -3,7 +3,7 @@ import { recoverMessageAddress } from 'viem'
 import { verifySolanaSignature } from '../../agent-runtime/src/chain/solana.ts'
 import { normalizeWallet, sameWallet, walletFamily } from '../../agent-runtime/src/shared/wallets.ts'
 
-// A signature is only valid for this long after its timestamp — bounds how
+// A signature is only valid for this long after its timestamp, bounds how
 // long a captured header set could be replayed.
 const MAX_AGE_MS = 60_000
 
@@ -11,12 +11,12 @@ const MAX_AGE_MS = 60_000
 export type AuthResult = { ok: true; wallet: string } | { ok: false; error: string }
 
 /**
- * Cryptographic proof of wallet ownership — replaces trusting a plain
+ * Cryptographic proof of wallet ownership, replaces trusting a plain
  * x-owner-wallet header. The caller signs `AgentEco:<wallet>:<timestamp>`
  * with their private key (see agent-runtime/src/authHeaders.ts and
  * frontend/lib/api/authHeaders.ts) and sends the signature + timestamp
- * alongside the claimed wallet — an EIP-191 signature for an EVM wallet, an ed25519 signature
- * (base58) for a Solana wallet. This only proves *who is calling* —
+ * alongside the claimed wallet, an EIP-191 signature for an EVM wallet, an ed25519 signature
+ * (base58) for a Solana wallet. This only proves *who is calling*,
  * whether that wallet is allowed to touch a given resource is still a
  * separate, per-route check against that resource's stored ownerWallet.
  */
@@ -57,7 +57,7 @@ export async function verifyOwnerAuth(req: Request): Promise<AuthResult> {
 
 /**
  * Is `wallet` the agent's owner: the wallet it was registered under, or the person it is linked
- * to (an approved device link — Agent.accountWallet)? The checks that guard what a person may do
+ * to (an approved device link. Agent.accountWallet)? The checks that guard what a person may do
  * to an agent from the website (edit, pause, delete, appeal) use this.
  */
 export function isAgentOwnerWallet(wallet: string, agent: { ownerWallet: string; accountWallet?: string | null }): boolean {
@@ -66,7 +66,7 @@ export function isAgentOwnerWallet(wallet: string, agent: { ownerWallet: string;
 
 /**
  * Is `wallet` allowed to act as this agent? True for the human owner
- * (administrative actions from the website — toggling online/offline,
+ * (administrative actions from the website, toggling online/offline,
  * editing) OR the agent's own operating wallet (a hosted buyer task's host
  * runtime, signing with the key it holds for exactly this agent). A
  * self-custodied agent like buyer-agent/seller-agent has these be the same

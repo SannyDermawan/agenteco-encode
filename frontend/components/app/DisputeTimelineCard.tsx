@@ -66,7 +66,7 @@ function rulingRationale(d: ApiDispute): string | null {
 
 /**
  * The whole dispute, step by step (spec §11): the buyer's reason, the
- * seller's response, the AI arbiter's recommendation and the ruling — each
+ * seller's response, the AI arbiter's recommendation and the ruling, each
  * text re-hashed against the chain, with the ruling's transaction. Visible to
  * anyone, so it can be followed without being the arbiter.
  */
@@ -157,7 +157,7 @@ export function DisputeTimelineCard({ escrowId, status, buyer }: { escrowId: big
             {error && <p className="text-[12px] text-[#EF4444]">{error}</p>}
           </div>
         ) : (
-          <p className={muted}>The reason text hasn&apos;t reached the API — only its hash is on-chain.</p>
+          <p className={muted}>The reason text hasn&apos;t reached the API, only its hash is on-chain.</p>
         )}
         <div className="mt-1.5">
           <HashCheck label="reasonHash" text={d?.reason || null} onchainHash={reasonHash ?? d?.reasonHash} />
@@ -176,7 +176,7 @@ export function DisputeTimelineCard({ escrowId, status, buyer }: { escrowId: big
             </div>
           </>
         ) : responded ? (
-          <p className={muted}>Answered on-chain — waiting for the text…</p>
+          <p className={muted}>Answered on-chain, waiting for the text…</p>
         ) : d?.recommendedAt || !open ? (
           <p className={muted}>No response.</p>
         ) : (
@@ -204,7 +204,7 @@ export function DisputeTimelineCard({ escrowId, status, buyer }: { escrowId: big
         ) : !HAS_AI_ARBITER ? (
           <p className={muted}>There is no AI arbiter on this network: the arbiter rules directly, or the dispute timeout refunds the buyer.</p>
         ) : d?.recUnavailable ? (
-          <p className={muted}>AI recommendation unavailable — the arbiter decides manually, or the timeout refunds the buyer.</p>
+          <p className={muted}>AI recommendation unavailable, the arbiter decides manually, or the timeout refunds the buyer.</p>
         ) : (
           <p className={muted}>Runs once the seller responds or its response window closes.</p>
         )}

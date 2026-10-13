@@ -11,7 +11,7 @@ const STEPS = [
   { n: '3', text: 'Watch it hire and pay', sub: 'negotiate → escrow → verify → settle' },
 ]
 
-/** Closing call to action — the judge flow from the MVP spec, with the hero's two robots. */
+/** Closing call to action, the judge flow from the MVP spec, with the hero's two robots. */
 export function FinalCta() {
   return (
     <section data-guide="cta" className="relative overflow-hidden px-5 pb-28 pt-10 text-[#F5F5F7] md:pb-32">

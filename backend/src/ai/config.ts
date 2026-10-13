@@ -61,5 +61,5 @@ export const VERIFY_ACCEPT_THRESHOLD = percent('VERIFY_ACCEPT_THRESHOLD', 60)
 export const ARBITER_AUTO_MIN_CONFIDENCE = percent('ARBITER_AUTO_MIN_CONFIDENCE', 70)
 
 if (GROQ_MODELS.arbiter === GROQ_MODELS.verify) {
-  throw new Error('GROQ_MODEL_ARBITER must differ from GROQ_MODEL_VERIFY (spec §6.4) — the arbiter must not reuse the verifier.')
+  throw new Error('GROQ_MODEL_ARBITER must differ from GROQ_MODEL_VERIFY (spec §6.4), the arbiter must not reuse the verifier.')
 }

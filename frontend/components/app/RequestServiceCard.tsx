@@ -36,7 +36,7 @@ export function RequestServiceCard({ agent }: { agent: AgentSummary }) {
 
   const [step, setStep] = useState<Step>('idle')
   const [error, setError] = useState<string | null>(null)
-  // Set when the wallet lacks the settlement token — shows the test-token card.
+  // Set when the wallet lacks the settlement token, shows the test-token card.
   const [needsTokens, setNeedsTokens] = useState(false)
 
   const seller = agent.walletAddress
@@ -50,7 +50,7 @@ export function RequestServiceCard({ agent }: { agent: AgentSummary }) {
   const [briefDraft, setBriefDraft] = useState<BriefDraft>(EMPTY_BRIEF_DRAFT)
   const [criteria, setCriteria] = useState('')
   const [showBriefErrors, setShowBriefErrors] = useState(false)
-  // The contract itself will escrow for any address — "offline" is only
+  // The contract itself will escrow for any address. "offline" is only
   // enforced here and in the registry, so an offline seller is never hired.
   const [isOfflineNow, setIsOfflineNow] = useState(false)
   const isOffline = agent.status === 'offline' || isOfflineNow
@@ -81,7 +81,7 @@ export function RequestServiceCard({ agent }: { agent: AgentSummary }) {
     }
 
     try {
-      // Re-check right before any money moves — this page may have been open
+      // Re-check right before any money moves, this page may have been open
       // since before the seller went offline.
       setStep('checking-status')
       const latest = await getAgent(agent.id)

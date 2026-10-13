@@ -7,7 +7,7 @@ import { CUSTOM_CAPABILITY_ID, registerCapabilitySchema } from '../../../agent-r
 import { normalizeWallet } from '../../../agent-runtime/src/shared/wallets.ts'
 
 /**
- * The open capability registry. Public to read — a capability is a contract
+ * The open capability registry. Public to read, a capability is a contract
  * between strangers, so its schemas and rubric are for everyone to see.
  * Publishing is signed by the developer's wallet and can't be undone or
  * edited: tasks commit to a capability, so a new version is a new id.
@@ -36,7 +36,7 @@ capabilitiesRouter.post('/', async (req, res) => {
     return res.status(400).json({ error: issue ? `${issue.path.join('.') || 'capability'}: ${issue.message}` : 'Invalid capability' })
   }
   if (await getCapability(parsed.data.id)) {
-    return res.status(409).json({ error: `"${parsed.data.id}" is already published — capabilities are immutable, so publish a new id (e.g. "${parsed.data.id}_v2").` })
+    return res.status(409).json({ error: `"${parsed.data.id}" is already published, capabilities are immutable, so publish a new id (e.g. "${parsed.data.id}_v2").` })
   }
 
   const row = await prisma.capability.create({

@@ -56,7 +56,7 @@ const DISPUTED = 4
 export function AppSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname()
 
-  // The arbiter's inbox — only shown to the wallet the contract names as arbiter.
+  // The arbiter's inbox, only shown to the wallet the contract names as arbiter.
   const { address } = useWallet()
   const isArbiter = useIsArbiter(address)
   const { data: disputes } = useDisputes(isArbiter)

@@ -20,7 +20,7 @@ function sleep(ms: number): Promise<void> {
 
 /**
  * Multi-tenant runtime for hosted buyer tasks ("make an agent buy for me"),
- * hosted seller agents and the AI arbiter —
+ * hosted seller agents and the AI arbiter,
  * the platform-run counterpart to the standalone buyer-agent/seller-agent
  * processes, which self-custody their own keys instead. Requires the API
  * server (src/server.ts) to already be running on the same host, since it
@@ -30,11 +30,11 @@ async function main(): Promise<void> {
   log('Host runtime started', 'HOST')
   for (const id of servedChainIdsOf('evm')) {
     const { config } = readChain(id)
-    log(`Chain: ${config.chain.name} (${id}) — contract ${config.agentEco}, ${config.tokenSymbol} ${config.usdt}`, 'HOST')
+    log(`Chain: ${config.chain.name} (${id}), contract ${config.agentEco}, ${config.tokenSymbol} ${config.usdt}`, 'HOST')
   }
   log(`Polling interval: ${INTERVAL_MS}ms`, 'HOST')
 
-  // The host signs real transactions — never let it run against the wrong
+  // The host signs real transactions, never let it run against the wrong
   // chain, or with escrow windows a chain's contract would reject.
   await assertServedChainsMatchRpc()
   for (const id of servedChainIds()) assertDurationsFit(await readAdapter(id).timerLimits())
@@ -52,7 +52,7 @@ async function main(): Promise<void> {
   /**
    * One independent loop per role. Sellers must answer a funded escrow within
    * the 120 s accept timeout, so they can't wait behind a buyer that is busy
-   * sending three funding transactions on a slow RPC — and the arbiter's
+   * sending three funding transactions on a slow RPC, and the arbiter's
    * deadlines are no different. Each role signs with its own wallets, so the
    * loops never share a nonce. A loop never overlaps itself.
    */

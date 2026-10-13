@@ -27,14 +27,14 @@ export interface ApiAgent {
   ownerWallet: string
   createdAt: string
   updatedAt: string
-  // Hosted agent fields — only set for an agent AgentEco runs on the
+  // Hosted agent fields, only set for an agent AgentEco runs on the
   // owner's behalf (a buyer task, or a hosted seller). Null for self-custody
   // demo agents.
   taskStatus: HostedTaskStatus | null
   depositorWallet: string | null
   minSuccessRate: number | null
   minCompletedJobs: number | null
-  /** Minimum average rating 0–100 (stars × 20) — see create-agent. */
+  /** Minimum average rating 0–100 (stars × 20), see create-agent. */
   minReputation: number | null
   /** Seller: style guide for its model. */
   customInstructions: string | null
@@ -50,7 +50,7 @@ export interface ApiAgent {
 
 export interface CreateAgentInput {
   name: string
-  // Optional — a buyer agent doesn't offer a capability, so it has neither.
+  // Optional, a buyer agent doesn't offer a capability, so it has neither.
   description?: string
   role: ApiAgentRole
   category?: string
@@ -66,7 +66,7 @@ export interface CreateAgentInput {
   inputSchema?: unknown
   outputSchema?: unknown
   isOnline?: boolean
-  // Hosted buyer task seller-selection filters — omit all three for
+  // Hosted buyer task seller-selection filters, omit all three for
   // "Recommended" (cheapest qualifying seller, no reputation filtering).
   minSuccessRate?: number
   minCompletedJobs?: number
@@ -112,8 +112,8 @@ export async function getAgent(id: string): Promise<ApiAgent | null> {
 
 /**
  * Agent profiles are public, so a session the API refuses (expired, or
- * signed on another domain) is dropped — the sign-in prompt comes back where
- * one is needed — and the read is retried anonymously.
+ * signed on another domain) is dropped, the sign-in prompt comes back where
+ * one is needed, and the read is retried anonymously.
  */
 async function fetchWithSession(url: string): Promise<Response> {
   const headers = readHeaders()
@@ -125,7 +125,7 @@ async function fetchWithSession(url: string): Promise<Response> {
 
 /**
  * A freshly registered real agent has no on-chain history yet, so
- * completedJobs/successRate/reputation are genuinely 0 — not a stand-in for
+ * completedJobs/successRate/reputation are genuinely 0, not a stand-in for
  * missing data. On-chain reputation lookup (once orders actually settle)
  * happens separately via `useReputation(agent.walletAddress)`.
  */

@@ -10,12 +10,12 @@ import { capabilityLabel } from '@/lib/capabilityTemplates'
 const DELIVERED_OR_LATER = 3 // AgentEco.sol OrderStatus.DELIVERED
 const RETRY_MS = 4000
 
-/** Shown once an escrow reaches DELIVERED or later — shared by the on-chain
+/** Shown once an escrow reaches DELIVERED or later, shared by the on-chain
  * order page and the off-chain order page's live status section. */
 export function EscrowResultCard({ escrowId, status }: { escrowId: bigint; status: number }) {
   // The seller commits the result hash on-chain first and publishes the
   // plaintext a few seconds later, so a page that sees DELIVERED early gets a
-  // 404 — keep polling until the result lands, then stop.
+  // 404, keep polling until the result lands, then stop.
   const { data: result } = useQuery({
     queryKey: ['escrowResult', escrowId.toString()],
     queryFn: () => getEscrowResult(escrowId.toString()),
@@ -47,7 +47,7 @@ export function EscrowResultCard({ escrowId, status }: { escrowId: bigint; statu
         </>
       ) : (
         <p className="text-[13px] text-[#8B8D96]">
-          No result recorded off-chain yet — only its hash was committed on-chain.
+          No result recorded off-chain yet, only its hash was committed on-chain.
         </p>
       )}
     </NeumorphicCard>

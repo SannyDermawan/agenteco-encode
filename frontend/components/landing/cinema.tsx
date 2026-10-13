@@ -42,7 +42,7 @@ export function SectionGlow({ tone = 'indigo', at = 'center' }: { tone?: keyof t
 
 /**
  * A headline whose words brighten one after another as it scrolls into the
- * middle of the screen — tied to the scroll, so it plays at the reader's pace.
+ * middle of the screen, tied to the scroll, so it plays at the reader's pace.
  */
 export function WordReveal({ text, className = '', style }: { text: string; className?: string; style?: CSSProperties }) {
   const ref = useRef<HTMLHeadingElement>(null)

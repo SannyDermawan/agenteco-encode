@@ -11,7 +11,7 @@ export interface LLMRequest<T> {
   task: LLMTask
   /** Instructions. DATA_RULES is appended automatically. */
   system: string
-  /** The task input — untrusted parts already wrapped with wrapData(). */
+  /** The task input, untrusted parts already wrapped with wrapData(). */
   user: string
   /** Output shape; anything else is a failed attempt. */
   schema: z.ZodType<T>
@@ -37,7 +37,7 @@ export interface LLMEvent {
 }
 
 // Where each attempt is reported (the host and API install a database writer
-// at startup — see aiCallLog.ts). Unset in tests, so they never touch a DB.
+// at startup, see aiCallLog.ts). Unset in tests, so they never touch a DB.
 let recorder: ((event: LLMEvent) => void) | null = null
 export function setLLMRecorder(fn: ((event: LLMEvent) => void) | null): void {
   recorder = fn
@@ -80,21 +80,21 @@ function describe(error: unknown): string {
 }
 
 /**
- * One AI call with fallbacks (spec §6.2). Providers are tried in order — Groq,
- * then Gemini — skipping any without an API key. Per provider:
+ * One AI call with fallbacks (spec §6.2). Providers are tried in order. Groq,
+ * then Gemini, skipping any without an API key. Per provider:
  * - output must be JSON matching `schema`; an invalid answer gets one retry
  *   that quotes the validation error, then the next provider takes over;
  * - HTTP 429 with retry-after ≤ LLM_MAX_WAIT_SECONDS waits once and retries;
  *   a longer wait (or any other error/timeout) moves to the next provider.
  * Returns null when every provider fails or the agent is over its hourly
- * budget — the caller must then use its deterministic fallback.
+ * budget, the caller must then use its deterministic fallback.
  *
- * Logs task, provider, model, duration and outcome — never the texts.
+ * Logs task, provider, model, duration and outcome, never the texts.
  */
 export async function callLLM<T>(req: LLMRequest<T>, deps: Partial<LLMDeps> = {}): Promise<LLMResult<T> | null> {
   const d = { ...defaultDeps, ...deps }
   if (req.agentId && !d.takeSlot(req.agentId)) {
-    log(`[ai] ${req.task}: agent ${req.agentId} is over its hourly AI budget — using fallback`)
+    log(`[ai] ${req.task}: agent ${req.agentId} is over its hourly AI budget, using fallback`)
     record({ task: req.task, provider: 'none', model: null, outcome: 'over_budget', ms: null, agentId: req.agentId })
     return null
   }
@@ -127,7 +127,7 @@ export async function callLLM<T>(req: LLMRequest<T>, deps: Partial<LLMDeps> = {}
           .slice(0, 5)
           .map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
           .join('; ')
-        log(`[ai] ${req.task} invalid output from ${provider.name}/${model} (${ms()}ms)${validationRetried ? ' — next provider' : ' — retrying once'}`)
+        log(`[ai] ${req.task} invalid output from ${provider.name}/${model} (${ms()}ms)${validationRetried ? ', next provider' : ', retrying once'}`)
         record({ task: req.task, provider: provider.name, model, outcome: 'invalid', ms: ms(), agentId: req.agentId })
         if (validationRetried) break
         validationRetried = true
@@ -142,13 +142,13 @@ export async function callLLM<T>(req: LLMRequest<T>, deps: Partial<LLMDeps> = {}
           await d.sleep(retryAfter * 1000)
           continue
         }
-        log(`[ai] ${req.task} failed on ${provider.name}/${model} (${describe(error)}, ${ms()}ms) — next provider`)
+        log(`[ai] ${req.task} failed on ${provider.name}/${model} (${describe(error)}, ${ms()}ms), next provider`)
         break
       }
     }
   }
 
-  log(`[ai] ${req.task}: no provider succeeded — using fallback`)
+  log(`[ai] ${req.task}: no provider succeeded, using fallback`)
   record({ task: req.task, provider: 'none', model: null, outcome: 'fallback', ms: null, agentId: req.agentId })
   return null
 }

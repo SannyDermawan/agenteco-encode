@@ -28,7 +28,7 @@ export function AgentShell({ role, progress, lit, children }: AgentShellProps) {
   const dir = role === 'buyer' ? -1 : 1
   const rgb = RGB[role]
 
-  // vertical float — the neon shadow is derived from this same value
+  // vertical float, the neon shadow is derived from this same value
   const float = useMotionValue(0)
   useEffect(() => {
     if (reduce) return

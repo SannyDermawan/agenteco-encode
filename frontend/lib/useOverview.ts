@@ -26,7 +26,7 @@ type OrderRowWithMeta = Order & { sortAt: number; escrowId?: bigint }
 /**
  * Everything the Dashboard, Orders, and Activity pages show for the connected
  * wallet: negotiated orders from the registry, plus direct "Request Service"
- * hires that only exist on-chain (no Order row) — both with live escrow status.
+ * hires that only exist on-chain (no Order row), both with live escrow status.
  */
 export function useOverview() {
   const { address, isConnected } = useWallet()
@@ -135,7 +135,7 @@ export function useOverview() {
   const settledRows = orderRows.filter((r) => r.escrowStatus === ON_CHAIN_SETTLED)
   const settledCount = settledRows.length
   const totalVolumeSettled = settledRows.reduce((sum, r) => sum + r.amount, 0)
-  // Anything not settled or refunded is still in flight — including agreed-but-unfunded deals.
+  // Anything not settled or refunded is still in flight, including agreed-but-unfunded deals.
   const activeOrders = orderRows.filter((r) => r.escrowStatus !== ON_CHAIN_SETTLED && r.escrowStatus !== ON_CHAIN_REFUNDED).length
 
   const activityEntries = useMemo(() => {

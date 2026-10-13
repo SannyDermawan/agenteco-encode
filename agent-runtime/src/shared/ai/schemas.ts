@@ -1,11 +1,11 @@
 import { z } from 'zod'
 
 /**
- * The shapes an AI must answer in — validated before anything acts on them
+ * The shapes an AI must answer in, validated before anything acts on them
  * (spec §6.2). Shared by the backend and the SDK.
  */
 
-// Execution — only the parts the model writes; code supplies the numbers.
+// Execution, only the parts the model writes; code supplies the numbers.
 export const translationExecution = z.object({
   translatedText: z.string().min(1),
   notes: z.string().max(500).optional(),

@@ -7,7 +7,7 @@ import { useMotionValue, type MotionValue } from 'framer-motion'
  * Scroll progress of an element, measured from where it really is on screen.
  *
  * framer-motion's useScroll measures a target with offsetTop, which CSS `zoom` leaves in the element's
- * own, unzoomed units — so inside the zoomed part of the landing page it drifts away from the real scroll
+ * own, unzoomed units, so inside the zoomed part of the landing page it drifts away from the real scroll
  * position. This hook reads getBoundingClientRect (real pixels) instead. Same offset syntax as useScroll:
  * "<edge of the element> <edge of the screen>", where an edge is start, center, end or a percentage.
  */

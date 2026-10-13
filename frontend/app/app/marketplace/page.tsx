@@ -26,7 +26,7 @@ export default function MarketplacePage() {
   const [sort, setSort] = useState('Recommended')
 
   useEffect(() => {
-    // The Marketplace lists services on offer — sellers only. Discovery
+    // The Marketplace lists services on offer, sellers only. Discovery
     // (§10) happens server-side via the registry; category/price/sort
     // stay client-side since the whole seller list is small enough to fetch
     // once and slice in the browser.

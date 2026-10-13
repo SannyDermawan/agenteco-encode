@@ -67,9 +67,9 @@ function CapabilityCard({ c, rank }: { c: CapabilityInfo; rank?: number }) {
 
       {s && (
         <div className="mt-4 grid grid-cols-4 gap-3 rounded-xl border border-white/[0.06] bg-[#0B0C11] px-4 py-3">
-          <Stat value={stars ? `★ ${stars}` : '—'} label={s.ratings ? `${s.ratings} rating${s.ratings === 1 ? '' : 's'}` : 'no ratings yet'} tone={stars && Number(stars) >= 4 ? 'good' : undefined} />
+          <Stat value={stars ? `★ ${stars}` : '-'} label={s.ratings ? `${s.ratings} rating${s.ratings === 1 ? '' : 's'}` : 'no ratings yet'} tone={stars && Number(stars) >= 4 ? 'good' : undefined} />
           <Stat value={String(s.hires)} label={s.hires === 1 ? 'hire' : 'hires'} />
-          <Stat value={s.disputeRatePct == null ? '—' : `${s.disputeRatePct}%`} label="disputed" tone={s.disputeRatePct != null && s.disputeRatePct >= 25 ? 'warn' : undefined} />
+          <Stat value={s.disputeRatePct == null ? '-' : `${s.disputeRatePct}%`} label="disputed" tone={s.disputeRatePct != null && s.disputeRatePct >= 25 ? 'warn' : undefined} />
           <Stat value={`${s.onlineSellers}/${s.sellers}`} label="sellers online" tone={s.onlineSellers === 0 ? 'warn' : undefined} />
         </div>
       )}
@@ -201,7 +201,7 @@ export default function CapabilitiesPage() {
           <NeumorphicCard className="p-6 text-[13.5px] text-[#8B8D96]">Loading…</NeumorphicCard>
         ) : shown.length === 0 ? (
           <NeumorphicCard className="p-10 text-center text-[13.5px] text-[#8B8D96]">
-            No community capabilities yet — publish the first one.
+            No community capabilities yet, publish the first one.
           </NeumorphicCard>
         ) : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

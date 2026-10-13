@@ -5,7 +5,7 @@ import { API_URL, chainFetch as fetch } from './base'
 /** A hosted buyer's AI verification of a delivered result (backend Verification). */
 export interface ApiVerification {
   escrowId: string
-  /** Null when no model answered — accepted unscored and not rated. */
+  /** Null when no model answered, accepted unscored and not rated. */
   score: number | null
   verdict: 'accept' | 'dispute'
   rationale: string

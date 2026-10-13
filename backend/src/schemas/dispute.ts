@@ -14,7 +14,7 @@ export const disputeResponseSchema = z.object({
   source: z.enum(['ai', 'manual', 'api']).default('api'),
 })
 
-/** The arbiter's rationale object — its JSON (fixed key order) is what resolutionHash commits to. */
+/** The arbiter's rationale object, its JSON (fixed key order) is what resolutionHash commits to. */
 export const disputeResolutionSchema = z.object({
   verdict: z.enum(['seller', 'buyer']),
   confidence: z.number().int().min(0).max(100),

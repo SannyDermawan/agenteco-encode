@@ -31,7 +31,7 @@ export async function registerCapability(signer: WalletSigner, input: RegisterCa
   return parseOrThrow(res)
 }
 
-/** The registry, cached for the session — published capabilities never change. */
+/** The registry, cached for the session, published capabilities never change. */
 export function useCapabilities(sort: CapabilitySort = 'top') {
   return useQuery({ queryKey: ['capabilities', sort], queryFn: () => listCapabilities(sort), staleTime: 60_000 })
 }

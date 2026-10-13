@@ -16,7 +16,7 @@ interface CoinGeckoMarket {
   market_cap: number | null
 }
 
-/** Maps CoinGecko's /coins/markets rows to our schema. Pure — tested directly. */
+/** Maps CoinGecko's /coins/markets rows to our schema. Pure, tested directly. */
 export function toCoinMarkets(rows: CoinGeckoMarket[]): CoinMarket[] {
   return rows.map((r) => ({
     id: r.id,

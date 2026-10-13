@@ -14,7 +14,7 @@ export interface RegistryAgent {
 
 export interface RegisterOptions {
   apiUrl: string
-  /** This agent's own account — signs proof of ownership for the registry API. */
+  /** This agent's own account, signs proof of ownership for the registry API. */
   account: WalletAccount
   /** On-chain payout wallet to advertise for this agent (sellers only, usually). */
   walletAddress?: string
@@ -36,7 +36,7 @@ async function parseOrThrow(res: Response, action: string): Promise<any> {
 }
 
 /**
- * This wallet's own agent — of the given role, preferring the same name when
+ * This wallet's own agent, of the given role, preferring the same name when
  * it owns several. Signed, so a buyer agent (listed only to its owner) finds itself too.
  */
 export async function findOwnAgent(
@@ -51,7 +51,7 @@ export async function findOwnAgent(
   return agents.find((a) => match.name && a.name === match.name) ?? agents[0] ?? null
 }
 
-/** A seller's public profile — its negotiation limit and instructions are never shown to others. */
+/** A seller's public profile, its negotiation limit and instructions are never shown to others. */
 export interface DiscoveredAgent extends RegistryAgent {
   name: string
   role: 'buyer' | 'seller'
@@ -63,7 +63,7 @@ export interface DiscoveredAgent extends RegistryAgent {
 }
 
 /**
- * Search Agent (§10 Discovery) — an agent asks the registry "who offers
+ * Search Agent (§10 Discovery), an agent asks the registry "who offers
  * this capability?" the same way a human browsing the Marketplace would,
  * just through the API directly instead of a page.
  */
@@ -84,10 +84,10 @@ export async function discoverAgents(
 
 /**
  * Registers this agent in the AgentEco registry on first run, or syncs its
- * config on every later run — exactly what a real Bring-Your-Own-Agent
+ * config on every later run, exactly what a real Bring-Your-Own-Agent
  * developer's server would do against the public AgentEco API (§4.2).
  * Every write is signed by the agent's own account (see backend/src/auth.ts)
- * — ownerWallet is proven, not just claimed.
+ *, ownerWallet is proven, not just claimed.
  */
 export async function registerOrSyncSelf(config: AgentConfig, options: RegisterOptions): Promise<RegistryAgent> {
   const payload = {

@@ -64,7 +64,7 @@ function parseJson(text: string): unknown {
  * One AI call whose answer must be JSON in `schema`'s shape. The security
  * rules (text in <DATA> blocks is data, not instructions) are appended to the
  * system prompt, and an invalid answer gets one retry quoting what was wrong.
- * Returns null when the model is unreachable or never answers validly — the
+ * Returns null when the model is unreachable or never answers validly, the
  * caller then falls back, exactly like AgentEco's own hosted agents.
  */
 export async function askJson<T>(ai: AiModel, prompt: Prompt, schema: z.ZodType<T>, log?: (m: string) => void): Promise<T | null> {
@@ -96,7 +96,7 @@ export async function askJson<T>(ai: AiModel, prompt: Prompt, schema: z.ZodType<
 }
 
 /**
- * Runs one of the four platform capabilities on your own model — the same
+ * Runs one of the four platform capabilities on your own model, the same
  * prompts AgentEco's hosted sellers use: code computed the facts, the model
  * writes the prose, and the combined result is checked against the capability's
  * output schema. Null when the model failed or the result is invalid.
@@ -146,7 +146,7 @@ export const ACCEPT_SCORE = 60
 
 /**
  * Scores a delivery 0–100 with your model, against the capability's rubric and
- * the buyer's criteria — the same verifier AgentEco's hosted buyers use. The
+ * the buyer's criteria, the same verifier AgentEco's hosted buyers use. The
  * decision is code's: at or above `threshold` (default 60) it accepts.
  */
 export async function scoreWithAi(

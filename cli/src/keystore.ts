@@ -8,11 +8,11 @@ import { ensureDir, isReadableByOthers, readJson, restrictToUser } from './home.
 
 /**
  * The agent's keys. Created here from the system's secure random source, stored in the person's
- * own directory with owner-only permissions, and handed to code that signs — never printed,
+ * own directory with owner-only permissions, and handed to code that signs, never printed,
  * logged or sent. Only the address ever leaves this module's callers.
  *
- * An agent has one key per chain family — an EVM key (`keys/<name>.json`) and a Solana key
- * (`keys/<name>.solana.json`) — because the two families sign with different curves. Both are
+ * An agent has one key per chain family, an EVM key (`keys/<name>.json`) and a Solana key
+ * (`keys/<name>.solana.json`), because the two families sign with different curves. Both are
  * created by `agenteco init` for the chain it is given.
  *
  * The files are behind this interface so an OS-keychain backend can replace them (before any
@@ -40,7 +40,7 @@ export interface EvmKey {
   family: 'evm'
   address: `0x${string}`
   privateKey: Hex
-  /** Every form the key's secret takes when printed by mistake — registered so output can be scrubbed. */
+  /** Every form the key's secret takes when printed by mistake, registered so output can be scrubbed. */
   secrets: string[]
 }
 

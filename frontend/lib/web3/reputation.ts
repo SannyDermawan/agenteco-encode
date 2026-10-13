@@ -5,7 +5,7 @@
 export interface ReputationSummary {
   completedJobs: number
   failedJobs: number
-  /** Settled volume in token base units — format with the token's decimals. */
+  /** Settled volume in token base units, format with the token's decimals. */
   volume: bigint
   ratingCount: number
   /** completed / (completed + failed) × 100, or null before the first finished job. */
@@ -34,7 +34,7 @@ export function summarizeReputation(
 
 /**
  * Stars to display: the indexed ratings without same-owner ones (spec §10.3),
- * falling back to "no ratings" — never the raw on-chain average, which a
+ * falling back to "no ratings", never the raw on-chain average, which a
  * seller could pump by rating itself.
  */
 export function displayStars(rating: { avgScore: number | null; count: number } | null | undefined): number | null {

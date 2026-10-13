@@ -104,7 +104,7 @@ export async function hireWithTask(input: HireInput): Promise<{ escrowId: bigint
   })
   await waitForTransactionReceipt(wagmiConfig, { hash: fundHash })
 
-  // The seller starts only once it can read the brief — retry a flaky link a
+  // The seller starts only once it can read the brief, retry a flaky link a
   // few times rather than leave a funded escrow for the accept timeout.
   onStep('linking')
   let linked: TaskLinkReceipt | null = null

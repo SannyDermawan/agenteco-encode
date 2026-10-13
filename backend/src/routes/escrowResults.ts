@@ -21,7 +21,7 @@ escrowResultsRouter.get('/:escrowId', async (req, res) => {
   res.json(result)
 })
 
-// Anyone can attempt to submit one too — instead of an owner-wallet check,
+// Anyone can attempt to submit one too, instead of an owner-wallet check,
 // this verifies the result actually hashes to what the seller already
 // committed on-chain via markDelivered. A mismatched or premature submission
 // is rejected by that check, not by who's asking.
@@ -40,7 +40,7 @@ escrowResultsRouter.post('/', async (req, res) => {
 
   // A platform capability's prose is written by a model. A result that says no model answered
   // ("AI unavailable") is not a delivery: the buyer is never shown it, and the contract's
-  // timeouts (or a dispute) decide the escrow. Checked first — it needs no chain read.
+  // timeouts (or a dispute) decide the escrow. Checked first, it needs no chain read.
   if (isCapabilityId(capability) && mentionsAiUnavailable(capability, result)) {
     return res.status(400).json({ error: `A ${capability} result must be written by an AI model; "AI unavailable" results are not accepted.` })
   }
@@ -49,7 +49,7 @@ escrowResultsRouter.post('/', async (req, res) => {
   try {
     onChainHash = await readAdapter(chainId).getResultHash(BigInt(escrowId))
   } catch {
-    return res.status(400).json({ error: 'Could not read this escrow on-chain — is the id correct?' })
+    return res.status(400).json({ error: 'Could not read this escrow on-chain, is the id correct?' })
   }
 
   // Hash the exact JSON text and keep it: jsonb reorders keys, so only the

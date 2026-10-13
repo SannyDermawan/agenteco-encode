@@ -112,7 +112,7 @@ export function Navbar() {
 
   // One pill for all links, always mounted: it slides between links, grows in
   // when a section becomes active, and shrinks out in place when none is (back
-  // on the hero) — a conditionally rendered pill could only vanish instantly.
+  // on the hero), a conditionally rendered pill could only vanish instantly.
   const linkRefs = useRef<Partial<Record<string, HTMLAnchorElement | null>>>({})
   const pillX = useMotionValue(0)
   const pillWidth = useMotionValue(0)
@@ -173,7 +173,7 @@ export function Navbar() {
           <span className="text-[16px] font-semibold tracking-[-0.01em] text-[#F5F5F7]">AgentEco</span>
         </Link>
 
-        {/* Absolutely centred on the nav itself — with justify-between it would sit in the middle
+        {/* Absolutely centred on the nav itself, with justify-between it would sit in the middle
             of the leftover space instead, drifting left whenever the right-hand group is wider. */}
         <div
           className={`absolute left-1/2 z-10 hidden -translate-x-1/2 items-center transition-all duration-500 ease-out md:flex ${

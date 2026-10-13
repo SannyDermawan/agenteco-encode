@@ -19,16 +19,16 @@ import { accountLinksRouter, deviceLinksRouter } from './routes/deviceLinks.ts'
 import { logError } from './log.ts'
 import { FRONTEND_ORIGINS } from './origins.ts'
 
-/** The API, without listening — src/server.ts serves it; tests mount it on a free port. */
+/** The API, without listening, src/server.ts serves it; tests mount it on a free port. */
 export const app = express()
-// Railway's edge proxy is the one hop in front of us — trust it for the client IP (rate limits).
+// Railway's edge proxy is the one hop in front of us, trust it for the client IP (rate limits).
 app.set('trust proxy', 1)
 app.use(helmet())
 app.use(cors({ origin: FRONTEND_ORIGINS, maxAge: 600 }))
 
 // Per client IP. Generous overall (the host polls through here for every
 // hosted agent); tight on what creates records or reads the chain.
-const limitOptions = { standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Too many requests — slow down and try again shortly.' } } as const
+const limitOptions = { standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Too many requests, slow down and try again shortly.' } } as const
 app.use(rateLimit({ ...limitOptions, windowMs: 60_000, limit: 3000 }))
 const chainLimiter = rateLimit({ ...limitOptions, windowMs: 60_000, limit: 120 })
 // Every hosted buyer's task comes from the host's single IP, so tasks get more room than agents.

@@ -41,7 +41,7 @@ export async function createTask(
   return parseOrThrow(res, 'Creating task')
 }
 
-/** What linking returns — never the brief (the caller already has it). */
+/** What linking returns, never the brief (the caller already has it). */
 export type TaskLinkReceipt = Pick<RegistryTask, 'id' | 'chainId' | 'escrowId' | 'taskHash' | 'verified'>
 
 export async function linkTaskEscrow(apiUrl: string, buyer: WalletAccount, taskId: string, escrowId: string): Promise<TaskLinkReceipt> {

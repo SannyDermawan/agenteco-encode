@@ -17,7 +17,7 @@ import { ensureDir, readJson, writeJsonAtomic } from './home.ts'
 import { SpendCapError, release, reserve, settleReservation } from './spend.ts'
 
 /**
- * A hire as a long-lived job: started now, worked in the background, decided later — by a person
+ * A hire as a long-lived job: started now, worked in the background, decided later, by a person
  * at a terminal or by the agent calling the MCP server. Each job is one file, so a restart resumes
  * it. The reviewer is whoever calls settle/dispute: nothing here ever pays for a result by itself.
  */

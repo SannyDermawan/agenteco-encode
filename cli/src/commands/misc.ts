@@ -25,7 +25,7 @@ export async function faucet(ctx: Ctx, args: string[]): Promise<number> {
   const native = await publicClient.getBalance({ address: account.address })
   if (native === BigInt(0)) {
     io.out(`The agent wallet ${account.address} has no ${config.nativeSymbol} for gas yet. A person gets some from a faucet first:`)
-    for (const g of faucetGuide(chainId).gas) io.out(`  ${g.label} — ${g.url}`)
+    for (const g of faucetGuide(chainId).gas) io.out(`  ${g.label}, ${g.url}`)
     return 1
   }
   const next = await publicClient.readContract({ address: config.usdt, abi: MOCK_USDT_ABI, functionName: 'nextClaimAt', args: [account.address] })

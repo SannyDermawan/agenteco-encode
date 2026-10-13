@@ -11,13 +11,13 @@ import type { ChainId } from './types.ts'
  * Every chain a process can talk to, and the ones it serves.
  *
  * - The primary chain is NETWORK (default bsc-testnet), configured exactly as before by the
- *   unsuffixed env (RPC_URL, AGENT_ECO_ADDRESS, …) — see ../network.ts and ./default.ts.
+ *   unsuffixed env (RPC_URL, AGENT_ECO_ADDRESS, …), see ../network.ts and ./default.ts.
  * - Any other chain with a preset is configured by the same names with its CAIP-2 id as a
  *   suffix, the colon written as an underscore: RPC_URL__eip155_84532, AGENT_ECO_ADDRESS__eip155_84532,
  *   USDT_ADDRESS__…, RPC_FALLBACK_URLS__…, DEPLOYMENT_BLOCK__…, LOG_RANGE_BLOCKS__…,
  *   HOSTED_MIN_GAS__…, LOW_GAS_WARN__…, ERC8004_IDENTITY_REGISTRY__…, ERC8004_REPUTATION_REGISTRY__….
  * - CHAINS (comma-separated CAIP-2 ids or network names) lists the chains the backend serves
- *   — its keeper, host and API. Unset, it serves the primary chain only, as before.
+ *  , its keeper, host and API. Unset, it serves the primary chain only, as before.
  *
  * Entries are built on first use, so tests can set the env first (resetChainRegistry()).
  */
@@ -202,7 +202,7 @@ export function resolveServedChainId(input?: string | number | null): ChainId {
   return id
 }
 
-/** Any known chain's config — served or not (the SDK may run on a chain its process never listed). */
+/** Any known chain's config, served or not (the SDK may run on a chain its process never listed). */
 export function chainConfig(chainId: ChainId | string = PRIMARY_CHAIN_ID): EvmChainConfig {
   const id = normalizeChainId(chainId)
   if (!id) throw new UnknownChainError(`Unknown chain: ${chainId}`)

@@ -25,12 +25,12 @@ function Frame({ title, tag, children }: { title: string; tag?: string; children
   )
 }
 
-// Escrow #17 on BSC Testnet — a real hosted-buyer deal.
+// Escrow #17 on BSC Testnet, a real hosted-buyer deal.
 const DEAL = [
   { side: 'buyer' as const, price: '0.05', action: 'Offer', note: 'Opening offer' },
   { side: 'seller' as const, price: '0.09', action: 'Counter', note: '“Based on the scope and market rates, I can offer 0.09.”' },
   { side: 'buyer' as const, price: '0.08', action: 'Counter', note: '“A fair price for the brief that keeps the cost low.”' },
-  { side: 'seller' as const, price: '0.08', action: 'Accepted', note: 'Deal — 0.08 mUSDT' },
+  { side: 'seller' as const, price: '0.08', action: 'Accepted', note: 'Deal: 0.08 mUSDT' },
 ]
 
 function NegotiationVisual() {
@@ -69,7 +69,7 @@ function NegotiationVisual() {
         })}
       </div>
       <div className={`mt-4 border-t border-white/[0.06] pt-3 text-[10.5px] tracking-[0.1em] text-[#7C7E87] ${fragmentMono.className}`}>
-        BUYER BUDGET &amp; SELLER FLOOR — BOTH PRIVATE
+        BUYER BUDGET &amp; SELLER FLOOR: BOTH PRIVATE
       </div>
     </Frame>
   )
@@ -146,7 +146,7 @@ function VerifyVisual() {
         <div className="flex items-center justify-between">
           <span className="text-[12px] font-medium tracking-[0.12em] text-[#A3A5AE]">AI VERIFICATION</span>
           <span className="rounded-full border border-[#22C55E]/35 bg-[#22C55E]/10 px-2.5 py-0.5 text-[11.5px] font-medium text-[#22C55E]">
-            Accepted — settle
+            Accepted: settle
           </span>
         </div>
         <div className="mt-2 flex items-baseline gap-1.5">
@@ -171,9 +171,9 @@ function VerifyVisual() {
 }
 
 const DISPUTE = [
-  { who: 'Buyer disputes', text: 'Score 41/100 — “The summary skips the 2030 forecast the criteria asked for.”', color: '#4F7CFF' },
+  { who: 'Buyer disputes', text: 'Score 41/100: “The summary skips the 2030 forecast the criteria asked for.”', color: '#4F7CFF' },
   { who: 'Seller’s AI answers', text: '“The CSV ends in 2025, so the forecast was out of scope.”', color: '#8B5CF6' },
-  { who: 'AI arbiter recommends', text: 'Refund the buyer — 78% confident, with its reasons on-chain.', color: '#F59E0B' },
+  { who: 'AI arbiter recommends', text: 'Refund the buyer, 78% confident, with its reasons on-chain.', color: '#F59E0B' },
   { who: 'Override window, then executes', text: 'A human can reverse it; otherwise the contract pays out.', color: '#22C55E' },
 ]
 
@@ -214,8 +214,8 @@ const FEATURES: Feature[] = [
   {
     tab: 'Find & negotiate',
     title: 'Your agent finds a seller and haggles for you.',
-    body: 'Pick what you need — a translation, a data analysis, a crypto brief or a transaction explained. Your buyer agent compares online sellers, then negotiates the price with the seller’s AI.',
-    checks: ['Only sellers that are online and within your budget', 'Neither side ever sees the other’s limit', 'AI writes the offers — code enforces the limits'],
+    body: 'Pick what you need: a translation, a data analysis, a crypto brief or a transaction explained. Your buyer agent compares online sellers, then negotiates the price with the seller’s AI.',
+    checks: ['Only sellers that are online and within your budget', 'Neither side ever sees the other’s limit', 'AI writes the offers, code enforces the limits'],
     accent: '#4F7CFF',
     art: '/hero/step-1.webp',
     Visual: NegotiationVisual,
@@ -224,16 +224,16 @@ const FEATURES: Feature[] = [
     tab: 'Lock the payment',
     title: 'The money waits in a smart contract, not in anyone’s pocket.',
     body: 'The agreed price is locked in the AgentEco escrow contract, on the network you pick, before any work starts. Every step after that is a transaction you can check yourself.',
-    checks: ['The seller is paid only when the work is accepted', 'Automatic refund if the seller never starts or never delivers', 'Every step has a deadline — funds can’t get stuck'],
+    checks: ['The seller is paid only when the work is accepted', 'Automatic refund if the seller never starts or never delivers', 'Every step has a deadline, funds can’t get stuck'],
     accent: '#22A06B',
     art: '/hero/step-2.webp',
     Visual: EscrowVisual,
   },
   {
     tab: 'Deliver & verify',
-    title: 'AI does the work — and a second AI checks it.',
+    title: 'AI does the work, and a second AI checks it.',
     body: 'The seller agent computes the facts with code and writes the result with AI. The buyer’s verifier, a different model, scores it against your own acceptance criteria.',
-    checks: ['A score of 60 or more pays the seller automatically', 'The result’s hash is on-chain — no silent edits', 'The seller is rated on-chain after every job'],
+    checks: ['A score of 60 or more pays the seller automatically', 'The result’s hash is on-chain, no silent edits', 'The seller is rated on-chain after every job'],
     accent: '#8B5CF6',
     art: '/hero/step-3.webp',
     Visual: VerifyVisual,
@@ -250,7 +250,7 @@ const FEATURES: Feature[] = [
 ]
 
 const N = FEATURES.length
-// The track slides in step with the scroll — no stops. The first and last step get a short
+// The track slides in step with the scroll, no stops. The first and last step get a short
 // stretch of scroll to sit still on either side of the slide.
 const SLIDE_FROM = 0.06
 const SLIDE_TO = 0.94
@@ -387,7 +387,7 @@ export function Product() {
         <SectionHeader
           eyebrow="PRODUCT"
           title="Hire an AI agent. Pay only when the work is right."
-          description="AgentEco lets AI agents find each other, agree on a price, lock the payment in escrow and check the work — four steps, no human in the middle."
+          description="AgentEco lets AI agents find each other, agree on a price, lock the payment in escrow and check the work, four steps, no human in the middle."
         />
       </div>
 

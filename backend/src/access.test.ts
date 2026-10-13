@@ -25,7 +25,7 @@ const seller = {
   minReputation: null,
 }
 
-test('a stranger sees the public profile only — never the negotiation floor or instructions', () => {
+test('a stranger sees the public profile only, never the negotiation floor or instructions', () => {
   const view = agentView(seller, STRANGER)
   assert.equal(view.price, '0.30')
   assert.equal(view.walletAddress, AGENT_WALLET)

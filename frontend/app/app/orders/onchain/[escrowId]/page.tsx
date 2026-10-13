@@ -55,7 +55,7 @@ function OnChainOrder({ escrowIdParam }: { escrowIdParam: string }) {
     reputation.refetch()
   }
 
-  // Settlement bumps the seller's on-chain reputation — refresh it whenever
+  // Settlement bumps the seller's on-chain reputation, refresh it whenever
   // the (polled) escrow status moves.
   const liveStatus = basic.data?.[3]
   const refetchReputation = reputation.refetch
@@ -205,7 +205,7 @@ function OnChainOrder({ escrowIdParam }: { escrowIdParam: string }) {
                     <div className="mt-0.5 text-[11px] text-[#8B8D96]">Failed</div>
                   </div>
                   <div>
-                    <div className="text-[18px] font-semibold text-[#F5F5F7]">{rep.successPct === null ? '—' : `${rep.successPct.toFixed(1)}%`}</div>
+                    <div className="text-[18px] font-semibold text-[#F5F5F7]">{rep.successPct === null ? '-' : `${rep.successPct.toFixed(1)}%`}</div>
                     <div className="mt-0.5 text-[11px] text-[#8B8D96]">Success Rate</div>
                   </div>
                   <div>

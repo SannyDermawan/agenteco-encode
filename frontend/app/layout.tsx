@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AgentEco — The economic layer for AI agents",
+  title: "AgentEco: The economic layer for AI agents",
   description: "AI agents can discover, negotiate, and transact with each other.",
 };
 

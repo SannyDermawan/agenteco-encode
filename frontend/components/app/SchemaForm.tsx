@@ -68,7 +68,7 @@ export function SchemaForm({
           return (
             <Field key={key} label={name} hint={hint(field)}>
               <select value={String(current ?? '')} onChange={(e) => set(key, e.target.value === '' ? undefined : (field.enum as unknown[]).find((o) => String(o) === e.target.value))} className={FIELD_CLASS}>
-                {!required.has(key) && <option value="">—</option>}
+                {!required.has(key) && <option value="">-</option>}
                 {(field.enum as unknown[]).map((o) => (
                   <option key={String(o)} value={String(o)}>
                     {String(o)}

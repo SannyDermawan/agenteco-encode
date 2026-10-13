@@ -1,5 +1,5 @@
 /**
- * Browser copy of the negotiation engine the hosted agents actually run —
+ * Browser copy of the negotiation engine the hosted agents actually run,
  * agent-runtime/src/runtime.ts (DemoAgentRuntime.decideOnOffer) plus the
  * buyer's opening/ceiling rules from backend/src/host/buyerTaskHost.ts.
  * The landing page's simulator uses it so visitors see the exact rounds a
@@ -30,7 +30,7 @@ export interface SimRound {
 }
 
 export type SimResult =
-  | { kind: 'skipped' } // even the buyer's opening offer is above its max budget — never approached
+  | { kind: 'skipped' } // even the buyer's opening offer is above its max budget, never approached
   | { kind: 'deal'; price: number; rounds: SimRound[] }
   | { kind: 'no-deal'; rounds: SimRound[] }
 
@@ -65,7 +65,7 @@ function decideOnOffer(p: Position, offeredPrice: number, myPriorOfferCount: num
 export function simulateNegotiation(input: { sellerPrice: number; sellerFloor: number; buyerBudget: number }): SimResult {
   const { sellerPrice, buyerBudget } = input
   const sellerFloor = Math.min(input.sellerFloor, sellerPrice)
-  // Approached only if the buyer can afford its own opening offer — a seller
+  // Approached only if the buyer can afford its own opening offer, a seller
   // listed above the budget may still settle within it.
   const openingOffer = roundCents(sellerPrice * OPENING_OFFER_RATIO)
   if (openingOffer > buyerBudget) return { kind: 'skipped' }

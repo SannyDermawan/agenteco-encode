@@ -28,7 +28,7 @@ import { UnsupportedOnSolana } from '@/components/app/solana/UnsupportedOnSolana
 
 /**
  * The escrow's on-chain state (once escrowId is set) is the live, real
- * status — the DB `status` column only ever tracks "agreed" vs "funded"
+ * status, the DB `status` column only ever tracks "agreed" vs "funded"
  * (see schema comment on the Order model). This reads the chain directly
  * and surfaces the full escrow experience (timeline, actions, result)
  * inline instead of linking out to the separate /orders/onchain page.
@@ -49,7 +49,7 @@ function LiveEscrowMain({ escrowId }: { escrowId: bigint }) {
     reputation.refetch()
   }
 
-  // Settlement bumps the seller's on-chain reputation — refresh it whenever
+  // Settlement bumps the seller's on-chain reputation, refresh it whenever
   // the (polled) escrow status moves.
   const refetchReputation = reputation.refetch
   useEffect(() => {
@@ -103,7 +103,7 @@ function LiveEscrowMain({ escrowId }: { escrowId: bigint }) {
   )
 }
 
-/** Escrow amount + live seller reputation — the sidebar half of the live escrow view. */
+/** Escrow amount + live seller reputation, the sidebar half of the live escrow view. */
 function LiveEscrowSidebar({ escrowId }: { escrowId: bigint }) {
   const basic = useEscrowBasic(escrowId)
   const { data: decimals } = useUsdtDecimals()
@@ -146,7 +146,7 @@ function LiveEscrowSidebar({ escrowId }: { escrowId: bigint }) {
               <div className="mt-0.5 text-[11px] text-[#8B8D96]">Failed</div>
             </div>
             <div>
-              <div className="text-[18px] font-semibold text-[#F5F5F7]">{rep.successPct === null ? '—' : `${rep.successPct.toFixed(1)}%`}</div>
+              <div className="text-[18px] font-semibold text-[#F5F5F7]">{rep.successPct === null ? '-' : `${rep.successPct.toFixed(1)}%`}</div>
               <div className="mt-0.5 text-[11px] text-[#8B8D96]">Success Rate</div>
             </div>
             <div>
@@ -178,7 +178,7 @@ function OrderDetail() {
   const { address } = useAccount()
 
   // A hosted buyer funds the deal on its own, so poll until the order has an
-  // escrow — from then on LiveEscrowMain polls the chain for the rest.
+  // escrow, from then on LiveEscrowMain polls the chain for the rest.
   const orderQuery = useQuery({
     queryKey: ['order', params.id, address],
     queryFn: () => getOrder(params.id),

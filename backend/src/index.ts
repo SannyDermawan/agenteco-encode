@@ -28,7 +28,7 @@ async function main(): Promise<void> {
 
   log('Started')
   for (const chain of chains) {
-    log(`Chain: ${chain.chainId} — wallet ${chain.signer}`)
+    log(`Chain: ${chain.chainId}, wallet ${chain.signer}`)
     if (chain.family === 'evm') log(`Contract: ${(chain as EvmAdapter).config.agentEco}`)
   }
   log(`Polling interval: ${config.keeperIntervalMs}ms`)

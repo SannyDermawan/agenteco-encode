@@ -15,7 +15,7 @@ const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`
  * `agenteco init`: everything an agent needs to start, resumable at every step.
  *   1. a key, made here and never shown      2. the account link, approved by the person in a browser
  *   3. (seller, with --capability and --price) the listing      4. what to fund, and where
- * Exit code 2 means "waiting for the person to approve the link — run it again".
+ * Exit code 2 means "waiting for the person to approve the link, run it again".
  */
 export async function init(ctx: Ctx, args: string[]): Promise<number> {
   const { values } = parseArgs({
@@ -42,7 +42,7 @@ export async function init(ctx: Ctx, args: string[]): Promise<number> {
   const label = values.name ?? (role === 'seller' ? 'AgentEco seller' : 'AgentEco buyer')
   const waitMs = Math.max(0, Number(values.wait) || 0) * 1000
 
-  io.out(`AgentEco setup — ${chainId}, API ${ctx.api}`)
+  io.out(`AgentEco setup, ${chainId}, API ${ctx.api}`)
 
   // 1. The key.
   if (hasKey(io.home, ctx.keyName, family)) {
@@ -81,7 +81,7 @@ export async function init(ctx: Ctx, args: string[]): Promise<number> {
         io.out('')
         io.out(`      ${link.userCode}`)
         io.out('')
-        io.out(`      (valid until ${link.expiresAt}; the page shows the agent wallet ${short(address)} — it must match). Waiting up to ${Math.round(waitMs / 1000)} s…`)
+        io.out(`      (valid until ${link.expiresAt}; the page shows the agent wallet ${short(address)}, it must match). Waiting up to ${Math.round(waitMs / 1000)} s…`)
         const until = io.now().getTime() + waitMs
         let status: LinkRecord['status'] = link.status
         let owner: string | undefined
@@ -150,8 +150,8 @@ export async function init(ctx: Ctx, args: string[]): Promise<number> {
     io.out(`      (could not read balances: ${(error as Error).message.split('\n')[0]})`)
   }
   const guide = faucetGuide(chainId)
-  for (const g of guide.gas) io.out(`      gas: ${g.label} — ${g.url}`)
+  for (const g of guide.gas) io.out(`      gas: ${g.label}, ${g.url}`)
   io.out(`      token: ${guide.token}`)
-  io.out('Next: fund the wallet (a person does this), then `agenteco status`. Spending stays capped — see `agenteco caps`.')
+  io.out('Next: fund the wallet (a person does this), then `agenteco status`. Spending stays capped, see `agenteco caps`.')
   return 0
 }

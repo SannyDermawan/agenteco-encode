@@ -4,7 +4,7 @@ import { setLLMRecorder, type LLMEvent } from './llm.ts'
 
 /**
  * Persists every AI attempt (task, provider, outcome, duration) so the load
- * test — or anyone debugging a slow demo — can count 429s and fallbacks per
+ * test, or anyone debugging a slow demo, can count 429s and fallbacks per
  * stage across processes. Writes are fire-and-forget: a slow or failing
  * database never delays or breaks an AI call.
  */

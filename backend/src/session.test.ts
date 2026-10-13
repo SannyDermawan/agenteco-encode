@@ -57,7 +57,7 @@ test('a sign-in message for something else (other statement) is rejected', async
 
 test('an expired session is rejected', async () => {
   const result = await verifyReadSession(await session({ issuedAt: new Date(NOW - 3 * HOUR), expirationTime: new Date(NOW - HOUR) }), rules)
-  assert.deepEqual(result, { ok: false, error: 'Session expired — sign in again' })
+  assert.deepEqual(result, { ok: false, error: 'Session expired, sign in again' })
 })
 
 test('a session without an expiry, or living over 24 h, is rejected', async () => {
@@ -125,7 +125,7 @@ test('Solana: a session signed by another key, for another website, chain, state
   assert.deepEqual(await verifyReadSession(await solSession({ domain: 'evil.example', uri: 'https://evil.example' }), solRules), { ok: false, error: 'Session was signed for another website' })
   assert.deepEqual(await verifyReadSession(await solSession({ chainId: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp' }), solRules), { ok: false, error: 'Session was signed for another chain' })
   assert.deepEqual(await verifyReadSession(await solSession({ statement: 'Sign in to some other app.' }), solRules), { ok: false, error: 'Unexpected session statement' })
-  assert.deepEqual(await verifyReadSession(await solSession({ issuedAt: new Date(NOW - 3 * HOUR), expirationTime: new Date(NOW - HOUR) }), solRules), { ok: false, error: 'Session expired — sign in again' })
+  assert.deepEqual(await verifyReadSession(await solSession({ issuedAt: new Date(NOW - 3 * HOUR), expirationTime: new Date(NOW - HOUR) }), solRules), { ok: false, error: 'Session expired, sign in again' })
   assert.deepEqual(await verifyReadSession(await solSession({ issuedAt: new Date(NOW - HOUR), expirationTime: new Date(NOW + 30 * HOUR) }), solRules), { ok: false, error: 'Session lasts too long' })
   assert.deepEqual(await verifyReadSession(await solSession({ issuedAt: new Date(NOW + HOUR), expirationTime: new Date(NOW + 2 * HOUR) }), solRules), { ok: false, error: 'Session is issued in the future' })
 })

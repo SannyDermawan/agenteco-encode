@@ -4,7 +4,7 @@ export const FRONTEND_ORIGINS = (process.env.FRONTEND_ORIGIN ?? 'http://localhos
   .map((origin) => origin.trim().replace(/\/+$/, ''))
   .filter(Boolean)
 
-/** host[:port] of each frontend origin — the only domains a read session may name. */
+/** host[:port] of each frontend origin, the only domains a read session may name. */
 export const FRONTEND_HOSTS = FRONTEND_ORIGINS.flatMap((origin) => {
   try {
     return [new URL(origin).host.toLowerCase()]

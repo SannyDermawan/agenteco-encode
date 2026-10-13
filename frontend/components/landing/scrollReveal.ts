@@ -8,7 +8,7 @@ import type { Transition, Variants } from 'framer-motion'
  * where an element "parks" while hidden: one that scrolled out through the
  * top (user scrolling down) parks slightly above its spot, so scrolling back
  * up brings it in moving down; one that left through the bottom parks below
- * and comes back moving up — mirroring the first-time reveal.
+ * and comes back moving up, mirroring the first-time reveal.
  *
  * Only an element with its own `initial="hidden"` gets this: when it leaves
  * view, framer-motion re-resolves its initial variant (calling the functions
@@ -40,7 +40,7 @@ export function hiddenOffset(distance: number): number {
 
 /**
  * Counts as "in view" from the first visible pixel and "out of view" only once
- * fully off-screen — so an element never fades out while still visible.
+ * fully off-screen, so an element never fades out while still visible.
  */
 export const REVEAL_VIEWPORT = { once: false, amount: 0 } as const
 

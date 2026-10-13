@@ -2,7 +2,7 @@
  * Wallet addresses of every chain family, as the API and the database store them.
  *
  * EVM addresses are hex and case-insensitive: stored lowercase. Solana addresses are base58 and
- * CASE-SENSITIVE: stored exactly as given — lowercasing one corrupts it. The two forms cannot be
+ * CASE-SENSITIVE: stored exactly as given, lowercasing one corrupts it. The two forms cannot be
  * confused (a base58 string has no `0`, and no `0x` prefix), so the family follows from the text.
  * Format only: whether a Solana string is really a 32-byte key is the adapter's check.
  */

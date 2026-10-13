@@ -29,7 +29,7 @@ export interface SessionRules {
  * message (or, for a Solana wallet, its CAIP-122 equivalent) for one of our frontend domains and
  * one of our chains, with our statement, not expired, living at most 24 h, and signed by the
  * address it names.
- * Proves who is asking — whether they may see a given order is checked
+ * Proves who is asking, whether they may see a given order is checked
  * separately (access.ts).
  */
 export async function verifyReadSession(headerValue: string, rules: SessionRules): Promise<AuthResult> {
@@ -62,7 +62,7 @@ export async function verifyReadSession(headerValue: string, rules: SessionRules
   }
   if (issuedAt > now + CLOCK_SKEW_MS) return { ok: false, error: 'Session is issued in the future' }
   if (expiresAt - issuedAt > READ_SESSION_MAX_AGE_MS + CLOCK_SKEW_MS) return { ok: false, error: 'Session lasts too long' }
-  if (expiresAt <= now) return { ok: false, error: 'Session expired — sign in again' }
+  if (expiresAt <= now) return { ok: false, error: 'Session expired, sign in again' }
   if (fields.notBefore && fields.notBefore.getTime() > now + CLOCK_SKEW_MS) return { ok: false, error: 'Session is not valid yet' }
 
   try {
@@ -86,7 +86,7 @@ async function verifySolanaSession(payload: SolanaReadSessionPayload, rules: Ses
   if (fields.statement !== READ_SESSION_STATEMENT) return { ok: false, error: 'Unexpected session statement' }
   if (issuedAt > now + CLOCK_SKEW_MS) return { ok: false, error: 'Session is issued in the future' }
   if (expiresAt - issuedAt > READ_SESSION_MAX_AGE_MS + CLOCK_SKEW_MS) return { ok: false, error: 'Session lasts too long' }
-  if (expiresAt <= now) return { ok: false, error: 'Session expired — sign in again' }
+  if (expiresAt <= now) return { ok: false, error: 'Session expired, sign in again' }
 
   if (!(await verifySolanaSignature({ address: fields.address, message: payload.message, signature: payload.signature }))) {
     return { ok: false, error: 'Session signature does not match its address' }

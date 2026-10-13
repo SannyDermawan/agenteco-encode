@@ -20,9 +20,9 @@ const contractFor = (escrowId: bigint | undefined) =>
   ({ address: escrowId === undefined ? AGENT_ECO_ADDRESS : agentEcoFor(escrowId), abi: AGENT_ECO_ABI }) as const
 
 // Hosted agents move escrows forward on their own, so an open order page has
-// to poll to show it live — until the escrow can't change any more.
+// to poll to show it live, until the escrow can't change any more.
 const LIVE_POLL_MS = 5000
-// AgentEco.sol OrderStatus: SETTLED / REFUNDED — terminal.
+// AgentEco.sol OrderStatus: SETTLED / REFUNDED, terminal.
 const TERMINAL_STATUSES = new Set([5, 6])
 
 // =================================================================
@@ -51,14 +51,14 @@ export function useEscrowTimestamps(escrowId?: bigint) {
     args: escrowId !== undefined ? [escrowId] : undefined,
     query: {
       enabled: escrowId !== undefined,
-      // [createdAt, fundedAt, executingAt, deliveredAt, settledAt] — done once settled.
+      // [createdAt, fundedAt, executingAt, deliveredAt, settledAt], done once settled.
       refetchInterval: (query) => (query.state.data && query.state.data[4] > BigInt(0) ? false : LIVE_POLL_MS),
     },
   })
 }
 
 /**
- * The arbiter, read from AgentEco.sol itself rather than hardcoded — so a new
+ * The arbiter, read from AgentEco.sol itself rather than hardcoded, so a new
  * deployment or an arbiter handover is picked up automatically. With an
  * escrowId, the arbiter of the deployment holding it (each has its own council).
  */
@@ -102,7 +102,7 @@ export function useArbiterCouncil(escrowId?: bigint): ArbiterCouncilInfo | null 
 
 /**
  * True when `address` can rule disputes: the arbiter wallet, or a member of the
- * arbiter council — of the deployment holding `escrowId`, or the current one.
+ * arbiter council, of the deployment holding `escrowId`, or the current one.
  */
 export function useIsArbiter(address?: string, escrowId?: bigint) {
   const { data: arbiter } = useArbiter(escrowId)
@@ -158,7 +158,7 @@ export function useIsReviewExpired(escrowId?: bigint) {
   })
 }
 
-/** Batched (multicall) read — for a dashboard aggregating many orders at once. */
+/** Batched (multicall) read, for a dashboard aggregating many orders at once. */
 export function useEscrowStatuses(escrowIds: bigint[]) {
   return useReadContracts({
     contracts: escrowIds.map((id) => ({ ...contractFor(id), functionName: 'getEscrowStatus' as const, args: [id] as const })),
@@ -173,7 +173,7 @@ export function useEscrowTimestampsMulti(escrowIds: bigint[]) {
   })
 }
 
-/** [disputedAt, disputeDeadline, acceptDeadline, rated] — polled until the escrow is final and rated. */
+/** [disputedAt, disputeDeadline, acceptDeadline, rated], polled until the escrow is final and rated. */
 export function useEscrowDisputeInfo(escrowId?: bigint, live = true) {
   return useReadContract({
     ...contractFor(escrowId),
@@ -196,7 +196,7 @@ export function useEscrowHashes(escrowId?: bigint, live = true) {
 const REPUTATION_CONTRACTS = ALL_AGENT_ECO_ADDRESSES
 
 /**
- * On-chain reputation for `address`, as a named summary (see ./reputation.ts) —
+ * On-chain reputation for `address`, as a named summary (see ./reputation.ts),
  * summed over every AgentEco deployment (v3, v2, v1), so a seller keeps its history.
  */
 export function useReputation(address?: `0x${string}`) {
@@ -285,10 +285,10 @@ export function useUsdtAllowance(owner?: `0x${string}`) {
 }
 
 // =================================================================
-// WRITES — shared shape: { write, hash, isPending, isConfirming, isSuccess, error, reset }
+// WRITES, shared shape: { write, hash, isPending, isConfirming, isSuccess, error, reset }
 // =================================================================
 
-// Actions that take only the escrow id. Dispute actions also carry a hash —
+// Actions that take only the escrow id. Dispute actions also carry a hash,
 // see useHashedEscrowAction below.
 type SimpleEscrowAction =
   | 'startExecution'
@@ -379,7 +379,7 @@ export function useResolveDisputeForBuyer() {
   return useHashedEscrowAction('resolveDisputeForBuyer')
 }
 
-/** Buyer: rateSeller(escrowId, score 1–100) — once, after the escrow is final and something was delivered. */
+/** Buyer: rateSeller(escrowId, score 1–100), once, after the escrow is final and something was delivered. */
 export function useRateSeller() {
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract()
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
@@ -424,7 +424,7 @@ export function useApproveUsdt() {
 
 /**
  * createEscrow doesn't hand back its return value directly (that's only
- * possible for a plain eth_call, not a state-changing tx) — the new
+ * possible for a plain eth_call, not a state-changing tx), the new
  * escrowId has to be read out of the EscrowCreated event once the
  * transaction is mined, via the receipt this hook already waits for.
  */

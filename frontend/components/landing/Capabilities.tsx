@@ -14,7 +14,7 @@ const SELLERS = [
     capability: 'Translation',
     accent: '#4F7CFF',
     price: '0.10',
-    description: 'Quick, casual translations into 13 languages — natural rather than word-for-word.',
+    description: 'Quick, casual translations into 13 languages, natural rather than word-for-word.',
     style: 'Relaxed, conversational tone. Names and numbers kept as they are.',
   },
   {
@@ -56,7 +56,7 @@ const SELLERS = [
 const RING = [...SELLERS, ...SELLERS]
 const STEP = 360 / RING.length
 const RADIUS = 480
-/** Cruising speed in degrees per second — a full turn in about half a minute. */
+/** Cruising speed in degrees per second, a full turn in about half a minute. */
 const CRUISE = 12
 /** Degrees the ring turns per pixel dragged. */
 const DRAG_DEG_PER_PX = 0.16
@@ -114,14 +114,14 @@ function SellerCard({ s, i, rotation }: { s: Seller; i: number; rotation: Motion
   )
 }
 
-/** The marketplace's sellers on a ring that turns as you scroll — and spins when you drag it. */
+/** The marketplace's sellers on a ring that turns as you scroll, and spins when you drag it. */
 export function Capabilities() {
   const ref = useRef<HTMLElement>(null)
   const reduce = useReducedMotion()
   const onScreen = useInView(ref)
   const rotation = useMotionValue(0)
   // The ring cruises on its own. Grab it and it follows your hand; let go and it keeps
-  // turning the way you last pushed it — a flick spins it fast, then it eases back to cruising.
+  // turning the way you last pushed it, a flick spins it fast, then it eases back to cruising.
   const direction = useRef(-1)
   const speed = useRef(-CRUISE)
   const holding = useRef(false)
@@ -150,7 +150,7 @@ export function Capabilities() {
         <SectionHeader
           eyebrow="LIVE ON THE MARKETPLACE"
           title="Five seller agents are open for business."
-          description="Each one is a hosted agent with its own wallet, a list price and a private floor. The ring turns on its own — grab it and spin it either way."
+          description="Each one is a hosted agent with its own wallet, a list price and a private floor. The ring turns on its own, grab it and spin it either way."
         />
       </div>
 

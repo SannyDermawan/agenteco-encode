@@ -6,10 +6,10 @@ import { AGENT_ECO_ABI, AGENT_ECO_ADDRESS, FIRST_ESCROW_ID, LEGACY_DEPLOYMENTS, 
 import { appChain } from './chain'
 import { DEPLOY_BLOCK, LOG_HISTORY_BLOCKS, LOG_RANGE } from './network'
 
-// Block AgentEco.sol was deployed at — no escrow event can predate it, so
+// Block AgentEco.sol was deployed at, no escrow event can predate it, so
 // every log scan starts here instead of at genesis. Per network, see ./network.ts.
 export const AGENT_ECO_DEPLOY_BLOCK = DEPLOY_BLOCK
-// eth_getLogs span per call — each RPC caps it (PublicNode on BSC Testnet:
+// eth_getLogs span per call, each RPC caps it (PublicNode on BSC Testnet:
 // 50,000 blocks), so every scan walks the chain in chunks. See ./network.ts.
 const LOG_CHUNK = LOG_RANGE
 
@@ -18,7 +18,7 @@ export { explorerTxUrl } from './network'
 type PublicClient = NonNullable<ReturnType<typeof usePublicClient>>
 
 /**
- * Walks the chain in LOG_CHUNK steps — but never further back than the RPC
+ * Walks the chain in LOG_CHUNK steps, but never further back than the RPC
  * still serves logs (PublicNode on BSC Testnet prunes after ~80,000 blocks).
  * Only explorer links rely on logs; escrow discovery reads contract state.
  */
@@ -83,7 +83,7 @@ async function readAllEscrows(client: PublicClient): Promise<EscrowBasic[]> {
 }
 
 /**
- * Every escrow where any of `addresses` is the buyer or the seller — read from
+ * Every escrow where any of `addresses` is the buyer or the seller, read from
  * contract state, so it includes direct "Request Service" hires that never get
  * an Order row in the database.
  */
@@ -109,7 +109,7 @@ export interface DisputeSummary {
   buyer: Address
   seller: Address
   amount: bigint
-  /** Live AgentEco.sol status — 4 DISPUTED while open, 5/6 once resolved. */
+  /** Live AgentEco.sol status, 4 DISPUTED while open, 5/6 once resolved. */
   status: number
   raisedAt: number // unix ms
   /** On-chain dispute deadline (unix ms); after it anyone can refund the buyer. */
@@ -130,7 +130,7 @@ const SETTLED = 5
 const ZERO_HASH = '0x0000000000000000000000000000000000000000000000000000000000000000'
 
 /**
- * Every dispute ever raised — the arbiter's inbox. Found from contract state
+ * Every dispute ever raised, the arbiter's inbox. Found from contract state
  * (disputedAt != 0), with transaction links added from logs where the RPC
  * still has them. `enabled` lets non-arbiters skip the reads entirely.
  */
@@ -226,7 +226,7 @@ export function useEscrowTxHashes(escrowId?: bigint) {
     queryFn: async (): Promise<EscrowTxHashes> => {
       const firstHashByEvent = new Map<string, Hash>()
       await forEachRecentChunk(client!, async (fromBlock, toBlock) => {
-        // Every AgentEco event indexes escrowId as its first topic — one
+        // Every AgentEco event indexes escrowId as its first topic, one
         // unfiltered-by-event query catches the escrow's whole lifecycle.
         const logs = await client!.request({
           method: 'eth_getLogs',
@@ -251,7 +251,7 @@ export function useEscrowTxHashes(escrowId?: bigint) {
                 : decoded.eventName
             if (!firstHashByEvent.has(eventName) && log.transactionHash) firstHashByEvent.set(eventName, log.transactionHash)
           } catch {
-            // Not an AgentEco event we know about — nothing to link.
+            // Not an AgentEco event we know about, nothing to link.
           }
         }
       })

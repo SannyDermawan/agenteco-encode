@@ -38,7 +38,7 @@ function normalizeApiUrl(raw: string | undefined): string {
 
 export interface HostedBuyerAgentRow {
   id: string
-  /** The chain this buyer trades on — its wallet, budget and escrows are there. */
+  /** The chain this buyer trades on, its wallet, budget and escrows are there. */
   chainId: string
   name: string
   capabilities: string[]
@@ -50,14 +50,14 @@ export interface HostedBuyerAgentRow {
   minSuccessRate: number | null
   minCompletedJobs: number | null
   minReputation: number | null
-  /** What to buy — validated against the capability's input schema at creation. */
+  /** What to buy, validated against the capability's input schema at creation. */
   taskBrief: unknown
   acceptanceCriteria: string | null
 }
 
 /**
  * Sends whatever settlement token remains in the agent's wallet (the adapter's
- * signer) back to whoever deposited it — a buyer's unspent budget, or a hosted
+ * signer) back to whoever deposited it, a buyer's unspent budget, or a hosted
  * seller's settled earnings.
  */
 export async function refundLeftover(chain: EvmAdapter, depositorWallet: Address, label: string, verb = 'refunded'): Promise<void> {
@@ -69,13 +69,13 @@ export async function refundLeftover(chain: EvmAdapter, depositorWallet: Address
   log(`[host:${label}] ${verb} ${formatUnits(balance, decimals)} ${symbol} to ${depositorWallet}`)
 }
 
-// A hosted buyer opens at this fraction of the chosen seller's listed price —
+// A hosted buyer opens at this fraction of the chosen seller's listed price,
 // anchored to what the seller asks, not to the buyer's own Max Budget, so a
 // generous budget never turns into an instant overpay.
 const OPENING_OFFER_RATIO = 0.5
 
 /**
- * Worth negotiating with only if the buyer can afford its own opening offer —
+ * Worth negotiating with only if the buyer can afford its own opening offer,
  * a seller listed above Max Budget may still settle within it (its floor can
  * be lower than its listing), so the listed price alone doesn't rule it out.
  */
@@ -86,7 +86,7 @@ function canOpenWith(sellerPrice: number, maxBudget: number): boolean {
 /**
  * The buyer's negotiating position against one specific seller: opens at
  * OPENING_OFFER_RATIO of the seller's price and concedes up to whichever is
- * lower of its Max Budget and that listed price — there's never a reason to
+ * lower of its Max Budget and that listed price, there's never a reason to
  * pay a seller more than it asked for.
  */
 function buyerRuntimeFor(agentRow: HostedBuyerAgentRow, sellerPrice: number): DemoAgentRuntime {
@@ -106,7 +106,7 @@ function buyerRuntimeFor(agentRow: HostedBuyerAgentRow, sellerPrice: number): De
 /**
  * One cycle of work for one active hosted buyer task. Does at most one
  * "step" per call (respond to a negotiation OR open one OR fund an order OR
- * settle one) — kept simple and predictable rather than racing through the
+ * settle one), kept simple and predictable rather than racing through the
  * whole lifecycle in a single pass.
  */
 export async function processHostedBuyerTask(agentRow: HostedBuyerAgentRow): Promise<void> {
@@ -157,7 +157,7 @@ export async function processHostedBuyerTask(agentRow: HostedBuyerAgentRow): Pro
     return
   }
 
-  // 2. No live negotiation for this capability yet? Go find a seller —
+  // 2. No live negotiation for this capability yet? Go find a seller,
   //    unless the owner paused this buyer. Steps 1, 3 and 4 still run while
   //    paused, so a seller already mid-deal is never left stranded.
   // Rejected or expired: that seller is done with us; anything else is still live.
@@ -165,7 +165,7 @@ export async function processHostedBuyerTask(agentRow: HostedBuyerAgentRow): Pro
   const hasPendingNegotiation = allNegotiations.some((n) => n.capability === capability && !ended(n.status))
   if (!hasPendingNegotiation && agentRow.isOnline) {
     // A seller that already walked away from this capability won't take the
-    // same opening offer again — reopening with it would just loop forever.
+    // same opening offer again, reopening with it would just loop forever.
     const rejectedSellerIds = new Set(
       allNegotiations.filter((n) => n.capability === capability && ended(n.status)).map((n) => n.sellerAgentId)
     )
@@ -179,12 +179,12 @@ export async function processHostedBuyerTask(agentRow: HostedBuyerAgentRow): Pro
       minReputation: agentRow.minReputation,
     })
     if (!chosen) {
-      log(`[host:${agentRow.name}] no qualifying seller for "${capability}" yet — will retry.`)
+      log(`[host:${agentRow.name}] no qualifying seller for "${capability}" yet, will retry.`)
       return
     }
     const openingOffer = buyerRuntimeFor(agentRow, Number(chosen.price)).config.basePrice
     log(
-      `[host:${agentRow.name}] opening negotiation with "${chosen.name}" (asks ${chosen.price} ${tokenSymbol}) — offering ${openingOffer} ${tokenSymbol}`
+      `[host:${agentRow.name}] opening negotiation with "${chosen.name}" (asks ${chosen.price} ${tokenSymbol}), offering ${openingOffer} ${tokenSymbol}`
     )
     await openNegotiation(API_URL, account, {
       buyerAgentId: agentRow.id,
@@ -202,12 +202,12 @@ export async function processHostedBuyerTask(agentRow: HostedBuyerAgentRow): Pro
     const sellerRes = await fetch(`${API_URL}/agents/${order.sellerAgentId}`)
     const seller = (await sellerRes.json()) as { walletAddress: Address | null }
     if (!seller.walletAddress) {
-      log(`[host:${agentRow.name}] order ${order.id}: seller has no on-chain wallet — cannot fund.`)
+      log(`[host:${agentRow.name}] order ${order.id}: seller has no on-chain wallet, cannot fund.`)
       continue
     }
 
     if (agentRow.taskBrief === null || agentRow.taskBrief === undefined) {
-      log(`[host:${agentRow.name}] order ${order.id}: this buyer has no task brief — cannot hire.`)
+      log(`[host:${agentRow.name}] order ${order.id}: this buyer has no task brief, cannot hire.`)
       continue
     }
 
@@ -250,7 +250,7 @@ export async function processHostedBuyerTask(agentRow: HostedBuyerAgentRow): Pro
 }
 
 export async function runHostCycleOnce(): Promise<void> {
-  // The only place allowed to read agentWalletKey — see db.ts.
+  // The only place allowed to read agentWalletKey, see db.ts.
   const served = servedChainIdsOf('evm')
   // Buyers on a chain this host does not serve (CHAINS) wait until it does.
   const activeAgents = await prismaWithAgentKey.agent.findMany({

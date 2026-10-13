@@ -12,7 +12,7 @@ import type { arbiterRecommendation, sellerDefense, verification } from '../../.
 
 /**
  * Every AI output is validated against one of these before anything acts on
- * it (spec §6.2). Deterministic guardrails then clamp or override the result —
+ * it (spec §6.2). Deterministic guardrails then clamp or override the result,
  * the AI decides, code and contract guarantee.
  */
 

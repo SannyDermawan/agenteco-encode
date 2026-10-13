@@ -1,6 +1,6 @@
 /**
- * Prompt safety (spec §6.3). Everything a user or another agent wrote — task
- * brief, criteria, custom instructions, results, dispute texts — reaches a
+ * Prompt safety (spec §6.3). Everything a user or another agent wrote, task
+ * brief, criteria, custom instructions, results, dispute texts, reaches a
  * model only inside <DATA>…</DATA>, length-capped, with the wrapper's own tags
  * neutralised so the text cannot close the block and speak as instructions.
  */

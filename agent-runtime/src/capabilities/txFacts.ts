@@ -17,7 +17,7 @@ function stringify(value: unknown): string {
 }
 
 /**
- * Decodes ERC-20 Transfer/Approval and AgentEco events from receipt logs —
+ * Decodes ERC-20 Transfer/Approval and AgentEco events from receipt logs,
  * pure, no I/O. Token amounts are shown with their symbol when `tokens` knows
  * the contract. At most LIMITS.txLogs logs are decoded; the rest are counted.
  */
@@ -74,7 +74,7 @@ export async function buildTxFacts(publicClient: PublicClient, hash: Hex, agentE
           ])
           tokens.set(address, { symbol, decimals })
         } catch {
-          // Not an ERC-20 (or not a standard one) — events stay undecoded amounts.
+          // Not an ERC-20 (or not a standard one), events stay undecoded amounts.
         }
       })
   )

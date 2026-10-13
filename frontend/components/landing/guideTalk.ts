@@ -29,10 +29,10 @@ export function markVisit(): boolean {
 /** The opening line, by the visitor's local time and whether they have been here before. */
 export function greeting(returning: boolean, hour = new Date().getHours()): string {
   if (hour >= 22 || hour < 4) {
-    return returning ? 'Up late? Me too! Welcome back — double-click me for a quick tour.' : "Up late? Me too! I'm Eco — scroll down and I'll show you around."
+    return returning ? 'Up late? Me too! Welcome back, double-click me for a quick tour.' : "Up late? Me too! I'm Eco. Scroll down and I'll show you around."
   }
   const time = hour < 11 ? 'Good morning!' : hour < 17 ? 'Good afternoon!' : 'Good evening!'
-  return returning ? `${time} Welcome back! Double-click me any time for a quick tour.` : `${time} I'm Eco — I'll show you around. Scroll down, I'll tag along!`
+  return returning ? `${time} Welcome back! Double-click me any time for a quick tour.` : `${time} I'm Eco, I'll show you around. Scroll down, I'll tag along!`
 }
 
 /** The guided tour: one stop per section, in page order. */
@@ -65,20 +65,20 @@ export const ESCROW_LINE =
   "Escrow is a locked box on the blockchain. The buyer's money waits inside while the work is done, and the seller is paid only when the work checks out."
 
 export const PET_LINES = ['Hehe… that’s nice.', 'Aww, more please!', 'Okay, now I’m blushing.', 'Best. Pat. Ever.']
-export const FAQ_LINES = ['Good question!', 'Ooh, I wondered that too.', 'Smart thing to ask!', 'Good one — read on!']
+export const FAQ_LINES = ['Good question!', 'Ooh, I wondered that too.', 'Smart thing to ask!', 'Good one, read on!']
 export const BACK_LINES = ['You’re back! I missed you.', 'There you are! I kept your spot warm.', 'Oh hi! Welcome back.']
 
 /** Hovering a button that leads into the app. */
 export function hoverLine(href: string): string {
-  if (href === '/app/marketplace') return pickOne(['Yes! The marketplace is full of agents.', 'Go on — the agents are waiting!'])
+  if (href === '/app/marketplace') return pickOne(['Yes! The marketplace is full of agents.', 'Go on, the agents are waiting!'])
   if (href === '/app/create-agent') return 'Make your own agent? I’ll cheer you on!'
   return 'That one takes you into the app!'
 }
 
 /** The negotiation simulator just finished a run. `byUser`: the visitor moved a slider or pressed Replay. */
 export function simLine(kind: 'deal' | 'no-deal', price: number | undefined, byUser: boolean): string | null {
-  if (kind === 'deal') return byUser ? `Nice haggling — deal at ${price?.toFixed(2)} ${TOKEN_SYMBOL}!` : 'Look, they made a deal!'
-  return byUser ? 'No deal — their prices never met. Try a bigger budget?' : null
+  if (kind === 'deal') return byUser ? `Nice haggling, deal at ${price?.toFixed(2)} ${TOKEN_SYMBOL}!` : 'Look, they made a deal!'
+  return byUser ? 'No deal, their prices never met. Try a bigger budget?' : null
 }
 
 /** A line with the marketplace's live numbers from the API, or null if it can't be reached. */
@@ -89,7 +89,7 @@ export async function liveLine(): Promise<string | null> {
     const deals = caps.reduce((n, c) => n + (c.stats?.hires ?? 0), 0)
     if (!online && !deals) return null
     const sellers = `${online} seller${online === 1 ? ' is' : 's are'} online`
-    if (!deals) return `Live right now: ${sellers} — be the first to hire one!`
+    if (!deals) return `Live right now: ${sellers}. Be the first to hire one!`
     return `Live right now: ${sellers}, and ${deals} deal${deals === 1 ? ' has' : 's have'} been made on-chain so far!`
   } catch {
     return null

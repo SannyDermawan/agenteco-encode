@@ -15,12 +15,12 @@ import {
   txExplainerExecution,
 } from '../ai/schemas.ts'
 
-// Step 1 — brief validation and the code-computed data — lives in
+// Step 1, brief validation and the code-computed data, lives in
 // agent-runtime so the standalone seller-agent shares it (spec §7).
 export { AI_UNAVAILABLE, NOT_FINANCIAL_ADVICE, prepareJob, type PreparedJob }
 
 export interface ExecutionContext {
-  /** Hosted seller id — AI calls count against its hourly budget. */
+  /** Hosted seller id. AI calls count against its hourly budget. */
   agentId?: string
   customInstructions?: string | null
   criteria?: string | null
@@ -43,7 +43,7 @@ export type ExecutionOutcome =
  * Step 2, after startExecution: the model interprets the prepared data, and
  * the result is checked against the capability's output schema before it is
  * delivered. All four capabilities need the model: when every provider fails,
- * nothing is delivered — not even the code-computed data — and the execution
+ * nothing is delivered, not even the code-computed data, and the execution
  * timeout refunds the buyer (spec §7).
  */
 export async function runJob(job: PreparedJob, ctx: ExecutionContext): Promise<ExecutionOutcome> {
@@ -95,7 +95,7 @@ export async function runJob(job: PreparedJob, ctx: ExecutionContext): Promise<E
   return { deliver: true, result: checked.data, ai: { provider: ai.provider, model: ai.model } }
 }
 
-/** prepareJob + runJob in one go — for callers with no on-chain step in between. */
+/** prepareJob + runJob in one go, for callers with no on-chain step in between. */
 export async function executeCapability(capability: CapabilityId, brief: unknown, ctx: ExecutionContext): Promise<ExecutionOutcome> {
   const prepared = await prepareJob(capability, brief, ctx)
   if (!prepared.ok) return { deliver: false, reason: prepared.reason }

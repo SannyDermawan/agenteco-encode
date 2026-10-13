@@ -54,7 +54,7 @@ disputesRouter.get('/:escrowId', async (req, res) => {
 })
 
 /**
- * The buyer's reason. On-chain first: raiseDispute(id, keccak256(reason)) —
+ * The buyer's reason. On-chain first: raiseDispute(id, keccak256(reason)),
  * then the text comes here and is accepted only if it hashes to exactly that.
  */
 disputesRouter.put('/:escrowId', async (req, res) => {
@@ -72,7 +72,7 @@ disputesRouter.put('/:escrowId', async (req, res) => {
   try {
     escrow = await readEscrow(chainId, escrowId)
   } catch {
-    return res.status(400).json({ error: 'Could not read this escrow on-chain — is the id correct?' })
+    return res.status(400).json({ error: 'Could not read this escrow on-chain, is the id correct?' })
   }
   if (!sameWallet(escrow.buyer, auth.wallet)) {
     return res.status(403).json({ error: "Only this escrow's buyer can describe its dispute" })
@@ -114,7 +114,7 @@ disputesRouter.post('/:escrowId/response', async (req, res) => {
   try {
     escrow = await readEscrow(chainId, escrowId)
   } catch {
-    return res.status(400).json({ error: 'Could not read this escrow on-chain — is the id correct?' })
+    return res.status(400).json({ error: 'Could not read this escrow on-chain, is the id correct?' })
   }
   if (!sameWallet(escrow.seller, auth.wallet)) {
     return res.status(403).json({ error: "Only this escrow's seller can answer its dispute" })
@@ -138,7 +138,7 @@ disputesRouter.post('/:escrowId/response', async (req, res) => {
 
 /**
  * The arbiter's ruling. On-chain first: resolveDisputeFor*(id, rationaleHash)
- * — then the rationale object comes here and is accepted only if its
+ *, then the rationale object comes here and is accepted only if its
  * fixed-order JSON hashes to the on-chain resolutionHash. Anyone may submit
  * it (the hash is the proof); the backend's auto-arbiter does so too.
  */
@@ -154,7 +154,7 @@ disputesRouter.post('/:escrowId/resolution', async (req, res) => {
   try {
     escrow = await readEscrow(chainId, escrowId)
   } catch {
-    return res.status(400).json({ error: 'Could not read this escrow on-chain — is the id correct?' })
+    return res.status(400).json({ error: 'Could not read this escrow on-chain, is the id correct?' })
   }
   if (escrow.status !== SETTLED && escrow.status !== REFUNDED) {
     return res.status(400).json({ error: escrow.status === DISPUTED ? 'The dispute is not resolved on-chain yet' : 'This escrow was not disputed' })

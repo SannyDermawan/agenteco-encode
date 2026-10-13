@@ -27,7 +27,7 @@ export const VERIFY_FALLBACK_RATIONALE = 'AI verification was unavailable, so th
 
 /**
  * Asks the verifier model to score a delivered result. The decision is the
- * code's: score ≥ VERIFY_ACCEPT_THRESHOLD accepts, anything lower disputes —
+ * code's: score ≥ VERIFY_ACCEPT_THRESHOLD accepts, anything lower disputes,
  * whatever verdict the model wrote. No model → accept, unscored (the old
  * behaviour, spec §10.1 step 5), and the caller must then not rate.
  */

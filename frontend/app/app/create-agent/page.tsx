@@ -86,7 +86,7 @@ function CreateAgentPageEvm() {
           {
             name,
             role,
-            // Unused for a hosted buyer — the host opens at 50% of whichever
+            // Unused for a hosted buyer, the host opens at 50% of whichever
             // seller it picks (see backend/src/host/buyerTaskHost.ts).
             price: 0,
             maxBudget,
@@ -133,7 +133,7 @@ function CreateAgentPageEvm() {
 
         {!isConnected && (
           <NeumorphicCard className="p-4 text-[13px] text-[#8B8D96]">
-            Connect your wallet from the top bar to create an agent — it becomes the agent&apos;s owner.
+            Connect your wallet from the top bar to create an agent, it becomes the agent&apos;s owner.
           </NeumorphicCard>
         )}
 
@@ -238,7 +238,7 @@ function CreateAgentPageEvm() {
                 </Field>
                 <p className="text-[12px] text-[#8B8D96]">
                   Opens at <span className="text-[#F5F5F7]">50% of the chosen seller&apos;s price</span> and negotiates
-                  up from there — never above that seller&apos;s price or your Max Budget.
+                  up from there, never above that seller&apos;s price or your Max Budget.
                 </p>
 
                 <Field label="Seller Selection">
@@ -260,7 +260,7 @@ function CreateAgentPageEvm() {
                   </div>
                   <p className="mt-1.5 text-[12px] text-[#8B8D96]">
                     {buyerFilterMode === 'recommended'
-                      ? 'Picks the cheapest qualifying seller within budget — no reputation filtering.'
+                      ? 'Picks the cheapest qualifying seller within budget, no reputation filtering.'
                       : 'Also requires the seller to meet the on-chain thresholds below. A minimum rating skips sellers nobody has rated yet.'}
                   </p>
                 </Field>
@@ -312,5 +312,5 @@ function CreateAgentPageEvm() {
 }
 
 export default function CreateAgentPage() {
-  return FAMILY === 'solana' ? <UnsupportedOnSolana title="Create Agent — Demo" why="Demo agents are hosted by AgentEco with a key it keeps for them, and hosted agents run on the EVM networks only." instead={{ href: '/app/register-agent', label: 'Register your own agent' }} /> : <CreateAgentPageEvm />
+  return FAMILY === 'solana' ? <UnsupportedOnSolana title="Create Agent (Demo)" why="Demo agents are hosted by AgentEco with a key it keeps for them, and hosted agents run on the EVM networks only." instead={{ href: '/app/register-agent', label: 'Register your own agent' }} /> : <CreateAgentPageEvm />
 }

@@ -4,7 +4,7 @@ export type WalletFamily = 'evm' | 'solana'
 /**
  * What an API call needs of the connected wallet to prove who is calling: its address and a way to
  * sign text. An EVM wallet answers with an EIP-191 hex signature, a Solana wallet with an ed25519
- * signature in base58 — the API tells them apart by the address (backend/src/auth.ts).
+ * signature in base58, the API tells them apart by the address (backend/src/auth.ts).
  */
 export interface WalletSigner {
   address: string
@@ -13,7 +13,7 @@ export interface WalletSigner {
 
 import type { TransactionModifyingSigner } from '@runtime/chain/kit.ts'
 
-/** A wallet the visitor can pick on Solana (wallets register themselves with the page — wallet-standard). */
+/** A wallet the visitor can pick on Solana (wallets register themselves with the page, wallet-standard). */
 export interface WalletChoice {
   name: string
   icon: string

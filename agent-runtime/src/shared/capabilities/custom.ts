@@ -3,7 +3,7 @@ import { CAPABILITIES, CAPABILITY_IDS, isCapabilityId, type CapabilityId } from 
 
 /**
  * The open capability registry: besides the four platform capabilities
- * (./definitions.ts), developers publish their own — an id, what it does, a
+ * (./definitions.ts), developers publish their own, an id, what it does, a
  * JSON Schema for the buyer's brief and one for the result, and the rubric a
  * verifier judges a delivery by. Self-hosted sellers (the SDK) can then offer
  * them, and buyers hire them like any other: the brief is checked against the
@@ -11,8 +11,8 @@ import { CAPABILITIES, CAPABILITY_IDS, isCapabilityId, type CapabilityId } from 
  * schema before it is accepted.
  *
  * Schemas are plain JSON Schema (draft 2020-12 subset), compiled to zod with
- * z.fromJSONSchema. A capability is immutable once published — tasks commit to
- * it — so a changed schema is a new id (e.g. "sentiment_v2").
+ * z.fromJSONSchema. A capability is immutable once published, tasks commit to
+ * it, so a changed schema is a new id (e.g. "sentiment_v2").
  */
 
 export const CUSTOM_CAPABILITY_ID = /^[a-z][a-z0-9_]{2,39}$/
@@ -84,7 +84,7 @@ export const registerCapabilitySchema = z.object({
 
 export type RegisterCapabilityInput = z.input<typeof registerCapabilitySchema>
 
-/** A capability as the registry lists it — platform or community. */
+/** A capability as the registry lists it, platform or community. */
 export interface CapabilityInfo {
   id: string
   name: string
@@ -126,7 +126,7 @@ export function validateWithSchema(schema: unknown, value: unknown): { ok: true;
 }
 
 /**
- * A starting value shaped like a schema — what a brief editor is prefilled
+ * A starting value shaped like a schema, what a brief editor is prefilled
  * with: defaults and first enum values where given, else empty strings, 0,
  * false and []. Only the object's required fields are included.
  */

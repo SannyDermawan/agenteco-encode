@@ -30,10 +30,10 @@ test('every platform capability needs a model: there is no code-only result to d
 })
 
 test('a result whose model-written prose says "AI unavailable" is recognised, and only there', () => {
-  assert.equal(mentionsAiUnavailable('data_analysis', { stats: {}, insights: [], summary: `${AI_UNAVAILABLE} — these are the computed statistics only.` }), true)
+  assert.equal(mentionsAiUnavailable('data_analysis', { stats: {}, insights: [], summary: `${AI_UNAVAILABLE}, these are the computed statistics only.` }), true)
   assert.equal(mentionsAiUnavailable('data_analysis', { insights: ['ai UNAVAILABLE'], summary: 'ok' }), true)
-  assert.equal(mentionsAiUnavailable('crypto_market_brief', { data: {}, brief: `${AI_UNAVAILABLE} — this is the market data only.` }), true)
-  assert.equal(mentionsAiUnavailable('tx_explainer', { facts: {}, explanation: `${AI_UNAVAILABLE} — these are the decoded facts only.` }), true)
+  assert.equal(mentionsAiUnavailable('crypto_market_brief', { data: {}, brief: `${AI_UNAVAILABLE}, this is the market data only.` }), true)
+  assert.equal(mentionsAiUnavailable('tx_explainer', { facts: {}, explanation: `${AI_UNAVAILABLE}, these are the decoded facts only.` }), true)
   assert.equal(mentionsAiUnavailable('translation', { translatedText: 'x', targetLanguage: 'id', notes: 'AI unavailable' }), true)
 
   // A translation of a text that happens to contain the phrase is the buyer's own words, not a fallback.

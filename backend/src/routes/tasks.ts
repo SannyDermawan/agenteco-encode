@@ -17,8 +17,8 @@ export const tasksRouter = Router()
 
 /**
  * Step 1 of every hire (spec §5): store the task before createEscrow. The
- * server builds the preimage itself with the shared helper — the buyer is the
- * signed-in wallet, never a body field — and returns the taskHash the buyer
+ * server builds the preimage itself with the shared helper, the buyer is the
+ * signed-in wallet, never a body field, and returns the taskHash the buyer
  * must pass to createEscrow. The task belongs to one chain (body chainId,
  * default: the default chain); its escrow must be created there.
  */
@@ -42,7 +42,7 @@ tasksRouter.post('/', async (req, res) => {
     brief = checked
   } else {
     const info = await getCapability(capability)
-    if (!info) return res.status(400).json({ error: `Unknown capability "${capability}" — publish it in the registry first.` })
+    if (!info) return res.status(400).json({ error: `Unknown capability "${capability}", publish it in the registry first.` })
     const checked = validateWithSchema(info.inputSchema, parsed.data.brief)
     if (!checked.ok) return res.status(400).json({ error: `Invalid ${capability} brief: ${checked.error}` })
     brief = checked
@@ -92,7 +92,7 @@ tasksRouter.post('/', async (req, res) => {
 
 /**
  * Step 2, after createEscrow: link the escrow on the task's own chain. Accepted only when the chain
- * agrees — same taskHash, buyer, seller and amount — so a task can never be
+ * agrees, same taskHash, buyer, seller and amount, so a task can never be
  * attached to someone else's escrow or a different price. That on-chain
  * check is the proof, so no signature is needed: the buyer's browser saves a
  * wallet prompt, and anyone can finish a link a closed tab left undone.
@@ -115,7 +115,7 @@ tasksRouter.post('/:id/escrow', async (req, res) => {
     const [{ buyer, seller, amount }, { taskHash }] = await Promise.all([chain.getEscrowBasic(escrowId), chain.getEscrowHashes(escrowId)])
     onchain = { buyer, seller, amount, taskHash }
   } catch {
-    return res.status(400).json({ error: 'Could not read this escrow on-chain — is the id correct?' })
+    return res.status(400).json({ error: 'Could not read this escrow on-chain, is the id correct?' })
   }
 
   const { decimals } = await chain.token()
@@ -138,7 +138,7 @@ function linkReceipt(task: { id: string; chainId: string; escrowId: string | nul
   return { id: task.id, chainId: task.chainId, escrowId: task.escrowId, taskHash: task.taskHash, verified: task.verified }
 }
 
-// The brief and its preimage — only for the escrow's buyer, seller and the
+// The brief and its preimage, only for the escrow's buyer, seller and the
 // arbiter, who can re-hash it against the chain.
 tasksRouter.get('/by-escrow/:escrowId', async (req, res) => {
   const access = await guardEscrow(req, res, req.params.escrowId)
@@ -155,7 +155,7 @@ tasksRouter.get('/:id', async (req, res) => {
   const task = await prisma.task.findUnique({ where: { id: req.params.id } })
   if (!task) return res.status(404).json({ error: 'Task not found' })
   if (!(await canViewParties(viewer, { buyer: task.buyer, seller: task.seller }, task.chainId))) {
-    return res.status(403).json({ error: 'This task is private — only its buyer, seller and the arbiter can see it.' })
+    return res.status(403).json({ error: 'This task is private, only its buyer, seller and the arbiter can see it.' })
   }
   res.json(task)
 })

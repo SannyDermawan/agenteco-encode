@@ -76,7 +76,7 @@ async function proposeMove(ctx: TurnContext): Promise<NegotiationMove> {
   const rule = ctx.runtime.decideOnOffer(ctx.offeredPrice, ctx.myPriorOfferCount)
   const ruleMove: NegotiationMove = { ...rule, reason: null, source: 'rule', adjusted: false }
 
-  // Guardrail 3 — the old policy's accept stands. Rounds are over when the
+  // Guardrail 3, the old policy's accept stands. Rounds are over when the
   // old policy says reject: the session ends there.
   if (rule.action === 'accept') return { action: 'accept', price: ctx.offeredPrice, reason: null, source: 'rule', adjusted: false }
 
@@ -108,11 +108,11 @@ async function proposeMove(ctx: TurnContext): Promise<NegotiationMove> {
 
   if (decision.action === 'accept') {
     if (withinLimits(ctx.offeredPrice)) return { action: 'accept', price: ctx.offeredPrice, reason, source: 'ai', adjusted: false }
-    // Guardrail 2 — accepting outside the limits becomes a counter at the limit.
+    // Guardrail 2, accepting outside the limits becomes a counter at the limit.
     return { action: 'counter', price: cents(privateLimit), reason, source: 'ai', adjusted: true }
   }
 
-  // Counter. Guardrail 1 — clamp to this side's limits.
+  // Counter. Guardrail 1, clamp to this side's limits.
   let price = cents(decision.price)
   let adjusted = false
   if (price < floor) {

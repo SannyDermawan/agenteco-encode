@@ -22,7 +22,7 @@ import { buildTxFacts } from './txFacts.ts'
  * without it.
  */
 
-/** The old stand-in text for "no model answered". A result carrying it is refused — see mentionsAiUnavailable. */
+/** The old stand-in text for "no model answered". A result carrying it is refused, see mentionsAiUnavailable. */
 export const AI_UNAVAILABLE = 'AI unavailable'
 export const NOT_FINANCIAL_ADVICE =
   'This brief summarises public market data for information only. It is not financial advice.'
@@ -43,7 +43,7 @@ export interface PrepareContext {
 /**
  * Before the seller accepts the job on-chain: validate the brief and run the
  * fast, deterministic part (CSV statistics, CoinGecko data, decoded
- * transaction facts). Any failure here is an invalid input — the seller must
+ * transaction facts). Any failure here is an invalid input, the seller must
  * not call startExecution, so the accept timeout refunds the buyer (spec §7).
  * Network failures (RPC, CoinGecko) are thrown, not reported as invalid.
  */

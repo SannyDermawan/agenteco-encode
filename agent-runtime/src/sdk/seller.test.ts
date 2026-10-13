@@ -19,7 +19,7 @@ const handle = async () => ({})
 
 const PLATFORM = ['translation', 'data_analysis', 'crypto_market_brief', 'tx_explainer']
 
-test('a platform capability cannot be sold without an AI or a handler — there is no code-only fallback', () => {
+test('a platform capability cannot be sold without an AI or a handler, there is no code-only fallback', () => {
   for (const capability of PLATFORM) {
     assert.throws(() => createSellerAgent(base(capability)), /needs an AI/, capability)
   }
@@ -39,7 +39,7 @@ test('a community capability still needs its own handler; an AI alone is not eno
 })
 
 test('a failing job pauses longer each time, then is dropped', () => {
-  // 5 s, 10 s, 20 s, 40 s: about 75 s of retries — a briefly rate-limited model recovers, a dead one costs 5 calls.
+  // 5 s, 10 s, 20 s, 40 s: about 75 s of retries, a briefly rate-limited model recovers, a dead one costs 5 calls.
   assert.deepEqual(
     [1, 2, 3, 4].map((n) => retryDecision(n, false)),
     [5_000, 10_000, 20_000, 40_000].map((waitMs) => ({ giveUp: false, waitMs }))

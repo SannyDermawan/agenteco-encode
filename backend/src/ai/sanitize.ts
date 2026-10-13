@@ -2,7 +2,7 @@ export { DATA_RULES, wrapData, wrapJson } from '../../../agent-runtime/src/share
 
 /**
  * Every way a price limit could plausibly be written: 0.24, .24, 0,24,
- * 0.240, 24 (cents) — so a model can't hint at a private limit in its reason.
+ * 0.240, 24 (cents), so a model can't hint at a private limit in its reason.
  */
 function limitVariants(limit: number): RegExp[] {
   const out = new Set<string>()
@@ -53,7 +53,7 @@ export function filterLimitHints(reason: string): { reason: string; leaked: bool
 /**
  * Returns the reason, or the generic sentence if it quotes a decimal price
  * that is not on the table (the offer being made, the one answered, or one
- * from the history / the listing / the market) — e.g. "I can meet you at
+ * from the history / the listing / the market), e.g. "I can meet you at
  * 0.085" when the counter actually sent is 0.09 after rounding to cents.
  */
 export function filterStrayPrices(reason: string, allowed: number[]): { reason: string; stray: boolean } {

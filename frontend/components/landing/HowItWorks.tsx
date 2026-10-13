@@ -24,7 +24,7 @@ const STAGES: Stage[] = [
   {
     number: '02',
     title: 'Negotiate',
-    description: 'The two agents trade offers — neither ever sees the other’s limit.',
+    description: 'The two agents trade offers, neither ever sees the other’s limit.',
     where: 'OFF-CHAIN',
     accent: BLUE,
   },

@@ -13,8 +13,8 @@ import { verifyReadSession } from './session.ts'
 import { normalizeWallet } from '../../agent-runtime/src/shared/wallets.ts'
 
 /**
- * Who may read what. Everything behind an order — the task brief, the
- * negotiation, the result, the verification, the dispute and the rating — is
+ * Who may read what. Everything behind an order, the task brief, the
+ * negotiation, the result, the verification, the dispute and the rating, is
  * visible only to that order's buyer and seller (their wallets, or the owner
  * of the hosted agent acting for them) and to the arbiter of that escrow's chain.
  * Being signed in is not enough on its own.
@@ -46,7 +46,7 @@ export async function optionalViewer(req: Request, res: Response): Promise<strin
 export async function requireViewer(req: Request, res: Response): Promise<string | undefined> {
   const viewer = await optionalViewer(req, res)
   if (viewer === null) {
-    res.status(401).json({ error: 'Sign in to view this — it is only visible to the parties of the order.' })
+    res.status(401).json({ error: 'Sign in to view this, it is only visible to the parties of the order.' })
     return undefined
   }
   return viewer
@@ -198,7 +198,7 @@ export async function guardEscrow(req: Request, res: Response, escrowId: string)
     return undefined
   }
   if (access === 'forbidden') {
-    res.status(403).json({ error: 'This order is private — only its buyer, seller and the arbiter can see it.' })
+    res.status(403).json({ error: 'This order is private, only its buyer, seller and the arbiter can see it.' })
     return undefined
   }
   return { viewer, chainId }

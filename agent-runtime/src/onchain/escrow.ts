@@ -25,7 +25,7 @@ export function startExecution(clients: OnchainClients, escrowId: bigint): Promi
   return evmAdapterFor(clients).startExecution(escrowId)
 }
 
-/** Seller side: deliver the task result (a hash of it — the payload itself lives off-chain/in logs). */
+/** Seller side: deliver the task result (a hash of it, the payload itself lives off-chain/in logs). */
 export function markDelivered(clients: OnchainClients, escrowId: bigint, resultHash: `0x${string}`): Promise<void> {
   return evmAdapterFor(clients).markDelivered(escrowId, resultHash)
 }
@@ -55,7 +55,7 @@ export function rateSeller(clients: OnchainClients, escrowId: bigint, score: num
 }
 
 /**
- * Arbiter side: rule a dispute, committing the rationale's hash — only when the
+ * Arbiter side: rule a dispute, committing the rationale's hash, only when the
  * arbiter is this wallet. ruleDispute (./arbiter.ts) also handles an ArbiterCouncil.
  */
 export function resolveDispute(clients: OnchainClients, escrowId: bigint, toSeller: boolean, rationaleHash: `0x${string}`) {

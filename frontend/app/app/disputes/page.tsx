@@ -51,7 +51,7 @@ function DisputeRow({ d, record, decimals }: { d: DisputeSummary; record?: ApiDi
           <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] font-medium text-[#8B8D96]">
             {d.resolution
               ? d.resolution.byTimeout
-                ? 'Refunded — arbiter deadline passed'
+                ? 'Refunded, arbiter deadline passed'
                 : d.resolution.releasedToSeller
                   ? 'Released to seller'
                   : 'Refunded to buyer'
@@ -90,7 +90,7 @@ function DisputeRow({ d, record, decimals }: { d: DisputeSummary; record?: ApiDi
         <div>
           <div className="mb-1 text-[11px] font-medium tracking-[0.08em] text-[#8B8D96]">BUYER&apos;S REASON</div>
           <p className="whitespace-pre-wrap rounded-xl border border-white/[0.06] bg-[#0B0C11] p-3 text-[13px] leading-relaxed text-[#F5F5F7]">
-            {record?.reason || <span className="text-[#8B8D96]">No reason text — only its hash is on-chain.</span>}
+            {record?.reason || <span className="text-[#8B8D96]">No reason text, only its hash is on-chain.</span>}
           </p>
         </div>
         <div>
@@ -117,9 +117,9 @@ function DisputeRow({ d, record, decimals }: { d: DisputeSummary; record?: ApiDi
             <p className="mt-1 text-[12.5px] leading-relaxed text-[#8B8D96]">{record.recRationale}</p>
           </>
         ) : record?.recUnavailable ? (
-          <p className="text-[12.5px] text-[#8B8D96]">AI recommendation unavailable — decide manually.</p>
+          <p className="text-[12.5px] text-[#8B8D96]">AI recommendation unavailable, decide manually.</p>
         ) : (
-          <p className="text-[12.5px] text-[#8B8D96]">Pending — runs after the seller responds or its window closes.</p>
+          <p className="text-[12.5px] text-[#8B8D96]">Pending, runs after the seller responds or its window closes.</p>
         )}
       </div>
 
@@ -129,11 +129,11 @@ function DisputeRow({ d, record, decimals }: { d: DisputeSummary; record?: ApiDi
             {overrideDeadline && record?.recVerdict && (
               <span>
                 Your override window: <Remaining deadline={overrideDeadline} now={now} />
-                {' — then the AI ruling executes if it is confident enough'}
+                {', then the AI ruling executes if it is confident enough'}
               </span>
             )}
             <span>
-              Dispute deadline: <Remaining deadline={Math.floor(d.deadline / 1000)} now={now} /> — then the buyer is refunded
+              Dispute deadline: <Remaining deadline={Math.floor(d.deadline / 1000)} now={now} />, then the buyer is refunded
             </span>
           </div>
           <ArbiterDecision escrowId={d.escrowId} dispute={record} />
@@ -211,7 +211,7 @@ function DisputesPageEvm() {
             {arbiter && (
               <>
                 {' '}
-                — {council ? 'council' : 'currently'} <span className="font-mono text-[#F5F5F7]">{truncateAddress(arbiter)}</span>
+               , {council ? 'council' : 'currently'} <span className="font-mono text-[#F5F5F7]">{truncateAddress(arbiter)}</span>
                 {council && <>, {council.members.length} members</>}
               </>
             )}
@@ -258,7 +258,7 @@ function DisputesPageEvm() {
                   <h3 className="text-[12px] font-medium tracking-[0.1em] text-[#8B8D96]">OPEN · {open.length}</h3>
                   {open.length === 0 ? (
                     <NeumorphicCard className="p-6 text-center text-[13.5px] text-[#8B8D96]">
-                      No open disputes — nothing is waiting on you.
+                      No open disputes, nothing is waiting on you.
                     </NeumorphicCard>
                   ) : (
                     open.map((d) => (

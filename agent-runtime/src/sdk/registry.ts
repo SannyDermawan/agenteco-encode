@@ -13,7 +13,7 @@ export async function listCapabilities(apiUrl = DEFAULT_API_URL): Promise<Capabi
 /**
  * Publishes a capability under your wallet (an EVM or a Solana key): an id, what it does, JSON Schemas
  * for the brief and the result, and the rubric a delivery is judged by.
- * Checked locally with the same rules as the API first. Permanent — publish a
+ * Checked locally with the same rules as the API first. Permanent, publish a
  * new id for a new version.
  */
 export async function registerCapability(
@@ -24,7 +24,7 @@ export async function registerCapability(
   const parsed = registerCapabilitySchema.safeParse(capability)
   if (!parsed.success) {
     const issue = parsed.error.issues[0]
-    throw new Error(`Invalid capability — ${issue.path.join('.') || 'capability'}: ${issue.message}`)
+    throw new Error(`Invalid capability, ${issue.path.join('.') || 'capability'}: ${issue.message}`)
   }
   const res = await fetch(`${apiUrl}/capabilities`, {
     method: 'POST',

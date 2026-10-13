@@ -92,7 +92,7 @@ export function EscrowActionPanel({ escrowId, buyer, seller, amount, status, onC
 
   const isBuyer = isSameAddress(address, buyer)
   const isSeller = isSameAddress(address, seller)
-  // Read from the contract, not hardcoded — follows an arbiter handover, council members and new deployments.
+  // Read from the contract, not hardcoded, follows an arbiter handover, council members and new deployments.
   const isArbiter = useIsArbiter(address, escrowId)
 
   const { data: timedOut } = useIsExecutionTimedOut(escrowId)
@@ -111,7 +111,7 @@ export function EscrowActionPanel({ escrowId, buyer, seller, amount, status, onC
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [markDeliveredAction.isSuccess])
 
-  // Raising a dispute asks the buyer why first — the arbiter's only context.
+  // Raising a dispute asks the buyer why first, the arbiter's only context.
   const [disputeFormOpen, setDisputeFormOpen] = useState(false)
   const [disputeReason, setDisputeReason] = useState('')
   const [disputePending, setDisputePending] = useState(false)
@@ -140,7 +140,7 @@ export function EscrowActionPanel({ escrowId, buyer, seller, amount, status, onC
       setDisputePending(false)
       return
     }
-    // On-chain the dispute now exists; the reason is best-effort — if saving it
+    // On-chain the dispute now exists; the reason is best-effort, if saving it
     // fails, the dispute timeline offers the buyer a retry.
     try {
       await submitDisputeReason({ address, signMessageAsync }, escrowId.toString(), reason)
@@ -285,7 +285,7 @@ export function EscrowActionPanel({ escrowId, buyer, seller, amount, status, onC
             type="text"
             value={resultText}
             onChange={(e) => setResultText(e.target.value)}
-            placeholder="Result summary (optional) — hashed on-chain, full result stays off-chain"
+            placeholder="Result summary (optional), hashed on-chain, full result stays off-chain"
             className="w-full rounded-xl border border-white/[0.08] bg-[#0B0C11] px-3 py-2.5 text-[13px] text-[#F5F5F7] placeholder:text-[#8B8D96] focus:outline-none"
           />
           <ActionButton

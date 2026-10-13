@@ -51,7 +51,7 @@ export function startMaintenance(): void {
     try {
       const offline = await takeStaleSelfHostedOffline()
       const expired = await expireSilentNegotiations()
-      if (offline) log(`${offline} self-hosted seller(s) stopped sending heartbeats — now offline`, 'API')
+      if (offline) log(`${offline} self-hosted seller(s) stopped sending heartbeats, now offline`, 'API')
       if (expired) log(`${expired} negotiation(s) expired: the side whose turn it was stayed silent for ${NEGOTIATION_TURN_SECONDS}s`, 'API')
     } catch (error) {
       logError('Maintenance sweep failed', error, 'API')

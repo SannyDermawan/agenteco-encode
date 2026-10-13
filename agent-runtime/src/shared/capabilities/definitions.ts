@@ -6,7 +6,7 @@ import { z } from 'zod'
  * verifier judges it (rubric). The frontend form, the API, hosted sellers and
  * standalone agents all validate against these same schemas.
  *
- * This file has no Node-only dependencies — the browser imports it.
+ * This file has no Node-only dependencies, the browser imports it.
  */
 
 export const CAPABILITY_IDS = ['translation', 'data_analysis', 'crypto_market_brief', 'tx_explainer'] as const
@@ -16,7 +16,7 @@ export const LIMITS = {
   translationChars: 2000,
   csvRows: 200,
   csvColumns: 20,
-  /** Raw CSV text cap — 200 rows × 20 columns of short values. */
+  /** Raw CSV text cap, 200 rows × 20 columns of short values. */
   csvChars: 60_000,
   questionChars: 500,
   coinsMin: 1,

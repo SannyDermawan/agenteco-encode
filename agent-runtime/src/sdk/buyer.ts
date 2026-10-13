@@ -19,7 +19,7 @@ import { accountOf, chainFor, openWallet, type WalletKey } from './wallet.ts'
 
 export type Review =
   | { accept: true; /** Optional on-chain rating for the seller, 1–100. */ rating?: number }
-  | { accept: false; /** Why — goes to the seller and the arbiter (≥ 10 characters). */ reason: string }
+  | { accept: false; /** Why, goes to the seller and the arbiter (≥ 10 characters). */ reason: string }
 
 export interface HireOptions {
   /**
@@ -32,13 +32,13 @@ export interface HireOptions {
   /**
    * The chain to buy on: a CAIP-2 id (eip155:84532, solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1), a
    * network name (base-sepolia, solana-devnet) or an EVM chain id. Only sellers on this chain are
-   * considered. Default: a given `sellerId`'s chain, else NETWORK (bsc-testnet) — or Solana devnet
+   * considered. Default: a given `sellerId`'s chain, else NETWORK (bsc-testnet), or Solana devnet
    * for a Solana key.
    */
   chain?: string
   /** What to buy: a platform capability id or a community one from the registry. */
   capability: string
-  /** The task, matching the capability's input schema — checked before anything is paid. */
+  /** The task, matching the capability's input schema, checked before anything is paid. */
   brief: unknown
   /** What a good result must satisfy; the seller, verifiers and arbiter read it. */
   criteria?: string
@@ -49,7 +49,7 @@ export interface HireOptions {
   /**
    * Your own model (see openAiCompatible), used as the verifier when you pass no
    * `review`: it scores the delivery 0–100 against the capability's rubric and your
-   * criteria — the same verifier AgentEco's hosted buyers use — and accepts at 60 or
+   * criteria, the same verifier AgentEco's hosted buyers use, and accepts at 60 or
    * more (rating the seller with the score), otherwise disputes with its reasons.
    * AgentEco provides no model for self-hosted agents; this one is yours.
    */
@@ -117,7 +117,7 @@ export interface HireHandle {
   capability: string
   /** The agreed price, in token units. */
   price: string
-  /** The brief as the capability's schema normalised it, and the criteria — for a verifier. */
+  /** The brief as the capability's schema normalised it, and the criteria, for a verifier. */
   brief: unknown
   criteria: string
 }
@@ -273,13 +273,13 @@ async function openStage(options: OpenHireOptions, deadline: number | undefined)
           'buyer'
         )
       } catch (error) {
-        log(`onOffer failed (${(error as Error).message}) — will retry`)
+        log(`onOffer failed (${(error as Error).message}), will retry`)
         continue
       }
       // The budget is a hard limit, whatever the hook decides.
       if (decision.action === 'accept' && offered > options.maxBudget) decision = { action: 'reject', reason: decision.reason }
       if (decision.action === 'counter' && decision.price > options.maxBudget) {
-        log(`onOffer countered ${decision.price}, above maxBudget ${options.maxBudget} — will retry`)
+        log(`onOffer countered ${decision.price}, above maxBudget ${options.maxBudget}, will retry`)
         continue
       }
       source = 'agent'
@@ -298,7 +298,7 @@ async function openStage(options: OpenHireOptions, deadline: number | undefined)
     } catch (error) {
       // The seller's answer landed between our read and our reply: read the negotiation again.
       if (!isStaleNegotiationError(error)) throw error
-      log('the negotiation moved on while replying — reading it again')
+      log('the negotiation moved on while replying, reading it again')
     }
   }
   if (negotiation.status === 'expired') throw new Error(`No deal with ${seller.name}: the negotiation expired (a side stayed silent too long).`)
@@ -322,7 +322,7 @@ async function openStage(options: OpenHireOptions, deadline: number | undefined)
     chain
   )
   if (order) await attachEscrowToOrder(apiUrl, account, order.id, escrowId.toString())
-  log(`escrow #${escrowId} funded — waiting for delivery`)
+  log(`escrow #${escrowId} funded, waiting for delivery`)
 
   return {
     version: 1,
@@ -340,7 +340,7 @@ async function openStage(options: OpenHireOptions, deadline: number | undefined)
  * Waits for the seller's delivery and checks it: the result must hash to what the seller committed
  * on-chain and fit the capability's output schema. Never pays or disputes by itself. A seller that
  * committed a hash but has not published the result within half the review window comes back as
- * `unpublished` — waiting longer would let the window run out, and the contract would then pay the
+ * `unpublished`, waiting longer would let the window run out, and the contract would then pay the
  * seller for a result nobody could check.
  */
 export async function awaitDelivery(handle: HireHandle, ctx: HireContext): Promise<Delivery> {
@@ -397,7 +397,7 @@ export async function settleHire(handle: HireHandle, ctx: HireContext, opts: { r
 async function settleStage(handle: HireHandle, s: Stage, opts: { rating?: number; erc8004Feedback?: boolean }): Promise<SettleOutcome> {
   const escrowId = BigInt(handle.escrowId)
   await s.chain.acceptAndSettle(escrowId)
-  s.log(`escrow #${escrowId}: accepted — ${handle.price} paid to ${handle.seller.name}`)
+  s.log(`escrow #${escrowId}: accepted, ${handle.price} paid to ${handle.seller.name}`)
   const outcome: SettleOutcome = { rated: null, erc8004FeedbackTx: null }
   if (opts.rating === undefined) return outcome
   const score = Math.max(1, Math.min(100, Math.round(opts.rating)))
@@ -430,7 +430,7 @@ async function disputeStage(handle: HireHandle, s: Stage, reasonText: string): P
   const escrowId = BigInt(handle.escrowId)
   await s.chain.raiseDispute(escrowId, textHash(reason))
   await submitDisputeReason(s.apiUrl, s.account, handle.escrowId, reason, s.chainId)
-  s.log(`escrow #${escrowId}: disputed — the arbiter decides`)
+  s.log(`escrow #${escrowId}: disputed, the arbiter decides`)
 }
 
 /**
@@ -439,7 +439,7 @@ async function disputeStage(handle: HireHandle, s: Stage, reasonText: string): P
  * check the result against the on-chain hash and the capability's output
  * schema, then settle (or dispute). Resolves with the result.
  *
- * It is the stages above in a row — openHire, awaitDelivery, then settleHire or disputeHire —
+ * It is the stages above in a row, openHire, awaitDelivery, then settleHire or disputeHire,
  * with `review` / `ai` deciding between the last two. Use the stages to decide later, elsewhere,
  * or from another process.
  */
@@ -456,10 +456,10 @@ export async function hire(options: HireOptions): Promise<HireResult> {
   const base = { escrowId, seller: sellerInfo, price: handle.price }
 
   const delivery = await deliveryStage(handle, s)
-  if (delivery.state === 'refunded') throw new Error(`Escrow #${escrowId} was refunded — the seller did not take or finish the job.`)
+  if (delivery.state === 'refunded') throw new Error(`Escrow #${escrowId} was refunded, the seller did not take or finish the job.`)
   if (delivery.state === 'unpublished') {
     await disputeStage(handle, s, UNPUBLISHED_REASON)
-    s.log(`escrow #${escrowId}: the seller never published its result — disputed`)
+    s.log(`escrow #${escrowId}: the seller never published its result, disputed`)
     return { ...base, result: null, outcome: 'disputed' }
   }
   const { result, problems } = delivery
@@ -478,10 +478,10 @@ export async function hire(options: HireOptions): Promise<HireResult> {
     )
     if (!verdict) {
       // Like a hosted buyer without a model: accept, unscored, and don't rate.
-      s.log('the verifier model did not answer — accepting without a score')
+      s.log('the verifier model did not answer, accepting without a score')
       review = { accept: true }
     } else {
-      s.log(`verifier: ${verdict.score}/100 — ${verdict.rationale}`)
+      s.log(`verifier: ${verdict.score}/100, ${verdict.rationale}`)
       review = verdict.accept
         ? { accept: true, rating: verdict.score }
         : { accept: false, reason: `AI verification scored ${verdict.score}/100 (accept threshold 60). ${verdict.rationale}`.slice(0, 1000) }

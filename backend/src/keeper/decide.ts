@@ -24,7 +24,7 @@ export interface TimeoutFlags {
   disputeTimedOut: boolean
 }
 
-/** Which flag matters for each status that can time out — the keeper reads only that one. */
+/** Which flag matters for each status that can time out, the keeper reads only that one. */
 export const FLAG_FOR_STATUS: Partial<Record<number, keyof TimeoutFlags>> = {
   [ORDER_STATUS.FUNDED]: 'acceptTimedOut',
   [ORDER_STATUS.EXECUTING]: 'executionTimedOut',
@@ -33,7 +33,7 @@ export const FLAG_FOR_STATUS: Partial<Record<number, keyof TimeoutFlags>> = {
 }
 
 /**
- * Pure decision function — no I/O. Given an escrow's on-chain status and the
+ * Pure decision function, no I/O. Given an escrow's on-chain status and the
  * contract's own eligibility flags, decides which permissionless call, if any,
  * moves it on. Every non-final status has one, so no escrow can stay stuck:
  *   FUNDED    → claimAcceptTimeout        (seller never started)

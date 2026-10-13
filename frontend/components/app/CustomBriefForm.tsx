@@ -7,7 +7,7 @@ import { SchemaForm, isSimpleSchema } from './SchemaForm'
 
 /**
  * The brief for a community capability (open registry), checked live against
- * the capability's published input schema — the same check the API and the
+ * the capability's published input schema, the same check the API and the
  * seller run before any money moves. A flat schema gets a real form (one field
  * per property); anything else, or anyone who prefers it, edits the JSON.
  * The capability's worked examples fill the brief in one click.
@@ -99,7 +99,7 @@ export function CustomBriefForm({
           onChange={(e) => onCriteriaChange(e.target.value)}
           rows={2}
           maxLength={LIMITS.textChars}
-          placeholder="What a good result must satisfy — the verifier and the arbiter read this."
+          placeholder="What a good result must satisfy, the verifier and the arbiter read this."
           className={`${FIELD_CLASS} resize-none`}
         />
       </Field>

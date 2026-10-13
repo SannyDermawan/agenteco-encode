@@ -19,14 +19,14 @@ async function submitKeeperTx(
   functionName: NonNullable<KeeperAction>
 ): Promise<void> {
   if (config.dryRun) {
-    log(`[DRY RUN] Would submit ${functionName}(#${escrowId}) — no transaction sent.`)
+    log(`[DRY RUN] Would submit ${functionName}(#${escrowId}), no transaction sent.`)
     return
   }
 
   try {
     // claimTimeout simulates first (catches a stale/ineligible escrow, e.g. someone
     // else's keeper already claimed it, before we spend gas), then sends, then awaits
-    // the receipt — not just the hash — which is what guarantees this escrow can't be
+    // the receipt, not just the hash, which is what guarantees this escrow can't be
     // double-submitted: processEscrow() is only called sequentially within a cycle, and
     // cycles never overlap (see index.ts), so nothing else touches this escrowId until
     // this resolves.
@@ -35,7 +35,7 @@ async function submitKeeperTx(
       onSent: (hash) => log(`Transaction: ${hash}`),
     })
     log(
-      `${functionName}(#${escrowId}) ${claim.success ? 'succeeded' : 'reverted'} — ` +
+      `${functionName}(#${escrowId}) ${claim.success ? 'succeeded' : 'reverted'}, ` +
         `block ${claim.blockNumber}, tx ${claim.hash}`
     )
   } catch (error) {
@@ -53,7 +53,7 @@ async function processEscrow(chain: ChainAdapter, config: KeeperConfig, escrowId
     const action = decideKeeperAction(status, { [flag]: flagValue })
     if (!action) return
 
-    log(`Escrow #${escrowId}: ${ACTION_REASON[action]} — calling ${action}`)
+    log(`Escrow #${escrowId}: ${ACTION_REASON[action]}, calling ${action}`)
     await submitKeeperTx(chain, config, escrowId, action)
   } catch (error) {
     logError(`Failed checking escrow #${escrowId}`, error)
@@ -63,7 +63,7 @@ async function processEscrow(chain: ChainAdapter, config: KeeperConfig, escrowId
 
 /**
  * One full keeper pass on one chain: read every escrow's status straight from
- * the contract (batched — no event logs, so it works on RPCs that prune history),
+ * the contract (batched, no event logs, so it works on RPCs that prune history),
  * then act on each one that can time out. Escrows are processed sequentially so
  * a slow or stuck transaction can't cause overlapping submissions. `chain` signs
  * with the keeper's wallet.
@@ -71,7 +71,7 @@ async function processEscrow(chain: ChainAdapter, config: KeeperConfig, escrowId
 export async function runKeeperCycleOn(chain: ChainAdapter, config: KeeperConfig, label = ''): Promise<void> {
   const escrows = await chain.listEscrows()
   const live = escrows.filter((e) => FLAG_FOR_STATUS[e.status] !== undefined)
-  if (live.length) log(`${label}${escrows.length} escrows, ${live.length} live — checking timeouts`)
+  if (live.length) log(`${label}${escrows.length} escrows, ${live.length} live, checking timeouts`)
 
   for (const escrow of live) {
     await processEscrow(chain, config, escrow.id, escrow.status)

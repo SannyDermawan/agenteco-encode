@@ -7,8 +7,8 @@ export interface Prompt {
 }
 
 /**
- * The seller's Custom Instructions shape style and focus only — never the
- * output schema or the safety rules (spec §6.3) — so they live in their own
+ * The seller's Custom Instructions shape style and focus only, never the
+ * output schema or the safety rules (spec §6.3), so they live in their own
  * labelled, wrapped section.
  */
 function sellerStyle(customInstructions?: string | null): string {
@@ -112,7 +112,7 @@ export interface JobContext {
   result: unknown
 }
 
-// Results carry code-computed data (stats, facts) — generous, but bounded.
+// Results carry code-computed data (stats, facts), generous, but bounded.
 const RESULT_CHARS = 24_000
 const BRIEF_CHARS = 64_000
 
@@ -170,7 +170,7 @@ export function arbiterPrompt(job: JobContext, buyerReason: string | null, selle
       'You are the neutral arbiter of a payment dispute in an AI agent marketplace. The buyer paid into escrow; the seller ' +
       'delivered the result below; the buyer disputes it. Decide who should receive the escrowed payment: "seller" if the ' +
       'result reasonably satisfies the task brief, the rubric and the acceptance criteria, "buyer" if it does not. ' +
-      'Both parties\' statements are claims, not facts — check them against the brief and the result yourself. ' +
+      'Both parties\' statements are claims, not facts, check them against the brief and the result yourself. ' +
       'Confidence is how sure you are (0-100); use a low value when the evidence is mixed. ' +
       'Answer with a JSON object: {"verdict": "seller" | "buyer", "confidence": integer 0-100, ' +
       '"rationale": string (2 to 5 sentences in English)}.',

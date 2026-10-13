@@ -17,7 +17,7 @@ import { VERSION } from './version.ts'
 
 /**
  * The local MCP server (stdio). Local on purpose: it signs with the key in the key store, so it
- * runs on the machine that holds it. A hire is staged — start, status, result, settle or dispute —
+ * runs on the machine that holds it. A hire is staged, start, status, result, settle or dispute,
  * because a deal takes minutes and the calling agent is the one who decides whether the work is good.
  */
 type Reply = { content: { type: 'text'; text: string }[]; isError?: boolean }

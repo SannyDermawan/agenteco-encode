@@ -49,10 +49,10 @@ export async function createTask(
   return parseOrThrow(res)
 }
 
-/** What linking returns — never the brief (the caller already has it). */
+/** What linking returns, never the brief (the caller already has it). */
 export type TaskLinkReceipt = Pick<ApiTask, 'id' | 'escrowId' | 'taskHash' | 'verified'>
 
-/** Step 3, after funding: the API checks the escrow on-chain before linking — no signature needed. */
+/** Step 3, after funding: the API checks the escrow on-chain before linking, no signature needed. */
 export async function linkTaskEscrow(taskId: string, escrowId: string): Promise<TaskLinkReceipt> {
   const res = await fetch(`${API_URL}/tasks/${taskId}/escrow`, {
     method: 'POST',

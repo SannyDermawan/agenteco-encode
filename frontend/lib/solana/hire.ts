@@ -24,11 +24,11 @@ export async function hireWithTask(input: HireInput): Promise<{ escrowId: bigint
   if (token < amount) {
     throw new InsufficientTokenError(
       `Not enough ${TOKEN_SYMBOL}: this needs ${input.price} ${TOKEN_SYMBOL} but your wallet holds ${formatUnits(token, decimals)} ${TOKEN_SYMBOL}. ` +
-        `Get some from the faucet below — no transaction was sent.`
+        `Get some from the faucet below, no transaction was sent.`
     )
   }
   if (sol === BigInt(0)) {
-    throw new Error(`Your wallet holds no ${adapter.nativeSymbol} for network fees. Get some from the faucet below — no transaction was sent.`)
+    throw new Error(`Your wallet holds no ${adapter.nativeSymbol} for network fees. Get some from the faucet below, no transaction was sent.`)
   }
 
   onStep('saving-task')
@@ -43,7 +43,7 @@ export async function hireWithTask(input: HireInput): Promise<{ escrowId: bigint
   onStep('creating')
   const escrowId = await adapter.createAndFundEscrow({ seller, amount: input.price, taskHash: task.taskHash })
 
-  // The seller starts only once it can read the brief — retry a flaky link a few times rather than
+  // The seller starts only once it can read the brief, retry a flaky link a few times rather than
   // leave a funded escrow for the accept timeout.
   onStep('linking')
   let linked: TaskLinkReceipt | null = null

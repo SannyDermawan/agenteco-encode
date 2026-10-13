@@ -22,7 +22,7 @@ const job: JobContext = {
 const answer = (data: unknown) => (async () => ({ data, provider: 'fake', model: 'm' })) as never
 const noAI = (async () => null) as never
 
-test('verification: the score decides, not the model verdict — at the threshold it accepts', async () => {
+test('verification: the score decides, not the model verdict, at the threshold it accepts', async () => {
   const out = await verifyResult(job, { llm: answer({ score: 60, verdict: 'dispute', rationale: 'Fine.' }), threshold: 60 })
   assert.equal(out.verdict, 'accept')
   assert.equal(out.score, 60)

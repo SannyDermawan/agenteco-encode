@@ -39,7 +39,7 @@ function optionalBoolean(name: string, fallback: boolean): boolean {
 
 /**
  * Loads and validates all keeper configuration from process.env. Throws
- * a descriptive error on the first problem found — the caller (index.ts)
+ * a descriptive error on the first problem found, the caller (index.ts)
  * is expected to let this crash the process at startup rather than run
  * with partial/invalid config.
  */

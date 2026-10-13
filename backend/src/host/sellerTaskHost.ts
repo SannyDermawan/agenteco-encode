@@ -40,7 +40,7 @@ const ON_CHAIN_SETTLED = 5
 
 export interface HostedSellerAgentRow {
   id: string
-  /** The chain this seller trades on — its wallet, escrows and payouts are there. */
+  /** The chain this seller trades on, its wallet, escrows and payouts are there. */
   chainId: string
   name: string
   capabilities: string[]
@@ -50,7 +50,7 @@ export interface HostedSellerAgentRow {
   agentWalletKey: string | null
   depositorWallet: string | null
   escrowScanBlock: bigint | null
-  /** Seller's style guide for the model (≤ 500 chars) — see prompts/execute.ts. */
+  /** Seller's style guide for the model (≤ 500 chars), see prompts/execute.ts. */
   customInstructions: string | null
   /** ERC-8004 identity on its chain, once registered. */
   erc8004AgentId: string | null
@@ -69,7 +69,7 @@ const key = (chain: EvmAdapter, escrowId: bigint) => `${chain.chainId}:${escrowI
 
 /**
  * Escrows each seller has nothing left to do on, in memory only. After a host
- * restart everything is re-checked once — every step below is idempotent
+ * restart everything is re-checked once, every step below is idempotent
  * against on-chain status, so that never double-executes anything.
  */
 const finishedEscrows = new Map<string, Set<bigint>>()
@@ -81,7 +81,7 @@ const finishedEscrows = new Map<string, Set<bigint>>()
  */
 const unpublished = new Map<string, { capability: string; result: Record<string, unknown> }>()
 
-/** Funded escrows already logged as waiting for their brief — logged once, not every cycle. */
+/** Funded escrows already logged as waiting for their brief, logged once, not every cycle. */
 const waitingForTask = new Set<string>()
 
 /** Disputes this seller has answered, or decided not to answer. */
@@ -110,7 +110,7 @@ async function publishPending(s: Seller, escrowId: bigint): Promise<boolean> {
     log(`[host:${s.label}] escrow #${escrowId}: result published.`)
     return true
   } catch (error) {
-    logError(`[host:${s.label}] escrow #${escrowId}: result publish failed — will retry`, error, 'HOST')
+    logError(`[host:${s.label}] escrow #${escrowId}: result publish failed, will retry`, error, 'HOST')
     return false
   }
 }
@@ -132,25 +132,25 @@ async function advanceEscrow(s: Seller, escrowId: bigint): Promise<boolean> {
   const status = await chain.getEscrowStatus(escrowId)
 
   if (status === ON_CHAIN_FUNDED || status === ON_CHAIN_EXECUTING) {
-    // The buyer links the task right after funding — until then, wait.
+    // The buyer links the task right after funding, until then, wait.
     const task = await getTaskByEscrow(API_URL, escrowId.toString(), s.account, chain.chainId)
     if (!task) {
-      if (!waitingForTask.has(k)) log(`[host:${label}] escrow #${escrowId} is funded — waiting for its task brief…`)
+      if (!waitingForTask.has(k)) log(`[host:${label}] escrow #${escrowId} is funded, waiting for its task brief…`)
       waitingForTask.add(k)
       return false
     }
 
     const { taskHash: expected } = await chain.getEscrowHashes(escrowId)
     if (hashPreimage(task.preimage).toLowerCase() !== expected.toLowerCase()) {
-      log(`[host:${label}] escrow #${escrowId}: stored task does not match the on-chain taskHash — not starting.`)
+      log(`[host:${label}] escrow #${escrowId}: stored task does not match the on-chain taskHash, not starting.`)
       return true
     }
     if (task.seller.toLowerCase() !== s.account.address.toLowerCase()) {
-      log(`[host:${label}] escrow #${escrowId}: task names a different seller — not starting.`)
+      log(`[host:${label}] escrow #${escrowId}: task names a different seller, not starting.`)
       return true
     }
     if (!isCapabilityId(task.capability) || !s.row.capabilities.includes(task.capability)) {
-      log(`[host:${label}] escrow #${escrowId}: this seller does not offer "${task.capability}" — not starting.`)
+      log(`[host:${label}] escrow #${escrowId}: this seller does not offer "${task.capability}", not starting.`)
       return true
     }
 
@@ -158,12 +158,12 @@ async function advanceEscrow(s: Seller, escrowId: bigint): Promise<boolean> {
     const ctx = { publicClient: chain.client, agentEcoAddress: chain.config.agentEco }
     const prepared = await prepareJob(task.capability, task.brief, ctx)
     if (!prepared.ok) {
-      log(`[host:${label}] escrow #${escrowId}: ${prepared.reason} — not starting; the accept timeout refunds the buyer.`)
+      log(`[host:${label}] escrow #${escrowId}: ${prepared.reason}, not starting; the accept timeout refunds the buyer.`)
       return true
     }
 
     if (status === ON_CHAIN_FUNDED) {
-      log(`[host:${label}] escrow #${escrowId}: brief is valid — starting execution…`)
+      log(`[host:${label}] escrow #${escrowId}: brief is valid, starting execution…`)
       await chain.startExecution(escrowId)
     }
 
@@ -215,7 +215,7 @@ async function sendPendingResponse(s: Seller, escrowId: bigint): Promise<void> {
     defended.add(k)
     log(`[host:${s.label}] escrow #${escrowId}: dispute response saved.`)
   } catch (error) {
-    logError(`[host:${s.label}] escrow #${escrowId}: dispute response not saved yet — will retry`, error, 'HOST')
+    logError(`[host:${s.label}] escrow #${escrowId}: dispute response not saved yet, will retry`, error, 'HOST')
   }
 }
 
@@ -223,7 +223,7 @@ async function sendPendingResponse(s: Seller, escrowId: bigint): Promise<void> {
  * The hosted seller's side of a dispute (spec §11 step 2): once the buyer's
  * reason is readable, the model writes a response grounded in the brief and
  * the result; its hash goes on-chain, then the text to the API. Only within
- * SELLER_RESPONSE_WINDOW_SECONDS — after that the arbiter decides without it.
+ * SELLER_RESPONSE_WINDOW_SECONDS, after that the arbiter decides without it.
  */
 async function defendIfDue(s: Seller, escrowId: bigint): Promise<void> {
   const { chain, label } = s
@@ -239,7 +239,7 @@ async function defendIfDue(s: Seller, escrowId: bigint): Promise<void> {
   const { disputedAt } = await chain.getEscrowDisputeInfo(escrowId)
   if (BigInt(Math.floor(Date.now() / 1000)) > disputedAt + BigInt(SELLER_RESPONSE_WINDOW_SECONDS)) {
     defended.add(k)
-    log(`[host:${label}] escrow #${escrowId}: the response window has passed — not responding.`)
+    log(`[host:${label}] escrow #${escrowId}: the response window has passed, not responding.`)
     return
   }
 
@@ -253,7 +253,7 @@ async function defendIfDue(s: Seller, escrowId: bigint): Promise<void> {
   const stored = resultRes.ok ? ((await resultRes.json()) as { resultJson: string | null }) : null
   if (!task || !stored?.resultJson || !isCapabilityId(task.capability)) {
     defended.add(k)
-    log(`[host:${label}] escrow #${escrowId}: brief or result unavailable — not responding.`)
+    log(`[host:${label}] escrow #${escrowId}: brief or result unavailable, not responding.`)
     return
   }
 
@@ -264,7 +264,7 @@ async function defendIfDue(s: Seller, escrowId: bigint): Promise<void> {
   )
   if (!defense) {
     defended.add(k)
-    log(`[host:${label}] escrow #${escrowId}: AI unavailable — no dispute response; the arbiter sees "no response".`)
+    log(`[host:${label}] escrow #${escrowId}: AI unavailable, no dispute response; the arbiter sees "no response".`)
     return
   }
   log(`[host:${label}] escrow #${escrowId}: answering the dispute (${defense.provider}/${defense.model})…`)
@@ -274,7 +274,7 @@ async function defendIfDue(s: Seller, escrowId: bigint): Promise<void> {
 }
 
 /**
- * @param myEscrows every escrow naming this agent's wallet as seller on its chain — read
+ * @param myEscrows every escrow naming this agent's wallet as seller on its chain, read
  *   from contract state by the caller, once per cycle for all sellers of that chain.
  */
 export async function processHostedSellerTask(agentRow: HostedSellerAgentRow, myEscrows: EscrowBasic[]): Promise<void> {
@@ -301,7 +301,7 @@ export async function processHostedSellerTask(agentRow: HostedSellerAgentRow, my
   })
 
   // 1. Answer every negotiation waiting on the seller. Isolated so an API
-  //    outage never blocks step 2 — funded escrows are on-chain obligations
+  //    outage never blocks step 2, funded escrows are on-chain obligations
   //    with an execution deadline, and only need the chain to be worked.
   try {
     const negotiations = await listNegotiationsForAgent(API_URL, account, agentRow.id, 'open')
@@ -345,7 +345,7 @@ export async function processHostedSellerTask(agentRow: HostedSellerAgentRow, my
     logError(`[host:${agentRow.name}] negotiations skipped this cycle`, error, 'HOST')
   }
 
-  // 2. Work every escrow naming this wallet as seller — negotiated orders and
+  // 2. Work every escrow naming this wallet as seller, negotiated orders and
   //    direct "Request Service" hires alike, straight from contract state.
   let finished = finishedEscrows.get(agentRow.id)
   if (!finished) finishedEscrows.set(agentRow.id, (finished = new Set()))
@@ -354,18 +354,18 @@ export async function processHostedSellerTask(agentRow: HostedSellerAgentRow, my
     try {
       if (await advanceEscrow(s, escrow.id)) finished.add(escrow.id)
     } catch (error) {
-      // A transient RPC/API/CoinGecko failure — retried next cycle.
+      // A transient RPC/API/CoinGecko failure, retried next cycle.
       logError(`[host:${agentRow.name}] escrow #${escrow.id} failed this cycle`, error, 'HOST')
     }
   }
 
-  // 3. Sweep settled earnings out to the owner — the agent wallet is only
+  // 3. Sweep settled earnings out to the owner, the agent wallet is only
   //    an operating wallet, not where the seller's money should sit.
   await refundLeftover(chain, agentRow.depositorWallet as Address, agentRow.name, 'paid out earnings of')
 }
 
 export async function runSellerHostCycleOnce(): Promise<void> {
-  // The only place (besides the buyer host) allowed to read agentWalletKey — see db.ts.
+  // The only place (besides the buyer host) allowed to read agentWalletKey, see db.ts.
   const activeSellers = await prismaWithAgentKey.agent.findMany({ where: { role: 'seller', taskStatus: 'active', deletedAt: null } })
   if (activeSellers.length === 0) return
 
@@ -373,12 +373,12 @@ export async function runSellerHostCycleOnce(): Promise<void> {
   for (const chainId of new Set(activeSellers.map((a) => a.chainId))) {
     const sellers = activeSellers.filter((a) => a.chainId === chainId)
     if (!served.has(chainId)) {
-      if (!unservedLogged.has(chainId)) log(`[host] ${sellers.length} hosted seller(s) on ${chainId}, which this host does not serve (CHAINS) — skipped.`)
+      if (!unservedLogged.has(chainId)) log(`[host] ${sellers.length} hosted seller(s) on ${chainId}, which this host does not serve (CHAINS), skipped.`)
       unservedLogged.add(chainId)
       continue
     }
 
-    // One batched read of every escrow on this chain for all its sellers — no event logs,
+    // One batched read of every escrow on this chain for all its sellers, no event logs,
     // so it keeps working on RPCs that prune history.
     const bySeller = new Map<string, EscrowBasic[]>()
     try {

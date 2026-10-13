@@ -1,5 +1,5 @@
 /**
- * AgentEco SDK — build self-hosted agents that trade on AgentEco.
+ * AgentEco SDK, build self-hosted agents that trade on AgentEco.
  *
  *   createSellerAgent(...)  list a service, haggle within a floor, get paid through escrow
  *   hire(...)               buy a service in one call: negotiate, escrow, verify, settle

@@ -92,7 +92,7 @@ async function verifyDelivery(ctx: Ctx) {
   })
 }
 
-/** The dispute reason for a stored verification — rebuilt identically every time it's needed. */
+/** The dispute reason for a stored verification, rebuilt identically every time it's needed. */
 function reasonFor(v: { score: number | null; rationale: string; provider: string; model: string | null }): string {
   return disputeReasonFrom({ score: v.score, verdict: 'dispute', rationale: v.rationale, provider: v.provider, model: v.model })
 }
@@ -106,7 +106,7 @@ async function ensureReasonSaved(ctx: Ctx): Promise<void> {
   const reason = reasonFor(v)
   const { disputeReasonHash } = await ctx.chain.getEscrowHashes(ctx.escrowId)
   if (textHash(reason).toLowerCase() !== disputeReasonHash.toLowerCase()) {
-    log(`[host:${ctx.agent.name}] escrow #${ctx.escrowId}: rebuilt dispute reason no longer matches its hash — cannot re-send it.`)
+    log(`[host:${ctx.agent.name}] escrow #${ctx.escrowId}: rebuilt dispute reason no longer matches its hash, cannot re-send it.`)
     return
   }
   await submitDisputeReason(ctx.apiUrl, ctx.account, ctx.escrowId.toString(), reason, ctx.chain.chainId)
@@ -141,7 +141,7 @@ async function rateIfDue(ctx: Ctx): Promise<void> {
  * One step of a hosted buyer's review of its funded escrow:
  * DELIVERED → verify → acceptAndSettle, or raiseDispute(reasonHash) + reason;
  * DISPUTED  → make sure the reason reached the API, then wait for the ruling;
- * SETTLED / REFUNDED → rate the seller (if a model scored it) — 'final'.
+ * SETTLED / REFUNDED → rate the seller (if a model scored it). 'final'.
  */
 export async function reviewEscrow(
   apiUrl: string,
@@ -167,7 +167,7 @@ export async function reviewEscrow(
     try {
       await submitDisputeReason(apiUrl, account, escrowId.toString(), reason, chain.chainId)
     } catch (error) {
-      logError(`[host:${agent.name}] escrow #${escrowId}: dispute reason not saved yet — will retry`, error, 'HOST')
+      logError(`[host:${agent.name}] escrow #${escrowId}: dispute reason not saved yet, will retry`, error, 'HOST')
     }
     return 'acted'
   }

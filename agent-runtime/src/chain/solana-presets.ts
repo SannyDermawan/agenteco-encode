@@ -4,9 +4,9 @@ import type { ChainId } from './types.ts'
 export const SOLANA_DEVNET_CHAIN_ID = 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1'
 
 /**
- * The Solana clusters AgentEco knows, as plain data — shared by ./solana-registry.ts (the process
+ * The Solana clusters AgentEco knows, as plain data, shared by ./solana-registry.ts (the process
  * side, which reads the environment) and the website (which imports this file into the browser,
- * so it must stay free of Node APIs and of every other module — not even ./solana.ts).
+ * so it must stay free of Node APIs and of every other module, not even ./solana.ts).
  */
 
 export interface SolanaPreset {

@@ -38,7 +38,7 @@ test('guardrail 2: accepting within limits goes through at the offered price', a
   assert.deepEqual(move, { action: 'accept', price: 0.25, reason: 'Fair for the work.', source: 'ai', adjusted: false })
 })
 
-test('guardrail 3: when the old policy already accepts, accept — whatever the model says', async () => {
+test('guardrail 3: when the old policy already accepts, accept, whatever the model says', async () => {
   // 0.30 is the seller's listing price: ideal for the seller.
   const move = await decideTurn(ctx(seller, 0.3, ai('counter', 0.35)))
   assert.deepEqual(move, { action: 'accept', price: 0.3, reason: null, source: 'rule', adjusted: false })
@@ -56,7 +56,7 @@ test('guardrail 5: no model answer → the old concession policy, rule-based, no
 })
 
 test('a counter at least as good as the offer on the table becomes an accept', async () => {
-  // The model "counters" 0.24 against a buyer offer of 0.25 — just take the 0.25.
+  // The model "counters" 0.24 against a buyer offer of 0.25, just take the 0.25.
   const move = await decideTurn(ctx(seller, 0.25, ai('counter', 0.24), 1))
   assert.equal(move.action, 'accept')
   assert.equal(move.price, 0.25)

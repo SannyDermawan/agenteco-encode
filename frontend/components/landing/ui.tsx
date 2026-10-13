@@ -9,7 +9,7 @@ import { WordReveal } from './cinema'
 
 export const fragmentMono = Fragment_Mono({ subsets: ['latin'], weight: '400' })
 
-/** Landing palette — body copy is a notch brighter than the app's #8B8D96 so it survives a projector. */
+/** Landing palette, body copy is a notch brighter than the app's #8B8D96 so it survives a projector. */
 export const C = {
   bg: '#0A0B1E',
   panel: '#0D0F16',

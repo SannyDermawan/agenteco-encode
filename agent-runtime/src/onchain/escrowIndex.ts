@@ -4,7 +4,7 @@ import { evmAdapterFor } from '../chain/default.ts'
 /**
  * Escrow discovery from contract state, not event logs. Public BSC Testnet
  * RPCs either refuse eth_getLogs (the official data-seed nodes) or prune log
- * history after ~80,000 blocks (~18 hours, PublicNode) — so a log scan from the
+ * history after ~80,000 blocks (~18 hours, PublicNode), so a log scan from the
  * deploy block breaks a day after deployment. AgentEco.sol numbers escrows
  * firstEscrowId..nextEscrowId-1 and exposes each one through getEscrowBasic,
  * which works against any RPC, forever.
@@ -22,12 +22,12 @@ export function allEscrowIds(publicClient: PublicClient): Promise<bigint[]> {
   return evmAdapterFor({ publicClient }).escrowIds()
 }
 
-/** Escrow ids on the current deployment only — the ones that can still change. */
+/** Escrow ids on the current deployment only, the ones that can still change. */
 export function currentEscrowIds(publicClient: PublicClient): Promise<bigint[]> {
   return evmAdapterFor({ publicClient }).escrowIds({ currentOnly: true })
 }
 
-/** Reads getEscrowBasic for many ids — batched through Multicall3 when the chain has it. */
+/** Reads getEscrowBasic for many ids, batched through Multicall3 when the chain has it. */
 export function readEscrowBasics(publicClient: PublicClient, ids: bigint[]) {
   return evmAdapterFor({ publicClient }).readEscrowBasics(ids)
 }

@@ -22,7 +22,7 @@ export function AgentReputationStats({
   const { data } = useReputation(walletAddress)
 
   const completedJobs = data ? data.completedJobs : fallback.completedJobs
-  const successRate = data ? (data.successPct === null ? '—' : `${Math.round(data.successPct)}%`) : `${fallback.successRate}%`
+  const successRate = data ? (data.successPct === null ? '-' : `${Math.round(data.successPct)}%`) : `${fallback.successRate}%`
   // Displayed rating leaves same-owner ratings out; the raw on-chain one is in the tooltip.
   const { data: summary } = useSellerRating(walletAddress)
   const stars = displayStars(summary)

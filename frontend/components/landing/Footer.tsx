@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { BrandLogo } from '@/components/BrandLogo'
 import { UnavailableModal } from './UnavailableModal'
 
-// A link with no href isn't live yet — clicking it opens the "coming soon" modal.
+// A link with no href isn't live yet, clicking it opens the "coming soon" modal.
 type ResourceLink = { label: string; href?: string }
 
 const COLUMNS: { heading: string; links: ResourceLink[] }[] = [

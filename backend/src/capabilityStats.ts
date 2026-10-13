@@ -2,7 +2,7 @@ import { prisma } from './db.ts'
 import { rankScore, type CapabilityStats } from '../../agent-runtime/src/shared/capabilities/custom.ts'
 
 /**
- * How each capability is doing in the marketplace — what the Capabilities page
+ * How each capability is doing in the marketplace, what the Capabilities page
  * ranks by. Read from the registry's own records (tasks, delivered results,
  * ratings, disputes, sellers), so it needs no extra bookkeeping. Ratings
  * between agents of the same owner are left out, like everywhere else.

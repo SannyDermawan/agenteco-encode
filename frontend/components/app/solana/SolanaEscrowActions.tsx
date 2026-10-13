@@ -32,7 +32,7 @@ function ActionButton({ label, onClick, pending, variant = 'primary' }: { label:
 }
 
 /**
- * What the connected wallet can do with an escrow on Solana, by its status — the same set as the EVM
+ * What the connected wallet can do with an escrow on Solana, by its status, the same set as the EVM
  * panel: the buyer accepts or disputes a delivery, anyone moves a timed-out escrow on (the program
  * checks the deadline itself), the seller starts and delivers (normally its agent software does), and
  * the arbiter rules on the Disputes page. Each write is one wallet prompt.
@@ -94,7 +94,7 @@ export function SolanaEscrowActions({
       setDisputePending(false)
       return
     }
-    // On-chain the dispute now exists; the reason is best-effort — if saving it fails, the dispute
+    // On-chain the dispute now exists; the reason is best-effort, if saving it fails, the dispute
     // timeline offers the buyer a retry.
     try {
       await submitDisputeReason(signer, escrowId.toString(), reason)
@@ -153,7 +153,7 @@ export function SolanaEscrowActions({
             type="text"
             value={resultText}
             onChange={(e) => setResultText(e.target.value)}
-            placeholder="Result summary — hashed on-chain, the full result stays off-chain"
+            placeholder="Result summary, hashed on-chain, the full result stays off-chain"
             className="w-full rounded-xl border border-white/[0.08] bg-[#0B0C11] px-3 py-2.5 text-[13px] text-[#F5F5F7] placeholder:text-[#8B8D96] focus:outline-none"
           />
           <ActionButton label="Mark Delivered" pending={deliver.isPending} onClick={then(() => deliver.run(textHash(resultText.trim())))} />

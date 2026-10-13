@@ -2,7 +2,7 @@ import { CAPABILITIES, CAPABILITY_IDS, type CapabilityId } from '@shared/capabil
 import type { AgentCategory } from './agenteco-data'
 
 /**
- * The four platform capabilities, as the forms and cards show them — read
+ * The four platform capabilities, as the forms and cards show them, read
  * from the shared definitions (agent-runtime/src/shared/capabilities), so the
  * frontend, the API and every seller agree on the same ids and schemas.
  */

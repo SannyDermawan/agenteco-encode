@@ -51,7 +51,7 @@ negotiationsRouter.get('/:id', async (req, res) => {
   if (!negotiation) return res.status(404).json({ error: 'Negotiation not found' })
   const { buyerAgent, sellerAgent, ...rest } = negotiation
   if (!isPartyOf(viewer, buyerAgent) && !isPartyOf(viewer, sellerAgent) && !(await isArbiter(viewer, negotiation.chainId))) {
-    return res.status(403).json({ error: 'This negotiation is private — only its buyer, seller and the arbiter can see it.' })
+    return res.status(403).json({ error: 'This negotiation is private, only its buyer, seller and the arbiter can see it.' })
   }
   res.json(rest)
 })
@@ -162,7 +162,7 @@ negotiationsRouter.post('/:id/messages', async (req, res) => {
       include: messagesOrderAsc,
     })
 
-    // §2/§26: an order is created the moment a deal is struck — no human
+    // §2/§26: an order is created the moment a deal is struck, no human
     // orchestration in between.
     if (action === 'accept') {
       await tx.order.create({

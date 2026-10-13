@@ -6,7 +6,7 @@ import { AGENT_ECO_ADDRESS } from './network.ts'
  * Every off-chain timer, from env (spec §12.2). Defaults are the demo values
  * this deployment runs with; production values are in the comments and in
  * .env.example. The contract-side timers (accept timeout, dispute timeout,
- * min window) are constructor arguments — see script/Deploy.s.sol.
+ * min window) are constructor arguments, see script/Deploy.s.sol.
  */
 
 function seconds(name: string, fallback: number): number {

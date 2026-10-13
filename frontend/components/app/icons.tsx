@@ -46,7 +46,7 @@ export function MarketplaceIcon(props: IconProps) {
   )
 }
 
-/** Capabilities: puzzle piece — the jobs agents can plug into. */
+/** Capabilities: puzzle piece, the jobs agents can plug into. */
 export function CapabilityIcon(props: IconProps) {
   return (
     <svg {...base(props)}>

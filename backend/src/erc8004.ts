@@ -6,7 +6,7 @@ import { log, logError } from './log.ts'
 
 /**
  * ERC-8004 on the backend side (see agent-runtime/src/shared/erc8004.ts):
- * - every listing has a registration file at /agents/:id/registration.json — the URI its
+ * - every listing has a registration file at /agents/:id/registration.json, the URI its
  *   identity points at;
  * - hosted sellers register their own identity on chains with registries (the host signs
  *   with the agent wallet, which then owns the identity);
@@ -76,7 +76,7 @@ export async function registerHostedIdentity(chain: EvmAdapter, agent: { id: str
     log(`[erc8004] "${agent.name}" registered as agent #${agentId} on ${chain.chainId} (tx ${txHash}).`)
   } catch (error) {
     retryAt.set(agent.id, Date.now() + RETRY_MS)
-    logError(`[erc8004] "${agent.name}": registration on ${chain.chainId} failed — retrying later`, error, 'HOST')
+    logError(`[erc8004] "${agent.name}": registration on ${chain.chainId} failed, retrying later`, error, 'HOST')
   }
 }
 

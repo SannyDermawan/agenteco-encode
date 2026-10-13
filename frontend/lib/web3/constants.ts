@@ -4,7 +4,7 @@
  * (86400 / 172800) are in .env.example. They must sit inside the contract's
  * [minWindow, MAX_WINDOW] or createEscrow reverts.
  *
- * NEXT_PUBLIC_* values are inlined at build time — read each literally.
+ * NEXT_PUBLIC_* values are inlined at build time, read each literally.
  */
 function seconds(name: string, raw: string | undefined, fallback: number): bigint {
   const value = raw?.trim()
@@ -25,7 +25,7 @@ export const REVIEW_WINDOW_SECONDS = seconds(
   600
 )
 
-/** Shortened timers for judging — shows a banner and live countdowns. */
+/** Shortened timers for judging, shows a banner and live countdowns. */
 export const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE?.trim().toLowerCase() === 'true'
 
 /** 300 → "5m", 7200 → "2h", 90 → "1m 30s", 86400 → "24h". */

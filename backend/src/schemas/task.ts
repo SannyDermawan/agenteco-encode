@@ -11,7 +11,7 @@ export const createTaskSchema = z.object({
   criteria: z.string().max(LIMITS.textChars).optional(),
   price: z.union([z.string(), z.number()]),
   seller: walletSchema,
-  /** Optional — the server generates a UUID when omitted. */
+  /** Optional, the server generates a UUID when omitted. */
   nonce: z.string().uuid().optional(),
 })
 

@@ -4,7 +4,7 @@ import { validateWithSchema, type CapabilityInfo } from '../shared/capabilities/
 /**
  * A capability the SDK can check briefs and results against: a platform one
  * (zod schemas in the code) or a community one from the open registry (its
- * published JSON Schemas, fetched once — they never change).
+ * published JSON Schemas, fetched once, they never change).
  */
 export interface ResolvedCapability {
   id: string
@@ -46,7 +46,7 @@ export async function resolveCapability(apiUrl: string, id: string): Promise<Res
     }
   } else {
     const res = await fetch(`${apiUrl}/capabilities/${encodeURIComponent(id)}`)
-    if (res.status === 404) throw new Error(`Capability "${id}" is not in the registry — publish it first (POST /capabilities, or the Capabilities page).`)
+    if (res.status === 404) throw new Error(`Capability "${id}" is not in the registry, publish it first (POST /capabilities, or the Capabilities page).`)
     if (!res.ok) throw new Error(`Reading capability "${id}" failed (${res.status}): ${await res.text()}`)
     const info = (await res.json()) as CapabilityInfo
     resolved = {

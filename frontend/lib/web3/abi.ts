@@ -1,4 +1,4 @@
-// AgentEco.sol and USDT for the network this build targets — see ./network.ts.
+// AgentEco.sol and USDT for the network this build targets, see ./network.ts.
 export {
   AGENT_ECO_ADDRESS,
   USDT_ADDRESS,

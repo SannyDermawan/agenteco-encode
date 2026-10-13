@@ -48,7 +48,7 @@ ratingsRouter.post('/', async (req, res) => {
     if (stored === 0) return res.status(400).json({ error: 'That transaction has no SellerRated event from AgentEco' })
     res.status(201).json({ stored })
   } catch {
-    res.status(400).json({ error: 'Could not read that transaction — is it mined yet?' })
+    res.status(400).json({ error: 'Could not read that transaction, is it mined yet?' })
   }
 })
 

@@ -10,7 +10,7 @@ export type ChainId = string
 /** An escrow's number on its chain (a u64 on Solana, a uint256 on EVM chains). */
 export type EscrowId = bigint
 
-/** A 32-byte hash as 0x-prefixed hex — keccak256 of the committed text, on every chain. */
+/** A 32-byte hash as 0x-prefixed hex, keccak256 of the committed text, on every chain. */
 export type Hash32 = `0x${string}`
 
 /** A transaction hash (EVM: 0x hex) or signature (Solana: base58), as the chain prints it. */
@@ -134,7 +134,7 @@ export interface ChainAdapter {
   /** Address of the wallet that signs this adapter's writes; null for a read-only adapter. */
   readonly signer: string | null
   readonly nativeSymbol: string
-  /** Decimals of the native coin's base unit (wei: 18, lamports: 9) — for showing balances. */
+  /** Decimals of the native coin's base unit (wei: 18, lamports: 9), for showing balances. */
   readonly nativeDecimals: number
   readonly explorer: { name: string; txUrl(hash: string): string; addressUrl(address: string): string }
 
@@ -143,7 +143,7 @@ export interface ChainAdapter {
   /** Whether `address` is well formed for this chain (EVM: 20-byte hex; Solana: base58 of 32 bytes). */
   isValidAddress(address: string): boolean
   /**
-   * Whether `signature` is `address`'s signature of the UTF-8 text `message` — for API sign-in and
+   * Whether `signature` is `address`'s signature of the UTF-8 text `message`, for API sign-in and
    * account linking. EVM: EIP-191 personal_sign, 0x hex (contract wallets are not supported). Solana:
    * ed25519 over the message bytes, base58 as wallets print it.
    */
@@ -160,7 +160,7 @@ export interface ChainAdapter {
   createAndFundEscrow(params: { seller: string; amount: number | string; taskHash: Hash32 }): Promise<EscrowId>
   /** Seller: FUNDED → EXECUTING. */
   startExecution(id: EscrowId): Promise<void>
-  /** Seller: deliver the result (its hash — the payload lives off-chain). */
+  /** Seller: deliver the result (its hash, the payload lives off-chain). */
   markDelivered(id: EscrowId, resultHash: Hash32): Promise<void>
   /** Buyer: accept the delivered result and release payment. */
   acceptAndSettle(id: EscrowId): Promise<void>
@@ -172,7 +172,7 @@ export interface ChainAdapter {
   rateSeller(id: EscrowId, score: number): Promise<TxHash>
   /** Arbiter wallet: rule a dispute directly. */
   resolveDispute(id: EscrowId, toSeller: boolean, rationaleHash: Hash32): Promise<TxHash>
-  /** Arbiter or council member: rule a dispute — directly, or by a council vote. */
+  /** Arbiter or council member: rule a dispute, directly, or by a council vote. */
   ruleDispute(id: EscrowId, toSeller: boolean, rationaleHash: Hash32): Promise<RulingOutcome>
   /** Anyone: claim a timeout the escrow is due for (checked before sending). */
   claimTimeout(id: EscrowId, action: TimeoutAction, hooks?: TimeoutClaimHooks): Promise<TimeoutClaim>
@@ -193,7 +193,7 @@ export interface ChainAdapter {
   readTimeoutFlag(id: EscrowId, flag: TimeoutFlag): Promise<boolean>
   /** The arbiter of the deployment holding `id`, or of the current deployment when none is given. */
   getArbiterSetup(id?: EscrowId): Promise<ArbiterSetup>
-  /** Every escrow id that exists (`currentOnly`: the current deployment's only — the ones that can still change). */
+  /** Every escrow id that exists (`currentOnly`: the current deployment's only, the ones that can still change). */
   escrowIds(opts?: { currentOnly?: boolean }): Promise<EscrowId[]>
   readEscrowBasics(ids: EscrowId[]): Promise<EscrowBasic[]>
   /** Every escrow, as basic info. */

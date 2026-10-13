@@ -4,7 +4,7 @@ import { SOLANA_PRESETS, type SolanaPreset } from '@runtime/chain/solana-presets
 /**
  * Which networks the app serves, which one this browser is on, and which AgentEco
  * deployment it talks to there. Mirrors agent-runtime/src/network.ts and
- * agent-runtime/src/chain/registry.ts (the backend side) — keep in sync.
+ * agent-runtime/src/chain/registry.ts (the backend side), keep in sync.
  *
  * - NEXT_PUBLIC_NETWORK (default bsc-testnet; "testnet"/"mainnet" still mean the BOT
  *   Chain presets) is the primary network: the unsuffixed NEXT_PUBLIC_* deployment
@@ -27,7 +27,7 @@ import { SOLANA_PRESETS, type SolanaPreset } from '@runtime/chain/solana-presets
  *
  * A build that offers a network without a deployment fails loudly instead of silently
  * pointing users at another chain's contracts. NEXT_PUBLIC_* values are inlined at build
- * time, so each must be read with a literal `process.env.NEXT_PUBLIC_…` — and changing one
+ * time, so each must be read with a literal `process.env.NEXT_PUBLIC_…`, and changing one
  * needs a redeploy.
  */
 
@@ -51,13 +51,13 @@ interface NetworkPreset {
   /** Short label for the top bar badge. */
   label: string
   rpcUrl: string
-  /** Tried when rpcUrl fails — mirrors agent-runtime/src/network.ts. */
+  /** Tried when rpcUrl fails, mirrors agent-runtime/src/network.ts. */
   fallbackRpcUrls?: string[]
   explorerUrl: string
   explorerName: string
   nativeSymbol: string
   testnet: boolean
-  /** Settlement token — MockUSDT on BSC Testnet, USDT on BOT Chain, USDC on Base Sepolia. */
+  /** Settlement token. MockUSDT on BSC Testnet, USDT on BOT Chain, USDC on Base Sepolia. */
   usdtAddress: Address
   /** What the UI calls the settlement token. */
   tokenSymbol: string
@@ -67,7 +67,7 @@ interface NetworkPreset {
   gasFaucets: FaucetLink[]
   /** True when the chain has no gas token of its own: fees are paid in test stablecoins (Tempo). */
   noGasToken?: boolean
-  /** Multicall3, when deployed on this chain — batches contract reads. */
+  /** Multicall3, when deployed on this chain, batches contract reads. */
   multicall3?: Address
   /** Largest block span per eth_getLogs call the default RPC accepts (with margin). */
   logRange: bigint
@@ -320,7 +320,7 @@ const PRIMARY_ENV: DeploymentEnv = {
   agentGasTopup: process.env.NEXT_PUBLIC_AGENT_GAS_TOPUP,
 }
 
-// Every other network's settings, suffixed with its CAIP-2 id — read literally (build-time inlining).
+// Every other network's settings, suffixed with its CAIP-2 id, read literally (build-time inlining).
 const SUFFIXED_ENV: Record<EvmNetworkName, DeploymentEnv> = {
   'bsc-testnet': {
     rpcUrl: process.env.NEXT_PUBLIC_RPC_URL__eip155_97,
@@ -431,7 +431,7 @@ export function networkConfig(name: EvmNetworkName): NetworkConfig {
 
   const address = (setting: string, raw: string | undefined, fallback: Address | undefined): Address => {
     const value = clean(raw) ?? fallback
-    if (!value) throw new Error(`NEXT_PUBLIC_${setting}${suffix} must be set to offer ${preset.name} — there is no default deployment for it.`)
+    if (!value) throw new Error(`NEXT_PUBLIC_${setting}${suffix} must be set to offer ${preset.name}, there is no default deployment for it.`)
     if (!isAddress(value)) throw new Error(`NEXT_PUBLIC_${setting}${suffix} is not a valid EVM address: ${value}`)
     return value
   }
@@ -531,7 +531,7 @@ export interface SolanaNetworkConfig {
 
 export type AnyNetworkConfig = NetworkConfig | SolanaNetworkConfig
 
-// Read literally — Next inlines NEXT_PUBLIC_* at build time. The suffix is the CAIP-2 id, the colon as an underscore.
+// Read literally. Next inlines NEXT_PUBLIC_* at build time. The suffix is the CAIP-2 id, the colon as an underscore.
 const SOLANA_ENV: Record<SolanaNetworkName, DeploymentEnv & { program?: string; mint?: string; firstEscrowId?: string }> = {
   'solana-devnet': {
     rpcUrl: process.env.NEXT_PUBLIC_RPC_URL__solana_EtWTRABZaYq6iMfeYKouRu166VU2xqa1,
@@ -546,7 +546,7 @@ const WALLET_CHAIN: Record<SolanaNetworkName, string> = { 'solana-devnet': 'sola
 const SOLANA_FAUCETS: Record<SolanaNetworkName, FaucetLink[]> = {
   'solana-devnet': [
     { label: 'Solana faucet (devnet SOL)', url: 'https://faucet.solana.com', provides: 'gas' },
-    { label: 'Circle faucet (devnet USDC — choose Solana Devnet)', url: 'https://faucet.circle.com', provides: 'token' },
+    { label: 'Circle faucet (devnet USDC: choose Solana Devnet)', url: 'https://faucet.circle.com', provides: 'token' },
   ],
 }
 const SOLANA_ADDRESS = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
@@ -557,7 +557,7 @@ export function solanaNetworkConfig(name: SolanaNetworkName): SolanaNetworkConfi
   const suffix = `__${preset.chainId.replace(':', '_')}`
   const base58 = (setting: string, raw: string | undefined, fallback?: string): string => {
     const value = clean(raw) ?? fallback
-    if (!value) throw new Error(`NEXT_PUBLIC_${setting}${suffix} must be set to offer ${preset.name} — there is no default deployment for it.`)
+    if (!value) throw new Error(`NEXT_PUBLIC_${setting}${suffix} must be set to offer ${preset.name}, there is no default deployment for it.`)
     if (!SOLANA_ADDRESS.test(value)) throw new Error(`NEXT_PUBLIC_${setting}${suffix} is not a valid Solana address: ${value}`)
     return value
   }
@@ -646,8 +646,8 @@ export const SOLANA_OFFERED: boolean = AVAILABLE_NETWORKS.some((n) => n.family =
 /** The Solana network when one is selected, else null. */
 export const SOLANA: SolanaNetworkConfig | null = selected.family === 'solana' ? selected : null
 /**
- * The EVM network the EVM exports below describe: the selected one, or — while a Solana network is
- * selected — the first EVM network offered (else the primary one). Nothing EVM runs on Solana, so
+ * The EVM network the EVM exports below describe: the selected one, or, while a Solana network is
+ * selected, the first EVM network offered (else the primary one). Nothing EVM runs on Solana, so
  * this only keeps those modules loading.
  */
 const active: NetworkConfig =
@@ -657,7 +657,7 @@ export const EVM_NETWORK = active
 
 // --- The selected network, of either family ---
 
-/** The selected network's CAIP-2 id — every API call names it (lib/api/base.ts). */
+/** The selected network's CAIP-2 id, every API call names it (lib/api/base.ts). */
 export const CHAIN_KEY = selected.chainKey
 export const CHAIN_NAME = selected.chainName
 export const NETWORK_LABEL = selected.label
@@ -693,7 +693,7 @@ export const LOG_RANGE = active.logRange
 export const MULTICALL3 = active.multicall3
 /**
  * How far back the default RPC still serves logs (PublicNode on BSC Testnet
- * prunes after ~80,000 blocks). Log scans — only used for explorer links —
+ * prunes after ~80,000 blocks). Log scans, only used for explorer links,
  * never reach further back; escrow discovery reads contract state instead.
  */
 export const LOG_HISTORY_BLOCKS = active.logHistory
@@ -706,7 +706,7 @@ export const MIN_NATIVE_BALANCE = readNumber('NEXT_PUBLIC_MIN_TBNB', process.env
 
 export const AGENT_ECO_ADDRESS = active.agentEcoAddress
 export const USDT_ADDRESS = active.usdtAddress
-/** Block AgentEco.sol was deployed at — every event-log scan starts here. */
+/** Block AgentEco.sol was deployed at, every event-log scan starts here. */
 export const DEPLOY_BLOCK = active.deployBlock
 
 /** First escrow id of AGENT_ECO_ADDRESS (the current deployment); lower ids belong to a legacy one. */

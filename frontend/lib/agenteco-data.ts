@@ -48,7 +48,7 @@ export interface Order {
   amount: number
   status: OrderStatus
   createdAt: string
-  /** Live AgentEco.sol status, once the order has an escrow — supersedes `status` for display. */
+  /** Live AgentEco.sol status, once the order has an escrow, supersedes `status` for display. */
   escrowStatus?: number
   /** Detail page; defaults to /app/orders/:id. Direct hires link to /app/orders/onchain/:escrowId. */
   href?: string

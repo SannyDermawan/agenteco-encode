@@ -76,7 +76,7 @@ export interface SellerAgentOptions {
   /**
    * The chain to trade on: a CAIP-2 id (eip155:84532, solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1), a
    * network name (base-sepolia, solana-devnet) or an EVM chain id. Default: an attached listing's
-   * chain, else NETWORK (bsc-testnet) — or Solana devnet for a Solana key.
+   * chain, else NETWORK (bsc-testnet), or Solana devnet for a Solana key.
    */
   chain?: string
   /**
@@ -124,7 +124,7 @@ export interface SellerAgentOptions {
    * job comes, nothing is delivered and the contract's timeout refunds the buyer.
    */
   ai?: AiModel
-  /** Style and focus for your model's prose (≤ 500 chars) — never the output shape. */
+  /** Style and focus for your model's prose (≤ 500 chars), never the output shape. */
   instructions?: string
   /** Answer a buyer's dispute (≤ 1000 characters). Return null to stay silent. */
   respondToDispute?: (ctx: DisputeContext) => Promise<string | null>
@@ -140,7 +140,7 @@ export interface SellerAgent {
   start(): Promise<void>
   /** Stops serving and tells AgentEco the agent is offline. */
   stop(): void
-  /** One pass over negotiations and escrows — for tests and custom loops. */
+  /** One pass over negotiations and escrows, for tests and custom loops. */
   runOnce(): Promise<void>
 }
 
@@ -174,9 +174,9 @@ const FIRST_PAUSE_MS = 5_000
 const MAX_PAUSE_MS = 60_000
 
 /**
- * What to do after a job failed `failures` times in a row: pause and retry —
+ * What to do after a job failed `failures` times in a row: pause and retry,
  * 5 s, then 10, 20, 40 (capped at 60), so a briefly rate-limited model has
- * time to recover — or give up, after MAX_ATTEMPTS failures or as soon as the
+ * time to recover, or give up, after MAX_ATTEMPTS failures or as soon as the
  * on-chain deadline for the step has passed (no retry can help then).
  */
 export function retryDecision(failures: number, deadlinePassed: boolean): { giveUp: true } | { giveUp: false; waitMs: number } {
@@ -217,7 +217,7 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
 
   function checkWorker(capability: string) {
     if (!options.handle && !isCapabilityId(capability)) {
-      throw new Error(`"${capability}" is a community capability — pass a handle(job) that produces its result.`)
+      throw new Error(`"${capability}" is a community capability, pass a handle(job) that produces its result.`)
     }
     if (capability === 'tx_explainer' && chainFamily(chainId) !== 'evm') {
       throw new Error('"tx_explainer" explains EVM transactions and cannot be sold on a Solana chain.')
@@ -313,7 +313,7 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
       minimumPrice: options.floor ?? l.price,
     })
     const how = options.onOffer ? 'your own negotiation logic' : `floor ${options.floor ?? l.price}, kept on this machine`
-    log(`${options.agentId ? 'attached to' : 'listed as'} ${id} — ${l.capability} at ${l.price} (${how})`)
+    log(`${options.agentId ? 'attached to' : 'listed as'} ${id}, ${l.capability} at ${l.price} (${how})`)
     return id
   }
 
@@ -323,12 +323,12 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
    */
   async function registerIdentity(id: string): Promise<void> {
     if (chain.family !== 'evm') {
-      log(`ERC-8004: not available on ${chain.chainId} — skipped`)
+      log(`ERC-8004: not available on ${chain.chainId}, skipped`)
       return
     }
     const registries = await apiErc8004Registries(apiUrl, chain.chainId)
     if (!registries) {
-      log(`ERC-8004: no registries on ${chain.chainId} — skipped`)
+      log(`ERC-8004: no registries on ${chain.chainId}, skipped`)
       return
     }
     const res = await fetch(`${apiUrl}/agents/${id}`)
@@ -380,7 +380,7 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
           source = 'agent'
         } catch (error) {
           // Tried again next poll; if it keeps failing, the negotiation expires and the buyer moves on.
-          log(`negotiation ${n.id.slice(0, 8)}: onOffer failed (${(error as Error).message}) — will retry`)
+          log(`negotiation ${n.id.slice(0, 8)}: onOffer failed (${(error as Error).message}), will retry`)
           continue
         }
       } else {
@@ -405,7 +405,7 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
       unpublished.delete(escrowId)
       log(`escrow #${escrowId}: result published`)
     } catch (error) {
-      log(`escrow #${escrowId}: publishing the result failed — will retry (${(error as Error).message})`)
+      log(`escrow #${escrowId}: publishing the result failed, will retry (${(error as Error).message})`)
     }
   }
 
@@ -415,17 +415,17 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
     if (!task) return 'wait' // the buyer links the task right after funding
     const { taskHash } = await chain.getEscrowHashes(escrowId)
     if (hashPreimage(task.preimage).toLowerCase() !== taskHash.toLowerCase()) {
-      log(`escrow #${escrowId}: the task does not match the on-chain taskHash — not taking it`)
+      log(`escrow #${escrowId}: the task does not match the on-chain taskHash, not taking it`)
       return null
     }
     if (!sameWallet(task.seller, address) || task.capability !== listing!.capability) {
-      log(`escrow #${escrowId}: the task is for another seller or capability — not taking it`)
+      log(`escrow #${escrowId}: the task is for another seller or capability, not taking it`)
       return null
     }
     const capability = await resolveCapability(apiUrl, task.capability)
     const brief = capability.checkBrief(task.brief)
     if (!brief.ok) {
-      log(`escrow #${escrowId}: invalid brief (${brief.error}) — not taking it; the accept timeout refunds the buyer`)
+      log(`escrow #${escrowId}: invalid brief (${brief.error}), not taking it; the accept timeout refunds the buyer`)
       return null
     }
     const job: Job = { escrowId, capability: task.capability, brief: brief.brief, criteria: task.criteria, price: task.price, buyer: task.buyer }
@@ -433,7 +433,7 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
       const evm = chain.family === 'evm' ? (chain as EvmAdapter) : null
       const prepared = await prepareJob(task.capability, task.brief, { publicClient: evm?.client, agentEcoAddress: evm?.config.agentEco })
       if (!prepared.ok) {
-        log(`escrow #${escrowId}: ${prepared.reason} — not taking it`)
+        log(`escrow #${escrowId}: ${prepared.reason}, not taking it`)
         return null
       }
       job.prepared = prepared.job
@@ -450,7 +450,7 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
     if (!raw) throw new Error(`${job.capability} needs the model, and it did not answer`)
     // The API refuses this too; catching it here keeps it from being committed on-chain.
     if (isCapabilityId(job.capability) && mentionsAiUnavailable(job.capability, raw)) {
-      throw new Error('the result says "AI unavailable" — a platform capability must be written by a model')
+      throw new Error('the result says "AI unavailable", a platform capability must be written by a model')
     }
     const capability = await resolveCapability(apiUrl, job.capability)
     const checked = capability.checkResult(raw)
@@ -511,7 +511,7 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
 
     if (status === FUNDED) {
       await chain.startExecution(escrowId)
-      log(`escrow #${escrowId}: accepted (${job.price}) — working…`)
+      log(`escrow #${escrowId}: accepted (${job.price}), working…`)
     }
     const result = await work(job)
     await chain.markDelivered(escrowId, resultHash(result))
@@ -542,10 +542,10 @@ export function createSellerAgent(options: SellerAgentOptions): SellerAgent {
         if (decision.giveUp) {
           finished.add(id)
           retries.delete(id)
-          log(`escrow #${id} failed ${failures} time(s) (${why}) — giving up; the contract's timeout refunds the buyer`)
+          log(`escrow #${id} failed ${failures} time(s) (${why}), giving up; the contract's timeout refunds the buyer`)
         } else {
           retries.set(id, { failures, nextTryAt: Date.now() + decision.waitMs })
-          log(`escrow #${id} failed (${why}) — retrying in ${Math.round(decision.waitMs / 1000)}s`)
+          log(`escrow #${id} failed (${why}), retrying in ${Math.round(decision.waitMs / 1000)}s`)
         }
       }
     }

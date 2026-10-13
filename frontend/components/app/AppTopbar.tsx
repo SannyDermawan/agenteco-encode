@@ -65,7 +65,7 @@ function EvmWalletControl() {
         disabled={isSwitching}
         className="flex items-center gap-2 rounded-full border border-[#F59E0B]/40 bg-[#F59E0B]/10 px-4 py-2 text-[13px] font-medium text-[#F59E0B] transition hover:bg-[#F59E0B]/15 disabled:opacity-60"
       >
-        {isSwitching ? 'Switching…' : 'Wrong Network — Switch'}
+        {isSwitching ? 'Switching…' : 'Wrong network: switch'}
       </button>
     )
   }
@@ -97,7 +97,7 @@ function EvmWalletControl() {
 const WalletControl = FAMILY === 'solana' ? SolanaWalletControl : EvmWalletControl
 
 /**
- * The network badge — a picker when the app offers several networks. Picking one reloads
+ * The network badge, a picker when the app offers several networks. Picking one reloads
  * the app on it (listings, orders, escrows and balances are all per network).
  */
 function NetworkPicker() {

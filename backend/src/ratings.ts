@@ -9,7 +9,7 @@ import { normalizeWallet } from '../../agent-runtime/src/shared/wallets.ts'
  * per seller; the per-escrow score lives in the SellerRated event. Each one
  * is stored with its chain, where it came from (a hosted agent's AI
  * verification, or a human) and whether buyer and seller belong to the same
- * owner — those are left out of the displayed average and out of seller
+ * owner, those are left out of the displayed average and out of seller
  * selection, so nobody can pump their own seller.
  */
 

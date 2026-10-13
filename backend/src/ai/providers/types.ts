@@ -11,7 +11,7 @@ export interface CompletionRequest {
 /** One LLM backend. `complete` returns the raw text the model produced (expected to be JSON). */
 export interface LLMProvider {
   name: 'groq' | 'gemini' | string
-  /** False when the provider has no API key — callLLM skips it. */
+  /** False when the provider has no API key, callLLM skips it. */
   available(): boolean
   modelFor(task: LLMTask): string
   complete(req: CompletionRequest): Promise<string>

@@ -7,7 +7,7 @@ import type { NextConfig } from "next";
 const repoRoot = path.join(__dirname, "..");
 
 // Browser hardening for every page. The CSP only restricts framing, plugins,
-// <base> and form targets — script and connect sources stay open because the
+// <base> and form targets, script and connect sources stay open because the
 // wallet connectors and RPC endpoints load from many origins.
 const securityHeaders = [
   { key: "Content-Security-Policy", value: "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'" },

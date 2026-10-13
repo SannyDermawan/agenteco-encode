@@ -75,7 +75,7 @@ export function Note({ tone = 'info', children }: { tone?: 'info' | 'warn'; chil
   )
 }
 
-/** "12s ago" — `now` in unix seconds (useNow), so rendering stays pure. */
+/** "12s ago", `now` in unix seconds (useNow), so rendering stays pure. */
 export function timeAgo(iso: string | null | undefined, now: number): string {
   if (!iso) return 'never'
   const s = Math.max(0, Math.round(now - new Date(iso).getTime() / 1000))

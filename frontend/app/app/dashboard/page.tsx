@@ -64,7 +64,7 @@ export default function DashboardPage() {
                   <NeumorphicCard className="grid grid-cols-2 gap-4 p-5">
                     <div>
                       <div className="text-[19px] font-semibold text-[#F5F5F7]">
-                        {reputation.data ? (reputation.data.successPct === null ? '—' : `${reputation.data.successPct.toFixed(1)}%`) : '…'}
+                        {reputation.data ? (reputation.data.successPct === null ? '-' : `${reputation.data.successPct.toFixed(1)}%`) : '…'}
                       </div>
                       <div className="mt-0.5 text-[11.5px] text-[#8B8D96]">Success Rate</div>
                     </div>
@@ -86,7 +86,7 @@ export default function DashboardPage() {
               <h3 className="mb-3 text-[15px] font-semibold text-[#F5F5F7]">Recent Activity</h3>
               <NeumorphicCard className="p-5">
                 {activityEntries.length === 0 ? (
-                  <p className="text-[13px] text-[#8B8D96]">Nothing yet — activity shows up once a negotiation starts.</p>
+                  <p className="text-[13px] text-[#8B8D96]">Nothing yet, activity shows up once a negotiation starts.</p>
                 ) : (
                   <ActivityTimeline entries={activityEntries.slice(0, 8)} />
                 )}

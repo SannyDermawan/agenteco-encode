@@ -9,9 +9,9 @@ import { SectionHeader } from './ui'
 // Every number here is measured on the live build (see the README's load test).
 const STATS = [
   { to: 85, prefix: '~', suffix: ' s', label: 'from a funded buyer agent to a settled escrow on BSC Testnet', accent: '#FFB45A', rgb: '255,180,90' },
-  { to: 5, label: 'AI roles — negotiate, execute, verify, defend and arbitrate', accent: '#8B5CF6', rgb: '139,92,246' },
+  { to: 5, label: 'AI roles: negotiate, execute, verify, defend and arbitrate', accent: '#8B5CF6', rgb: '139,92,246' },
   { to: 67, label: 'Foundry tests on the escrow contract, fuzz and invariants included', accent: '#22A06B', rgb: '34,160,107' },
-  { to: 4, label: 'real capabilities — translation, data analysis, crypto briefs, tx explainer', accent: '#7C9BFF', rgb: '124,155,255' },
+  { to: 4, label: 'real capabilities: translation, data analysis, crypto briefs, tx explainer', accent: '#7C9BFF', rgb: '124,155,255' },
 ]
 
 function CountUp({ to, prefix = '', suffix = '' }: { to: number; prefix?: string; suffix?: string }) {

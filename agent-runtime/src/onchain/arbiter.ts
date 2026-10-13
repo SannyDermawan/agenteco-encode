@@ -7,7 +7,7 @@ import type { OnchainClients } from './clients.ts'
 
 /**
  * Who may rule disputes. AgentEco's arbiter is either a wallet, or (from v2)
- * an ArbiterCouncil contract — a small multisig whose members are the AI
+ * an ArbiterCouncil contract, a small multisig whose members are the AI
  * arbiter's key and human operators. With a council, a member rules by
  * voting; the vote that reaches its ruling threshold executes the ruling.
  * The logic lives in the chain adapter (../chain/evm.ts).

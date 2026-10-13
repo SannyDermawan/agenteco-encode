@@ -180,7 +180,7 @@ function EvmGetTestTokensCard({ reason }: { reason?: string }) {
             <>
               <div className="rounded-xl border border-white/[0.06] bg-[#0B0C11]/60 p-3.5">
                 <div className="text-[12.5px] font-medium text-[#F5F5F7]">
-                  1. {NATIVE_SYMBOL} for gas {onCorrectChain && isConnected && native.data !== undefined ? (lowGas ? '— you need some first' : '✓') : ''}
+                  1. {NATIVE_SYMBOL} for gas {onCorrectChain && isConnected && native.data !== undefined ? (lowGas ? '(you need some first)' : '✓') : ''}
                 </div>
                 {lowGas && (
                   <p className="mt-1 text-[12px] text-[#F59E0B]">
@@ -191,7 +191,7 @@ function EvmGetTestTokensCard({ reason }: { reason?: string }) {
               </div>
               <div className="rounded-xl border border-white/[0.06] bg-[#0B0C11]/60 p-3.5">
                 <div className="text-[12.5px] font-medium text-[#F5F5F7]">
-                  2. {TOKEN_SYMBOL} to hire agents {onCorrectChain && isConnected && token.data !== undefined ? (lowToken ? '— you need some' : '✓') : ''}
+                  2. {TOKEN_SYMBOL} to hire agents {onCorrectChain && isConnected && token.data !== undefined ? (lowToken ? '(you need some)' : '✓') : ''}
                 </div>
                 <FaucetLinks links={tokenLinks} />
               </div>
@@ -212,7 +212,7 @@ function EvmGetTestTokensCard({ reason }: { reason?: string }) {
           <h3 className="text-[15px] font-semibold text-[#F5F5F7]">Get test tokens</h3>
           <p className="mt-1 max-w-[520px] text-[12.5px] leading-relaxed text-[#8B8D96]">
             {reason ??
-              `AgentEco on ${appChain.name} settles in ${TOKEN_SYMBOL}, a test token made by AgentEco — it has no value. You need a little ${NATIVE_SYMBOL} for gas and some ${TOKEN_SYMBOL} to hire agents.`}
+              `AgentEco on ${appChain.name} settles in ${TOKEN_SYMBOL}, a test token made by AgentEco, it has no value. You need a little ${NATIVE_SYMBOL} for gas and some ${TOKEN_SYMBOL} to hire agents.`}
           </p>
         </div>
         {balances}
@@ -226,7 +226,7 @@ function EvmGetTestTokensCard({ reason }: { reason?: string }) {
         <div className="mt-4 space-y-3">
           <div className="rounded-xl border border-white/[0.06] bg-[#0B0C11]/60 p-3.5">
             <div className="text-[12.5px] font-medium text-[#F5F5F7]">
-              1. {NATIVE_SYMBOL} for gas {lowGas ? '— you need some first' : '✓'}
+              1. {NATIVE_SYMBOL} for gas {lowGas ? '(you need some first)' : '✓'}
             </div>
             {lowGas && (
               <p className="mt-1 text-[12px] text-[#F59E0B]">

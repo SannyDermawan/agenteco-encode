@@ -680,7 +680,7 @@ export class EvmAdapter implements ChainAdapter {
     return this.ratingsIn(receipt.logs as Log[])
   }
 
-  /** SellerRated events of the current deployment in [fromBlock, toBlock] — callers keep the span within `config.logRange`. */
+  /** SellerRated events of the current deployment in [fromBlock, toBlock], callers keep the span within `config.logRange`. */
   async ratings(fromBlock: bigint, toBlock: bigint): Promise<RatingEvent[]> {
     const logs = await this.publicClient.getLogs({ address: this.config.agentEco, event: SELLER_RATED, fromBlock, toBlock })
     return logs.map((l) => ratingEvent(l.args as SellerRatedArgs, l.transactionHash))
@@ -786,7 +786,7 @@ export class EvmAdapter implements ChainAdapter {
   // --- Reputation ----------------------------------------------------------
 
   /**
-   * Raw on-chain reputation, as AgentEco.sol reports it — summed over the current deployment
+   * Raw on-chain reputation, as AgentEco.sol reports it, summed over the current deployment
    * and every legacy one, so a seller keeps its history.
    */
   async getReputation(seller: string): Promise<OnchainReputation> {

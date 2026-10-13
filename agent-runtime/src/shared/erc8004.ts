@@ -1,6 +1,6 @@
 /**
  * ERC-8004 ("Trustless Agents", https://eips.ethereum.org/EIPS/eip-8004, status Draft):
- * the parts AgentEco uses — the Identity Registry (an agent is an ERC-721 whose URI points at
+ * the parts AgentEco uses, the Identity Registry (an agent is an ERC-721 whose URI points at
  * its registration file) and the Reputation Registry (giveFeedback). The registries are
  * singletons per chain; their addresses are not in the EIP, so each chain configures them
  * (ERC8004_IDENTITY_REGISTRY / ERC8004_REPUTATION_REGISTRY, suffixed per chain like every

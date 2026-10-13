@@ -120,7 +120,7 @@ describe('hire() against createSellerAgent on Solana', { skip }, () => {
     )
   })
 
-  test('a deal settles: negotiate, escrow, deliver, check, pay, rate — on the Solana default chain', async () => {
+  test('a deal settles: negotiate, escrow, deliver, check, pay, rate, on the Solana default chain', async () => {
     const { listing, agent } = await startSeller('seller')
     assert.equal(agent.address, address('seller'))
     const before = await balance('buyer')

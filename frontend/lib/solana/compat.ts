@@ -100,7 +100,7 @@ export function useRateSeller() {
   return { ...action, write: (escrowId: bigint, score: number) => void action.run(escrowId, score) }
 }
 
-/** Every escrow one of `addresses` is the buyer or seller of — found by reading the program's escrows. */
+/** Every escrow one of `addresses` is the buyer or seller of, found by reading the program's escrows. */
 export function useEscrowsInvolving(addresses: string[]) {
   const mine = [...new Set(addresses.map(normalizeWallet))].sort()
   return useQuery({

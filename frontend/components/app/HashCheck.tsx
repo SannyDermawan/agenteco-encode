@@ -11,7 +11,7 @@ export function HashCheck({ label, text, onchainHash }: { label: string; text: s
     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10.5px]">
       <span className="text-[#54565F]">{label}</span>
       <span className="truncate font-mono text-[#54565F]" title={onchainHash}>
-        {onchainHash ? `${onchainHash.slice(0, 10)}…${onchainHash.slice(-6)}` : '—'}
+        {onchainHash ? `${onchainHash.slice(0, 10)}…${onchainHash.slice(-6)}` : '-'}
       </span>
       {!zero &&
         (text ? (

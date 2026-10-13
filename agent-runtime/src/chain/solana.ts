@@ -115,7 +115,7 @@ export function secretKeyFromBase58(text: string): Uint8Array {
 /**
  * A Solana secret key from the text people keep it in: the JSON array of a Solana CLI keypair file
  * (`[12,34,…]`, 64 numbers) or the base58 string wallets export. The key must be consistent
- * (its second half is the public key of its first half) — checked here, so a typo fails early.
+ * (its second half is the public key of its first half), checked here, so a typo fails early.
  */
 export async function parseSolanaSecretKey(text: string): Promise<Uint8Array> {
   const trimmed = text.trim()
@@ -219,7 +219,7 @@ function readonlySigner(signer: TransactionSigner): AnyAccountMeta {
 }
 
 // The program's EscrowStatus variants (Funded..Refunded) in the EVM contract's numbering
-// (CREATED = 0 never occurs on Solana — see docs/SOLANA.md §2).
+// (CREATED = 0 never occurs on Solana, see docs/SOLANA.md §2).
 const STATUS_CODE = [1, 2, 3, 4, 5, 6] as const // Funded..Refunded -> FUNDED..REFUNDED
 
 interface DecodedEscrow {
@@ -866,7 +866,7 @@ export class SolanaAdapter implements ChainAdapter {
     return (await this.decodedConfig()).feeBps
   }
 
-  /** The fee, in basis points, this escrow was created with — fixed for its lifetime. */
+  /** The fee, in basis points, this escrow was created with, fixed for its lifetime. */
   async escrowFeeBps(id: EscrowId): Promise<number> {
     return (await this.decodedEscrow(id)).feeBps
   }
@@ -913,7 +913,7 @@ export class SolanaAdapter implements ChainAdapter {
   async getArbiterSetup(_id?: EscrowId): Promise<ArbiterSetup> {
     const config = await this.decodedConfig()
     // No council program this phase (docs/SOLANA.md §6): the configured arbiter is a
-    // single pubkey, which may itself be a multisig vault (e.g. Squads) — this adapter
+    // single pubkey, which may itself be a multisig vault (e.g. Squads), this adapter
     // cannot distinguish that from a plain wallet without a dedicated council program.
     return { arbiter: config.arbiter, council: null }
   }
@@ -934,8 +934,8 @@ export class SolanaAdapter implements ChainAdapter {
   }
 
   /**
-   * A seller's five on-chain counters in the order AgentEco.sol's getReputation() returns them — completed
-   * jobs, failed jobs, settled volume (token base units), rating sum, rating count — all zero before the first job.
+   * A seller's five on-chain counters in the order AgentEco.sol's getReputation() returns them, completed
+   * jobs, failed jobs, settled volume (token base units), rating sum, rating count, all zero before the first job.
    */
   async reputationCounters(seller: string): Promise<readonly [bigint, bigint, bigint, bigint, bigint]> {
     const acc = await this.backend.getAccount(await reputationPda(this.programId, address(seller)))

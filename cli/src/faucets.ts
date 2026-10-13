@@ -22,19 +22,19 @@ export const FAUCETS: Record<string, FaucetGuide> = {
   },
   [SOLANA_DEVNET_CHAIN_ID]: {
     gas: [{ label: 'Solana faucet (devnet SOL)', url: 'https://faucet.solana.com' }],
-    token: "Devnet USDC comes from Circle's faucet (a person has to ask for it): https://faucet.circle.com — choose Solana Devnet and paste the agent address.",
+    token: "Devnet USDC comes from Circle's faucet (a person has to ask for it): https://faucet.circle.com, choose Solana Devnet and paste the agent address.",
   },
   'eip155:968': {
     gas: [{ label: 'BOT Chain testnet faucet (up to 10 BOT per 24 hours; asks a person to pass a robot check)', url: 'https://faucet.botchain.ai' }],
-    token: "The test USDT comes from the same faucet (a person has to ask for it): https://faucet.botchain.ai — choose BOT Chain Testnet and paste the agent address.",
+    token: "The test USDT comes from the same faucet (a person has to ask for it): https://faucet.botchain.ai, choose BOT Chain Testnet and paste the agent address.",
   },
   'eip155:11155111': {
     gas: [{ label: 'Google Cloud Web3 faucet (Sepolia ETH)', url: 'https://cloud.google.com/application/web3/faucet/ethereum/sepolia' }],
-    token: "Test USDC comes from Circle's faucet (a person has to ask for it): https://faucet.circle.com — choose Ethereum Sepolia and paste the agent address.",
+    token: "Test USDC comes from Circle's faucet (a person has to ask for it): https://faucet.circle.com, choose Ethereum Sepolia and paste the agent address.",
   },
   'eip155:421614': {
     gas: [{ label: 'Arbitrum faucets and the Ethereum Sepolia bridge', url: 'https://docs.arbitrum.io/build-decentralized-apps/reference/node-providers#faucets' }],
-    token: "Test USDC comes from Circle's faucet (a person has to ask for it): https://faucet.circle.com — choose Arbitrum Sepolia and paste the agent address.",
+    token: "Test USDC comes from Circle's faucet (a person has to ask for it): https://faucet.circle.com, choose Arbitrum Sepolia and paste the agent address.",
   },
   'eip155:42431': {
     gas: [],
@@ -42,7 +42,7 @@ export const FAUCETS: Record<string, FaucetGuide> = {
   },
   'eip155:84532': {
     gas: [{ label: 'Coinbase Developer Platform faucet (Base Sepolia ETH)', url: 'https://portal.cdp.coinbase.com/products/faucet' }],
-    token: "Test USDC comes from Circle's faucet (a person has to ask for it): https://faucet.circle.com — choose Base Sepolia and paste the agent address.",
+    token: "Test USDC comes from Circle's faucet (a person has to ask for it): https://faucet.circle.com, choose Base Sepolia and paste the agent address.",
   },
 }
 

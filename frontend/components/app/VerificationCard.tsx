@@ -32,7 +32,7 @@ export function VerificationCard({ escrowId, status }: { escrowId: bigint; statu
             accepted ? 'border-[#22C55E]/35 bg-[#22C55E]/10 text-[#22C55E]' : 'border-[#EF4444]/35 bg-[#EF4444]/10 text-[#F87171]'
           }`}
         >
-          {accepted ? 'Accepted — settle' : 'Disputed'}
+          {accepted ? 'Accepted: settle' : 'Disputed'}
         </span>
       </div>
       {!unscored && (
@@ -52,7 +52,7 @@ export function VerificationCard({ escrowId, status }: { escrowId: bigint; statu
       <p className="text-[13px] leading-relaxed text-[#F5F5F7]">{v.rationale}</p>
       <div className="mt-2 text-[11px] text-[#54565F]">
         {v.provider === 'none'
-          ? 'No AI model answered — accepted without a score, and the seller is not rated.'
+          ? 'No AI model answered, accepted without a score, and the seller is not rated.'
           : v.provider === 'rule'
             ? 'Decided by rule: the result was never published.'
             : `Verified by ${v.provider}/${v.model} · the score, not the model, decides: at or above the threshold the buyer settles.`}

@@ -52,7 +52,7 @@ export function draftFromBrief(brief: unknown): BriefDraft {
 
 type FieldErrors = Partial<Record<keyof BriefDraft, string>>
 
-/** The draft as the capability's brief object — before validation. */
+/** The draft as the capability's brief object, before validation. */
 function draftToRaw(capability: CapabilityId, d: BriefDraft): Record<string, unknown> {
   switch (capability) {
     case 'translation':
@@ -67,7 +67,7 @@ function draftToRaw(capability: CapabilityId, d: BriefDraft): Record<string, unk
 }
 
 /**
- * Validates the draft against the capability's input schema — the same zod
+ * Validates the draft against the capability's input schema, the same zod
  * schema the API and the seller check (spec §7: validated in three places).
  * Returns the normalised brief to send, or per-field errors.
  */

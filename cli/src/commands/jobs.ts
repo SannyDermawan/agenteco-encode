@@ -14,7 +14,7 @@ function describe(job: JobRecord): string {
   if (job.handle) parts.push(`escrow #${job.handle.escrowId} with ${job.handle.seller.name}`)
   if (job.reviewDeadline && job.stage === 'delivered') parts.push(`the contract pays the seller at ${job.reviewDeadline} if nobody decides`)
   if (job.error) parts.push(`note: ${job.error}`)
-  return parts.join(' — ')
+  return parts.join('. ')
 }
 
 export function printJob(ctx: Ctx, job: JobRecord, withResult = true): void {

@@ -9,8 +9,8 @@ import { startTestDb, type TestDb } from '../test-support/db.ts'
 /**
  * The SDK's two halves against each other, end to end: a self-hosted seller (createSellerAgent)
  * and a buyer (hire()) trading through the real API, a real (in-memory) database and a real local
- * chain. It pins the behaviour of hire() and createSellerAgent as users see it — settle, dispute,
- * attach to a listing, budget and argument checks — whatever code sits underneath.
+ * chain. It pins the behaviour of hire() and createSellerAgent as users see it, settle, dispute,
+ * attach to a listing, budget and argument checks, whatever code sits underneath.
  */
 const skip = anvilUnavailable() ?? false
 

@@ -31,7 +31,7 @@ async function canViewOrder(viewer: string, order: OrderWithAgents): Promise<boo
   return isPartyOf(viewer, order.buyerAgent) || isPartyOf(viewer, order.sellerAgent) || isArbiter(viewer, order.chainId)
 }
 
-// Only the viewer's own orders — ownerWallet / agentId just narrow them further.
+// Only the viewer's own orders, ownerWallet / agentId just narrow them further.
 ordersRouter.get('/', async (req, res) => {
   const viewer = await requireViewer(req, res)
   if (!viewer) return
@@ -65,14 +65,14 @@ ordersRouter.get('/:id', async (req, res) => {
   const order = await prisma.order.findUnique({ where: { id: req.params.id }, include: fullInclude })
   if (!order) return res.status(404).json({ error: 'Order not found' })
   if (!(await canViewOrder(viewer, order))) {
-    return res.status(403).json({ error: 'This order is private — only its buyer, seller and the arbiter can see it.' })
+    return res.status(403).json({ error: 'This order is private, only its buyer, seller and the arbiter can see it.' })
   }
   res.json(orderView(order, viewer))
 })
 
 // Called once the buyer actually funds the on-chain escrow (RequestServiceCard
 // or, later, the buyer agent itself). From here AgentEco.sol is the source of
-// truth for status — this just remembers which escrowId belongs to which order.
+// truth for status, this just remembers which escrowId belongs to which order.
 ordersRouter.patch('/:id/escrow', async (req, res) => {
   const auth = await verifyOwnerAuth(req)
   if (!auth.ok) return res.status(401).json({ error: auth.error })
@@ -88,7 +88,7 @@ ordersRouter.patch('/:id/escrow', async (req, res) => {
     return res.status(403).json({ error: 'Only the buyer agent owner (or the agent itself) can attach an escrow to this order' })
   }
 
-  // The task was linked to this escrow (and checked on-chain) just before —
+  // The task was linked to this escrow (and checked on-chain) just before,
   // see routes/tasks.ts. It must be this order's deal on this order's chain: its
   // buyer is this order's buyer (the agent or its owner) and its seller this
   // order's seller, so nobody can pin someone else's escrow onto their order.
@@ -97,7 +97,7 @@ ordersRouter.patch('/:id/escrow', async (req, res) => {
     select: { id: true, buyer: true, seller: true, verified: true },
   })
   if (!task?.verified) {
-    return res.status(400).json({ error: `Escrow #${parsed.data.escrowId} has no task linked to it yet — link the task first.` })
+    return res.status(400).json({ error: `Escrow #${parsed.data.escrowId} has no task linked to it yet, link the task first.` })
   }
   if (!isPartyOf(normalizeWallet(task.buyer), order.buyerAgent) || !order.sellerAgent.walletAddress || !sameWallet(task.seller, order.sellerAgent.walletAddress)) {
     return res.status(400).json({ error: `Escrow #${parsed.data.escrowId} belongs to a different buyer or seller than this order.` })

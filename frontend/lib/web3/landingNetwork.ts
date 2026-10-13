@@ -8,7 +8,7 @@ import { AVAILABLE_NETWORKS } from './network'
 const landing = AVAILABLE_NETWORKS[0]
 
 export const TOKEN_SYMBOL = landing.tokenSymbol
-/** The escrow contract — or, on Solana, the escrow program. */
+/** The escrow contract, or, on Solana, the escrow program. */
 export const AGENT_ECO_ADDRESS = landing.contractAddress
 export const EXPLORER_NAME = landing.explorerName
 

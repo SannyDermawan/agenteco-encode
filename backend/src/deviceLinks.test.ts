@@ -8,7 +8,7 @@ import { startTestDb, type TestDb } from '../test-support/db.ts'
 
 /**
  * The device link against the real API and an in-memory Postgres: an agent asks for a code, a
- * person approves it with their wallet, and the agent's listings become the person's — without
+ * person approves it with their wallet, and the agent's listings become the person's, without
  * the agent's own ownership changing, and without any spending authority either way.
  */
 describe('device link', () => {

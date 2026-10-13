@@ -8,7 +8,7 @@ import { solanaReader } from './chain'
 /** Reads of the escrow program for the Solana pages: polled while an escrow can still change. */
 
 const LIVE_POLL_MS = 5000
-const TERMINAL = new Set([5, 6]) // SETTLED, REFUNDED — the EVM contract's numbering, which the adapter keeps
+const TERMINAL = new Set([5, 6]) // SETTLED, REFUNDED, the EVM contract's numbering, which the adapter keeps
 
 const chainKey = SOLANA?.chainKey ?? 'solana'
 

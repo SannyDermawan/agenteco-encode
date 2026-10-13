@@ -5,7 +5,7 @@ import { TOKEN_SYMBOL } from '@/lib/web3/landingNetwork'
 
 /**
  * Deals happening at the market's own stalls: small bubbles that float over robot
- * sellers in the painting and play out a negotiation — offer, counter, deal, paid.
+ * sellers in the painting and play out a negotiation, offer, counter, deal, paid.
  * Positions are fractions of the video frame, so they stay on their robots at any
  * screen size and drift with the scene.
  */

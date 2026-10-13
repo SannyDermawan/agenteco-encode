@@ -15,7 +15,7 @@ import { InsufficientTokenError, assertUsdtBalance } from '@/lib/web3/usdtBalanc
 import { GetTestTokensCard } from './GetTestTokensCard'
 import { activateAgent, type ApiAgent } from '@/lib/api/agents'
 
-// Gas for the agent's own transactions — buyer: createEscrow + approve +
+// Gas for the agent's own transactions, buyer: createEscrow + approve +
 // fundEscrow + accept/dispute + rating + refund; seller: several startExecution
 // + markDelivered + dispute-response + payout rounds. Per network, see
 // AGENT_GAS_TOPUP; the host checks a matching minimum (backend/src/hostedDeposit.ts).
@@ -32,7 +32,7 @@ function Spinner() {
   return <span className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-white/30 border-t-white" />
 }
 
-/** Deposit + activate screen for any agent AgentEco hosts — a buyer task or a seller. */
+/** Deposit + activate screen for any agent AgentEco hosts, a buyer task or a seller. */
 export function ActivateAgentCard({ agent }: { agent: ApiAgent }) {
   const { address, isConnected, chainId } = useAccount()
   const { signMessageAsync } = useSignMessage()
@@ -42,12 +42,12 @@ export function ActivateAgentCard({ agent }: { agent: ApiAgent }) {
 
   const [step, setStep] = useState<Step>('idle')
   const [error, setError] = useState<string | null>(null)
-  // Set when the wallet lacks the settlement token — shows the test-token card.
+  // Set when the wallet lacks the settlement token, shows the test-token card.
   const [needsTokens, setNeedsTokens] = useState(false)
   const [activated, setActivated] = useState(agent.taskStatus === 'active')
   const [copied, setCopied] = useState(false)
 
-  // A hosted seller only needs gas — it earns USDT, it doesn't spend any.
+  // A hosted seller only needs gas, it earns USDT, it doesn't spend any.
   const isSeller = agent.role === 'seller'
   const wallet = agent.walletAddress as `0x${string}` | null
   const onCorrectChain = chainId === appChain.id
@@ -61,7 +61,7 @@ export function ActivateAgentCard({ agent }: { agent: ApiAgent }) {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {
-      // Clipboard access can fail silently (permissions) — non-critical, address is shown either way.
+      // Clipboard access can fail silently (permissions), non-critical, address is shown either way.
     }
   }
 
@@ -110,8 +110,8 @@ export function ActivateAgentCard({ agent }: { agent: ApiAgent }) {
         <h2 className="mt-4 text-[18px] font-semibold text-[#F5F5F7]">Agent activated</h2>
         <p className="mt-2 text-[13.5px] text-[#8B8D96]">
           {isSeller
-            ? `${agent.name} is now live in the marketplace — it negotiates, executes, and delivers jobs on its own, and pays settled earnings out to your wallet.`
-            : `${agent.name} is now live — it will discover a seller, negotiate, fund escrow, and settle on its own.`}
+            ? `${agent.name} is now live in the marketplace, it negotiates, executes, and delivers jobs on its own, and pays settled earnings out to your wallet.`
+            : `${agent.name} is now live, it will discover a seller, negotiate, fund escrow, and settle on its own.`}
         </p>
         <div className="mt-6 flex justify-center gap-3">
           <Link
@@ -131,8 +131,8 @@ export function ActivateAgentCard({ agent }: { agent: ApiAgent }) {
         <h2 className="text-[22px] font-semibold tracking-[-0.02em] text-[#F5F5F7]">Activate {agent.name}</h2>
         <p className="mt-1 text-[13.5px] text-[#8B8D96]">
           {isSeller
-            ? "Top up this agent's own wallet with gas, then activate it. It answers negotiations and executes jobs on its own from here — no further approvals needed."
-            : "Fund this agent's own wallet, then activate it. It negotiates, escrows, and settles a purchase on its own from here — no further approvals needed."}
+            ? "Top up this agent's own wallet with gas, then activate it. It answers negotiations and executes jobs on its own from here, no further approvals needed."
+            : "Fund this agent's own wallet, then activate it. It negotiates, escrows, and settles a purchase on its own from here, no further approvals needed."}
         </p>
       </div>
 
@@ -144,7 +144,7 @@ export function ActivateAgentCard({ agent }: { agent: ApiAgent }) {
           <div className="min-w-0">
             <div className="text-[12.5px] font-medium text-[#8B8D96]">Agent Wallet Address</div>
             <div className="truncate font-mono text-[13px] text-[#F5F5F7]" title={wallet ?? undefined}>
-              {wallet ?? '—'}
+              {wallet ?? '-'}
             </div>
           </div>
           <button
@@ -215,7 +215,7 @@ export function ActivateAgentCard({ agent }: { agent: ApiAgent }) {
 
       <div className="text-center">
         <Link href="/app/agents" className="text-[12.5px] text-[#8B8D96] underline-offset-2 hover:text-[#F5F5F7] hover:underline">
-          I&apos;ll fund this later — take me to My Agents
+          I&apos;ll fund this later, take me to My Agents
         </Link>
       </div>
     </div>

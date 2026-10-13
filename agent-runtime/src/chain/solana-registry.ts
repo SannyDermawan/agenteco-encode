@@ -21,7 +21,7 @@ export { SOLANA_PRESETS }
  * chain with its own backend (registerSolanaChain), e.g. the in-process litesvm one.
  */
 
-/** `solana-devnet`, `solana:EtWT…` — anything that names a Solana chain, known or not. */
+/** `solana-devnet`, `solana:EtWT…`, anything that names a Solana chain, known or not. */
 export function isSolanaChainRef(input: string | number): boolean {
   return /^solana([:-]|$)/i.test(String(input).trim())
 }

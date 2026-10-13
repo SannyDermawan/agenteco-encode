@@ -5,7 +5,7 @@ import { readChain, type ChainId } from './chains.ts'
 // Seller: enough for a handful of startExecution + markDelivered + dispute-response + payout rounds.
 // Per chain (its hostedMinGas), below the frontend's activation top-up.
 
-/** Pass requiredUsdt = '0' for a hosted seller — it only needs gas, not a budget. */
+/** Pass requiredUsdt = '0' for a hosted seller, it only needs gas, not a budget. */
 export async function checkHostedDeposit(
   chainId: ChainId,
   walletAddress: Address,

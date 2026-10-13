@@ -47,16 +47,16 @@ function Slider({
 }
 
 // Each round carries a short reason, as in the app: the AI writes a line with every offer.
-// These are fixed lines for the demo — they never mention either side's limit.
+// These are fixed lines for the demo, they never mention either side's limit.
 const SELLER_COUNTER = [
   'Based on the scope and market rates, I can offer {p}.',
-  'My costs leave little room — {p} is a fair middle.',
+  'My costs leave little room, {p} is a fair middle.',
   'I can move a bit more: {p}, close to my best.',
 ]
 const BUYER_COUNTER = [
   'A fair price for the brief that keeps the cost low.',
   'I can stretch a little further, to {p}.',
-  'Meeting you closer at {p} — that is nearly my ceiling.',
+  'Meeting you closer at {p}, that is nearly my ceiling.',
 ]
 
 function reasonFor(round: SimRound, index: number): string {
@@ -68,7 +68,7 @@ function reasonFor(round: SimRound, index: number): string {
     case 'counter':
       return pool[Math.floor((index - 1) / 2) % pool.length].replace('{p}', p)
     case 'accept':
-      return round.side === 'seller' ? `Happy with that — deal at ${p}.` : `Within my budget — deal at ${p}.`
+      return round.side === 'seller' ? `Happy with that, deal at ${p}.` : `Within my budget, deal at ${p}.`
     case 'reject':
       return 'The gap is too wide for me to close.'
   }
@@ -142,7 +142,7 @@ function Playback({ result, listedPrice, play, byUser }: { result: SimResult; li
         {result.kind === 'skipped' ? (
           <p className="rounded-xl border border-white/10 bg-white/[0.05] p-4 text-[13.5px] leading-relaxed text-[#A3A5AE]">
             Even the buyer&apos;s opening offer (50% of the seller&apos;s price) is above its max budget, so it never
-            opens a negotiation with this seller — it looks for another one instead.
+            opens a negotiation with this seller, it looks for another one instead.
           </p>
         ) : (
           rounds.slice(0, shown).map((r, i) => <Bubble key={i} round={r} index={i} />)
@@ -169,7 +169,7 @@ function Playback({ result, listedPrice, play, byUser }: { result: SimResult; li
                 </span>
               </>
             ) : (
-              <span className="text-[13.5px] text-[#A3A5AE]">No deal — their ranges never met, so no money moves.</span>
+              <span className="text-[13.5px] text-[#A3A5AE]">No deal, their ranges never met, so no money moves.</span>
             )}
             <Link href="/app/create-agent" className="ml-auto text-[13px] font-medium text-[#5B5FEF] hover:underline">
               Run it for real →

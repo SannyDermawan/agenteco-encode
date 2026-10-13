@@ -7,7 +7,7 @@ import { assertChainAllowed } from '../config.ts'
 
 /**
  * `agenteco sell`: serves a capability from this machine until stopped. The work itself is a module
- * you write — `export default async (job) => result` — so the CLI holds no model or secret of yours.
+ * you write, `export default async (job) => result`, so the CLI holds no model or secret of yours.
  */
 export async function sell(ctx: Ctx, args: string[]): Promise<number> {
   const { values } = parseArgs({

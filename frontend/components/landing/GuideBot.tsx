@@ -19,7 +19,7 @@ import { BACK_LINES, ESCROW_LINE, FAQ_LINES, PET_LINES, TOUR, greeting, hoverLin
 
 /**
  * Eco, the landing page's guide: the blue AgentEco robot floats along as you scroll, flies to a
- * new spot at every section — beside what people look at first, at eye height — and says a line about it. Left alone it explores: it drifts to other
+ * new spot at every section, beside what people look at first, at eye height, and says a line about it. Left alone it explores: it drifts to other
  * empty parts of the page and points out buttons and sliders worth trying. It never sits on text,
  * buttons or cards (it measures what is on screen and steps aside after you scroll). It looks at
  * your cursor, dodges a fast-approaching cursor for a game of tag, reacts when you click it, can be
@@ -43,11 +43,11 @@ type Spot = { x: number; y: number }
 // `at` is where people's eyes already are: just beside the headline or the visual of each section, at eye
 // height, not down in a corner. (If something is there, the guide settles on the nearest empty spot.)
 const GUIDE: Record<string, { at: Spot; line: string }> = {
-  hero: { at: { x: 0.13, y: 0.4 }, line: "Hi, I'm Eco! I'll show you around. Scroll down — I'll tag along!" },
+  hero: { at: { x: 0.13, y: 0.4 }, line: "Hi, I'm Eco! I'll show you around. Scroll down. I'll tag along!" },
   product: { at: { x: 0.87, y: 0.36 }, line: 'This is where AI agents get hired. You only pay when the work is right!' },
-  capabilities: { at: { x: 0.11, y: 0.4 }, line: "So many jobs to pick from — translate, analyze, explain… which one's yours?" },
+  capabilities: { at: { x: 0.11, y: 0.4 }, line: "So many jobs to pick from, translate, analyze, explain… which one's yours?" },
   roles: { at: { x: 0.89, y: 0.34 }, line: "Buyer or seller? I'd be a buyer. I love a bargain!" },
-  'how-it-works': { at: { x: 0.1, y: 0.42 }, line: "They haggle, lock the money, then check the work. Try the sliders — it's fun!" },
+  'how-it-works': { at: { x: 0.1, y: 0.42 }, line: "They haggle, lock the money, then check the work. Try the sliders, it's fun!" },
   proof: { at: { x: 0.87, y: 0.4 }, line: 'Real deals on a real chain. No fibbing here!' },
   developers: { at: { x: 0.1, y: 0.4 }, line: "Your key stays yours. Every result is checked against an on-chain hash." },
   faq: { at: { x: 0.88, y: 0.38 }, line: 'Got a question? Somebody here has an answer. Maybe me!' },
@@ -122,7 +122,7 @@ function pointOuts(d: Dim): { rect: DOMRect; line: string }[] {
   add([...document.querySelectorAll('button')].filter((b) => /replay/i.test(b.textContent ?? '')), ['Press Replay to watch the haggling again!'])
   add([...document.querySelectorAll('[class*="cursor-grab"]')], ['Grab the ring and give it a spin!'])
   add([...document.querySelectorAll('a[href^="/app/"]:not([href="/app/marketplace"])')], ['This link takes you into the app.'])
-  add([...document.querySelectorAll('main h2')], ['Psst — this part is a good one!', "Read this bit. I'll wait!", 'Ooh, I like this section!'])
+  add([...document.querySelectorAll('main h2')], ['Psst, this part is a good one!', "Read this bit. I'll wait!", 'Ooh, I like this section!'])
   return found
 }
 
@@ -810,7 +810,7 @@ export function GuideBot() {
         setMood('wink', 1800)
         fx('tilt')
         burst('✦', '#FFD27A', 2)
-        return say('Psst — your money is safe in escrow!', 3000)
+        return say('Psst, your money is safe in escrow!', 3000)
       case 'love':
         setMood('love', 2200)
         fx('hop')
@@ -1102,7 +1102,7 @@ export function GuideBot() {
     fx('hop')
     const line = live.current ?? (await liveLine())
     if (line) live.current = line
-    say(line ?? 'I can’t reach the network right now — try again in a bit!', line ? readMs(line) : 3200)
+    say(line ?? 'I can’t reach the network right now, try again in a bit!', line ? readMs(line) : 3200)
   }
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Enter') {
@@ -1197,7 +1197,7 @@ export function GuideBot() {
       scheduleRoam()
     }
 
-    // Tag: dash at it with the cursor and it scoots away — twice, then it lets you catch it.
+    // Tag: dash at it with the cursor and it scoots away, twice, then it lets you catch it.
     const tryDodge = (m: { x: number; y: number }) => {
       const now = Date.now()
       const dg = dodge.current
@@ -1212,7 +1212,7 @@ export function GuideBot() {
         dg.count = 0
         setMood('happy', 1800)
         fx('hop')
-        say('Okay, okay — you got me!', 2600)
+        say('Okay, okay, you got me!', 2600)
         return
       }
       dg.count++

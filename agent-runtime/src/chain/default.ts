@@ -19,7 +19,7 @@ import { erc8004FromSettings } from '../shared/erc8004.ts'
 
 /**
  * The process's primary chain (NETWORK + unsuffixed env, see ../network.ts) as an
- * EvmChainConfig — the one place where the env-driven constants meet the config-driven
+ * EvmChainConfig, the one place where the env-driven constants meet the config-driven
  * adapter. ./registry.ts adds the other chains of CHAINS.
  */
 let cached: EvmChainConfig | undefined

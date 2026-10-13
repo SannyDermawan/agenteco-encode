@@ -9,8 +9,8 @@ import { defineChain, fallback, http, isAddress, type Address, type Transport } 
  * (default bsc-testnet; "testnet"/"mainnet" still mean the BOT Chain presets).
  * This is the process's primary chain; ./chain/registry.ts serves several
  * chains at once (CHAINS) from the same presets. Chain
- * params come from the presets below; the deployment — contract, token, deploy
- * block — comes from env, with working defaults where this repo has deployed.
+ * params come from the presets below; the deployment, contract, token, deploy
+ * block, comes from env, with working defaults where this repo has deployed.
  * A network without a default deployment refuses to start until
  * AGENT_ECO_ADDRESS is set, instead of quietly pointing at another chain.
  */
@@ -27,7 +27,7 @@ export interface NetworkPreset {
   explorerName: string
   nativeSymbol: string
   testnet: boolean
-  /** Settlement token for this network — MockUSDT on BSC Testnet, USDT on BOT Chain, Circle's USDC on the Sepolia testnets, a TIP-20 stablecoin on Tempo. */
+  /** Settlement token for this network. MockUSDT on BSC Testnet, USDT on BOT Chain, Circle's USDC on the Sepolia testnets, a TIP-20 stablecoin on Tempo. */
   usdtAddress: Address
   /** What logs and API messages call the settlement token. */
   tokenSymbol: string
@@ -35,7 +35,7 @@ export interface NetworkPreset {
   hostedMinGas: string
   /** System wallets (keeper, arbiter, hosted agents) below this log a warning. */
   lowGasWarn: string
-  /** Multicall3, when deployed on this chain — batches contract reads. */
+  /** Multicall3, when deployed on this chain, batches contract reads. */
   multicall3?: Address
   /** Largest block span per eth_getLogs call the default RPC accepts (with margin). */
   logRange: bigint
@@ -70,7 +70,7 @@ export const NETWORK_PRESETS: Record<NetworkName, NetworkPreset> = {
     explorerName: 'BscScan Testnet',
     nativeSymbol: 'tBNB',
     testnet: true,
-    // MockUSDT (mUSDT, 18 decimals) — AgentEco's own test token, see contracts/MockUSDT.sol.
+    // MockUSDT (mUSDT, 18 decimals). AgentEco's own test token, see contracts/MockUSDT.sol.
     usdtAddress: '0xae0BbCf2Ec6cbE83C39927e9A087c9486E51Cea7',
     tokenSymbol: 'mUSDT',
     hostedMinGas: '0.003',
@@ -218,7 +218,7 @@ function readNetwork(): NetworkName {
 
 function readAddress(name: string, fallback: Address | undefined): Address {
   const value = env(name) ?? fallback
-  if (!value) throw new Error(`${name} must be set when NETWORK=${NETWORK} — there is no default deployment for it.`)
+  if (!value) throw new Error(`${name} must be set when NETWORK=${NETWORK}, there is no default deployment for it.`)
   if (!isAddress(value)) throw new Error(`${name} is not a valid EVM address: ${value}`)
   return value
 }
@@ -272,7 +272,7 @@ export const LOG_RANGE = readBlock('LOG_RANGE_BLOCKS', preset.logRange) ?? prese
 export const PRESET_ERC8004 = preset.erc8004 ?? null
 export const AGENT_ECO_ADDRESS = readAddress('AGENT_ECO_ADDRESS', preset.deployment?.agentEcoAddress)
 export const USDT_ADDRESS = readAddress('USDT_ADDRESS', preset.usdtAddress)
-/** Block AgentEco.sol was deployed at — log scans start here. Null = unknown (scan from "now"). */
+/** Block AgentEco.sol was deployed at, log scans start here. Null = unknown (scan from "now"). */
 export const DEPLOYMENT_BLOCK = readBlock('DEPLOYMENT_BLOCK', preset.deployment?.deploymentBlock)
 
 /*
@@ -326,7 +326,7 @@ export function explorerTxUrl(hash: string): string {
 }
 
 /**
- * Fails fast when RPC_URL points at a different chain than NETWORK — e.g. a
+ * Fails fast when RPC_URL points at a different chain than NETWORK, e.g. a
  * mainnet process accidentally given a testnet RPC.
  */
 export async function assertRpcMatchesNetwork(getChainId: () => Promise<number>): Promise<void> {

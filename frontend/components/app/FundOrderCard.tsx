@@ -25,7 +25,7 @@ function Spinner() {
   return <span className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-white/30 border-t-white" />
 }
 
-/** Funds the agreed price from a Negotiation — not the seller's listed price. */
+/** Funds the agreed price from a Negotiation, not the seller's listed price. */
 export function FundOrderCard({ order }: { order: ApiOrder }) {
   const router = useRouter()
   const { address, isConnected, chainId } = useAccount()
@@ -34,7 +34,7 @@ export function FundOrderCard({ order }: { order: ApiOrder }) {
 
   const [step, setStep] = useState<Step>('idle')
   const [error, setError] = useState<string | null>(null)
-  // Set when the wallet lacks the settlement token — shows the test-token card.
+  // Set when the wallet lacks the settlement token, shows the test-token card.
   const [needsTokens, setNeedsTokens] = useState(false)
 
   const seller = order.sellerAgent.walletAddress as `0x${string}` | null

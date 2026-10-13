@@ -11,7 +11,7 @@ import { FRONTEND, SOL, startSolanaBrowserStack, type SolanaBrowserStack } from 
  * The website on Solana, in a real browser: Chromium drives the built frontend (next start) against a real
  * solana-test-validator running the escrow program, this API with an in-memory Postgres, and an SDK seller.
  * The browser has a mock wallet-standard wallet (the same interface Phantom, Solflare and Backpack expose)
- * whose signatures come from a test key held here — so what runs in the page is the production code path:
+ * whose signatures come from a test key held here, so what runs in the page is the production code path:
  * wallet discovery, connect, the 24 h read session, the SolanaAdapter in the bundle, a wallet-signed
  * create-and-fund transaction, settling, rating and disputing.
  *

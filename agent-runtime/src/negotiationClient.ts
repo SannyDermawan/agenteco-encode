@@ -4,7 +4,7 @@ export type NegotiationSide = 'buyer' | 'seller'
 export type NegotiationAction = 'offer' | 'counter' | 'accept' | 'reject'
 export type NegotiationStatus = 'open' | 'accepted' | 'rejected' | 'expired'
 
-/** Why a move was made (spec §9) — the model's reason, or rule-based. */
+/** Why a move was made (spec §9), the model's reason, or rule-based. */
 export interface MoveMeta {
   reason?: string | null
   source?: 'ai' | 'rule' | 'agent'

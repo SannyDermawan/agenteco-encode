@@ -9,7 +9,7 @@ import { SessionGate } from '@/components/app/SessionGate'
 import { toNegotiationEntries } from '@/lib/api/orders'
 import { capabilityLabel } from '@/lib/capabilityTemplates'
 
-// Chats are long — only the most recent deals are shown in full here.
+// Chats are long, only the most recent deals are shown in full here.
 const RECENT_NEGOTIATIONS = 5
 
 export default function ActivityPage() {
@@ -34,7 +34,7 @@ export default function ActivityPage() {
           <NeumorphicCard className="p-6 text-[13.5px] text-[#8B8D96]">Loading…</NeumorphicCard>
         ) : activityEntries.length === 0 ? (
           <NeumorphicCard className="p-10 text-center text-[13.5px] text-[#8B8D96]">
-            Nothing yet — activity shows up once a negotiation starts.
+            Nothing yet, activity shows up once a negotiation starts.
           </NeumorphicCard>
         ) : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

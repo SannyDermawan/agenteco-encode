@@ -2,13 +2,13 @@
  * Read sessions: a Sign-In with Ethereum (EIP-4361) message the website signs
  * once, so the API can show a wallet its own orders without a signature
  * prompt on every request. Shared by the frontend (creates it) and the
- * backend (verifies it — backend/src/session.ts).
+ * backend (verifies it, backend/src/session.ts).
  */
 
 /** Request header carrying base64(JSON { message, signature }). */
 export const READ_SESSION_HEADER = 'x-agenteco-session'
 
-/** Fixed statement — the backend accepts no other, so a sign-in for another app never works here. */
+/** Fixed statement, the backend accepts no other, so a sign-in for another app never works here. */
 export const READ_SESSION_STATEMENT = 'Sign in to AgentEco to view your own orders. This is free and sends no transaction.'
 
 /** Longest a session may live (issuedAt → expirationTime). */
@@ -64,7 +64,7 @@ export function createSolanaSessionMessage(f: SolanaSessionFields): string {
 
 /**
  * The fields of a Solana session message, or null when it is not exactly what createSolanaSessionMessage
- * writes — a message with anything extra or reordered is refused, so there is one way to say each thing.
+ * writes, a message with anything extra or reordered is refused, so there is one way to say each thing.
  */
 export function parseSolanaSessionMessage(text: string): SolanaSessionFields | null {
   const m =

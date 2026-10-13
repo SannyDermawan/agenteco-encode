@@ -1,6 +1,6 @@
 import { LIMITS, type DataStats } from '../shared/capabilities/definitions.ts'
 
-/** A brief that breaks a capability's input limits — the seller must not start the job. */
+/** A brief that breaks a capability's input limits, the seller must not start the job. */
 export class InvalidInputError extends Error {}
 
 /**
@@ -63,7 +63,7 @@ const round = (n: number, digits = 4) => Math.round(n * 10 ** digits) / 10 ** di
 /**
  * Per numeric column: count, mean, median, min, max, stddev (population).
  * If a column holds dates, adds the first→last change of each numeric
- * column over time. Pure — the AI only interprets these numbers.
+ * column over time. Pure, the AI only interprets these numbers.
  */
 export function computeStats(csv: string): DataStats {
   const table = parseCsv(csv)

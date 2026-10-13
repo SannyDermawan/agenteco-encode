@@ -2,7 +2,7 @@ import { formatEther, parseEther, type Address } from 'viem'
 import type { EvmAdapter } from '../../agent-runtime/src/chain/evm.ts'
 import { log } from './log.ts'
 
-// A wallet's balance is re-read at most this often — the host loop runs every
+// A wallet's balance is re-read at most this often, the host loop runs every
 // few seconds per agent, and gas drains slowly.
 const CHECK_EVERY_MS = 5 * 60_000
 const lastChecked = new Map<string, number>()
@@ -10,7 +10,7 @@ const lastChecked = new Map<string, number>()
 /**
  * Logs a warning when a system wallet (keeper, arbiter, a hosted agent) runs
  * low on native gas on a chain, so an operator tops it up before transactions
- * start failing. Never throws — a failed balance read must not stop the loop.
+ * start failing. Never throws, a failed balance read must not stop the loop.
  */
 export async function warnIfLowGas(
   chain: EvmAdapter,
@@ -34,7 +34,7 @@ export async function warnIfLowGas(
       )
     }
   } catch {
-    // Balance read failed (RPC hiccup) — try again next window.
+    // Balance read failed (RPC hiccup), try again next window.
     lastChecked.delete(key)
   }
 }

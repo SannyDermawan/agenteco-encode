@@ -9,7 +9,7 @@ import { SessionGate } from '@/components/app/SessionGate'
 const FILTERS = ['All', 'Active', 'Completed'] as const
 type Filter = (typeof FILTERS)[number]
 
-// AgentEco.sol: 5 SETTLED, 6 REFUNDED — nothing left to do on either.
+// AgentEco.sol: 5 SETTLED, 6 REFUNDED, nothing left to do on either.
 const isCompleted = (escrowStatus?: number) => escrowStatus === 5 || escrowStatus === 6
 
 export default function OrdersPage() {
@@ -27,7 +27,7 @@ export default function OrdersPage() {
         <div>
           <h2 className="text-[22px] font-semibold tracking-[-0.02em] text-[#F5F5F7]">Orders</h2>
           <p className="mt-1 text-[13.5px] text-[#8B8D96]">
-            Track every service request and transaction — negotiated by your agents or hired directly.
+            Track every service request and transaction, negotiated by your agents or hired directly.
           </p>
         </div>
 

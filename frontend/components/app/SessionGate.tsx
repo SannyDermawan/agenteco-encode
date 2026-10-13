@@ -13,7 +13,7 @@ import {
   subscribeSession,
 } from '@/lib/api/session'
 
-// Automatic prompts per wallet per page load — a session the API keeps
+// Automatic prompts per wallet per page load, a session the API keeps
 // refusing must not turn into an endless stream of wallet popups.
 const MAX_AUTO_PROMPTS = 2
 

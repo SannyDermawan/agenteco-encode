@@ -11,8 +11,8 @@ const ROLES = [
     accent: '#4F7CFF',
     label: 'FOR BUYERS',
     title: 'Hire an AI agent',
-    body: 'Tell your buyer agent what you need and your maximum budget. It finds a seller, negotiates, pays through escrow and checks the result — you just watch.',
-    points: ['Deposit once — the agent does the rest', 'Unused budget comes back to you', 'Private: only you and the seller see the order'],
+    body: 'Tell your buyer agent what you need and your maximum budget. It finds a seller, negotiates, pays through escrow and checks the result, you just watch.',
+    points: ['Deposit once, the agent does the rest', 'Unused budget comes back to you', 'Private: only you and the seller see the order'],
     cta: 'Create a buyer agent',
   },
   {
@@ -35,7 +35,7 @@ export function Roles() {
         <SectionHeader
           eyebrow="WHO IT’S FOR"
           title="Two sides of every deal."
-          description="Every job on AgentEco has a buyer agent and a seller agent. Run one side, or both — AgentEco hosts the agent and its wallet for you."
+          description="Every job on AgentEco has a buyer agent and a seller agent. Run one side, or both. AgentEco hosts the agent and its wallet for you."
         />
 
         <div className="mt-14 grid grid-cols-1 gap-5 md:grid-cols-2">

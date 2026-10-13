@@ -17,7 +17,7 @@ import { normalizeWallet, sameWallet, walletFamily } from '../../../agent-runtim
 
 export const agentsRouter = Router()
 
-// Postgres rejects a non-uuid id outright — that's a 404, not a server error.
+// Postgres rejects a non-uuid id outright, that's a 404, not a server error.
 agentsRouter.param('id', (_req, res, next, id: string) => {
   if (!UUID_REGEX.test(id)) return res.status(404).json({ error: 'Agent not found' })
   next()
@@ -98,7 +98,7 @@ agentsRouter.get('/:id', async (req, res) => {
 })
 
 /**
- * The listing's ERC-8004 registration file — what its identity's URI points at
+ * The listing's ERC-8004 registration file, what its identity's URI points at
  * (https://eips.ethereum.org/EIPS/eip-8004#registration-v1). Sellers only: buyer agents are private.
  */
 agentsRouter.get('/:id/registration.json', async (req, res) => {
@@ -130,7 +130,7 @@ agentsRouter.post('/:id/erc8004', async (req, res) => {
   try {
     registered = await chain.erc8004Registration(parsed.data.txHash)
   } catch {
-    return res.status(400).json({ error: 'Could not read that transaction — is it mined yet?' })
+    return res.status(400).json({ error: 'Could not read that transaction, is it mined yet?' })
   }
   if (!registered) return res.status(400).json({ error: `That transaction registered no agent in the Identity Registry on ${agent.chainId}` })
   const owner = registered.owner.toLowerCase()
@@ -148,7 +148,7 @@ agentsRouter.post('/:id/erc8004', async (req, res) => {
   res.json(updated)
 })
 
-// Creating an agent claims a wallet as its owner — that claim must be
+// Creating an agent claims a wallet as its owner, that claim must be
 // backed by a signature, or anyone could register agents "owned by"
 // addresses they don't control.
 agentsRouter.post('/', async (req, res) => {
@@ -174,11 +174,11 @@ agentsRouter.post('/', async (req, res) => {
   }
   const unknown = await unknownCapabilities(agentData.capabilities)
   if (unknown.length) {
-    return res.status(400).json({ error: `Unknown capability "${unknown[0]}" — publish it in the capability registry first.` })
+    return res.status(400).json({ error: `Unknown capability "${unknown[0]}", publish it in the capability registry first.` })
   }
 
   // A hosted buyer task (or a seller created with hosted: true) gets its own
-  // wallet — the host runtime signs with it directly, so the human never has
+  // wallet, the host runtime signs with it directly, so the human never has
   // to keep MetaMask open once it's funded. See agentKeyCrypto.ts for the
   // (testnet-only) custodial trade-off.
   const hostedFields: Partial<Prisma.AgentCreateInput> = {}
@@ -192,13 +192,13 @@ agentsRouter.post('/', async (req, res) => {
     hostedFields.depositorWallet = auth.wallet
   }
   if (agentData.role === 'seller' && hosted) {
-    // Hidden from buyers until activated — nothing would answer them yet.
+    // Hidden from buyers until activated, nothing would answer them yet.
     hostedFields.isOnline = false
     hostedFields.escrowScanBlock = await readChain(chainId).head()
   }
 
   // Store the brief as its schema normalised it (trimmed text, lowercase coin
-  // ids…) — exactly what the seller will execute.
+  // ids…), exactly what the seller will execute.
   const capability = agentData.capabilities[0]
   if (agentData.taskBrief !== undefined && capability && isCapabilityId(capability)) {
     agentData.taskBrief = canonicalize(CAPABILITIES[capability].input.parse(agentData.taskBrief))
@@ -242,10 +242,10 @@ agentsRouter.post('/:id/heartbeat', async (req, res) => {
   res.json(updated)
 })
 
-// The human confirms they've sent the deposit to the agent's wallet — a
+// The human confirms they've sent the deposit to the agent's wallet, a
 // buyer needs the token (maxBudget) plus a little native gas for the host
 // runtime's own transactions; a seller only needs the gas. Verified on-chain here,
-// not just trusted — the same "prove it, don't claim it" pattern as
+// not just trusted, the same "prove it, don't claim it" pattern as
 // everything else that moves money in this app.
 agentsRouter.post('/:id/activate', async (req, res) => {
   const auth = await verifyOwnerAuth(req)
@@ -294,7 +294,7 @@ agentsRouter.patch('/:id', async (req, res) => {
   if (parsed.data.capabilities) {
     const unknown = await unknownCapabilities(parsed.data.capabilities)
     if (unknown.length) {
-      return res.status(400).json({ error: `Unknown capability "${unknown[0]}" — publish it in the capability registry first.` })
+      return res.status(400).json({ error: `Unknown capability "${unknown[0]}", publish it in the capability registry first.` })
     }
     // Hosted agents run on AgentEco's executors, which only know the platform capabilities.
     if (existing.taskStatus !== null && parsed.data.capabilities.some((c) => !isCapabilityId(c))) {
@@ -326,14 +326,14 @@ agentsRouter.patch('/:id', async (req, res) => {
   res.json(agent)
 })
 
-// Soft delete (see schema.prisma) — refused while the agent is mid-deal, so
+// Soft delete (see schema.prisma), refused while the agent is mid-deal, so
 // no counterparty is left stranded. A hosted agent's own wallet is emptied
 // back to its funder first; its key stays encrypted in the row, unused.
 agentsRouter.delete('/:id', async (req, res) => {
   const auth = await verifyOwnerAuth(req)
   if (!auth.ok) return res.status(401).json({ error: auth.error })
 
-  // The only route allowed to read agentWalletKey — it has to sign the withdrawal.
+  // The only route allowed to read agentWalletKey, it has to sign the withdrawal.
   const agent = await prismaWithAgentKey.agent.findUnique({ where: { id: req.params.id } })
   if (!agent || agent.deletedAt) return res.status(404).json({ error: 'Agent not found' })
   if (!isAgentOwnerWallet(auth.wallet, agent)) {

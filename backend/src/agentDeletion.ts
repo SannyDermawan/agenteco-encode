@@ -5,7 +5,7 @@ import { refundLeftover } from './host/buyerTaskHost.ts'
 import { readAdapter, signerChain, type ChainId } from './chains.ts'
 import { normalizeWallet } from '../../agent-runtime/src/shared/wallets.ts'
 
-// AgentEco.sol OrderStatus: FUNDED, EXECUTING, DELIVERED, DISPUTED — money is
+// AgentEco.sol OrderStatus: FUNDED, EXECUTING, DELIVERED, DISPUTED, money is
 // locked and someone still has to act. CREATED/SETTLED/REFUNDED are safe.
 const IN_PROGRESS_STATUSES = new Set([1, 2, 3, 4])
 const STATUS_LABEL = ['CREATED', 'FUNDED', 'EXECUTING', 'DELIVERED', 'DISPUTED', 'SETTLED', 'REFUNDED']
@@ -35,7 +35,7 @@ export async function findBlockingWork(agent: DeletableAgent): Promise<string | 
 
   // Every escrow this agent is part of on its chain: its orders' escrows, plus any
   // escrow naming its wallet (direct hires have no Order row). Read from contract
-  // state — no event logs, so it works on RPCs that prune history.
+  // state, no event logs, so it works on RPCs that prune history.
   const orderEscrowIds = new Set(orders.filter((o) => o.escrowId).map((o) => o.escrowId!))
   const wallet = ((agent.walletAddress) ? normalizeWallet(agent.walletAddress) : undefined)
   for (const escrow of await readAdapter(agent.chainId).listEscrows()) {
@@ -43,7 +43,7 @@ export async function findBlockingWork(agent: DeletableAgent): Promise<string | 
       orderEscrowIds.has(escrow.id.toString()) ||
       (!!wallet && (normalizeWallet(escrow.seller) === wallet || normalizeWallet(escrow.buyer) === wallet))
     if (involved && IN_PROGRESS_STATUSES.has(escrow.status)) {
-      return `On-chain order #${escrow.id} is still ${STATUS_LABEL[escrow.status]} — finish, settle, or refund it first.`
+      return `On-chain order #${escrow.id} is still ${STATUS_LABEL[escrow.status]}, finish, settle, or refund it first.`
     }
   }
   return null

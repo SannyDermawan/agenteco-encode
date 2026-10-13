@@ -38,7 +38,7 @@ function Stars({ value, onPick, size = 'text-[22px]' }: { value: number; onPick?
  * Rating after a finished job (spec §10.2): the buyer rates 1–5 stars once
  * the escrow is final and something was delivered; the contract stores
  * stars × 20 and allows it only once. Hosted buyers rate with their AI
- * verification score instead — shown here too.
+ * verification score instead, shown here too.
  */
 export function RateSellerCard({
   escrowId,
@@ -103,7 +103,7 @@ export function RateSellerCard({
           )}
         </div>
       ) : rated ? (
-        <p className="text-[13px] text-[#8B8D96]">Rated on-chain — loading the score…</p>
+        <p className="text-[13px] text-[#8B8D96]">Rated on-chain, loading the score…</p>
       ) : (
         <div className="space-y-3">
           <p className="text-[13px] text-[#8B8D96]">How did this seller do? One rating per job, stored on-chain.</p>
