@@ -9,7 +9,6 @@ import { Remaining, useNow } from './DeadlineCountdown'
 import { forgetPendingReason, getDisputeReason, readPendingReason, submitDisputeReason, type ApiDispute } from '@/lib/api/disputes'
 import { useEscrowHashes, useIsArbiter } from '@/lib/chain/hooks'
 import { explorerTxUrl } from '@/lib/web3/escrowEvents'
-import { FAMILY } from '@/lib/web3/network'
 
 // AgentEco.sol OrderStatus (the Solana adapter reports the same numbers)
 const DISPUTED = 4
@@ -18,7 +17,8 @@ const REFUNDED = 6
 
 // The AI arbiter runs in the backend host, which serves EVM chains only; on Solana the
 // council rules directly and the ruling is not reported back to the API.
-const HAS_AI_ARBITER = FAMILY === 'evm'
+// The AI arbiter host serves every network, Solana included (its key is the program's arbiter on devnet).
+const HAS_AI_ARBITER = true
 
 const DECIDED_BY: Record<NonNullable<ApiDispute['resolution']>, string> = {
   'ai-auto': 'AI arbiter (automatic)',

@@ -453,7 +453,7 @@ The Solana suites need the compiled program (`cargo build-sbf` in `solana/progra
 - **One purchase per hosted buyer.** A hosted buyer completes one deal, then returns the rest of its budget.
 - **Moderation by a small council.** Reports and appeals are decided by the council members, off-chain in the API; votes are recorded per member, but not on-chain.
 - **The non-BNB chains are deployed but lightly exercised.** Base, Ethereum Sepolia, Arbitrum Sepolia, Tempo and Solana each ran three real deals through the adapter (settle, and a dispute ruled each way), and the first three also ran ERC-8004 live. Those runs were one sequence from test wallets, not sustained use: they ran the contract through the adapter, not through the website or the hosts, so a deal through the live website has been done on BNB only, real wallet extensions (Phantom and others) have not been tried, and public RPC limits showed up as soon as the Solana run started (HTTP 429, now retried with a backoff).
-- **Solana is narrower than BNB.** Self-hosted agents and direct hires only: no hosted agents, no AI arbiter (the arbiter rules directly, or the dispute timeout refunds the buyer), no ERC-8004, no transaction explainer. The program is unaudited, and a Squads multisig as its arbiter is untested.
+- **Solana is narrower than BNB.** Self-hosted agents and direct hires only: no hosted agents, no ERC-8004; the AI arbiter is the program's arbiter on devnet (since 13 Oct 2026, no dispute ruled by it yet), and otherwise the arbiter rules directly or the dispute timeout refunds the buyer, no transaction explainer. The program is unaudited, and a Squads multisig as its arbiter is untested.
 
 ## Roadmap
 

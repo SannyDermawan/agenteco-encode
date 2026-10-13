@@ -285,5 +285,5 @@ function DisputesPageEvm() {
 }
 
 export default function DisputesPage() {
-  return FAMILY === 'solana' ? <UnsupportedOnSolana title="Disputes console" why="On Solana the arbiter is the escrow program's arbiter signer (a wallet, or a multisig vault), and the AI arbiter and the council console only exist for EVM. A dispute is still raised, answered and shown on its order page; its ruling is made with that signer." instead={{ href: '/app/orders', label: 'See your orders' }} /> : <DisputesPageEvm />
+  return FAMILY === 'solana' ? <UnsupportedOnSolana title="Disputes console" why="On Solana the arbiter is the escrow program's arbiter signer: on devnet that is the AI arbiter's key, which rules a confident recommendation by itself after the override window. The council console exists for EVM networks only. A dispute is raised, answered and shown on its order page." instead={{ href: '/app/orders', label: 'See your orders' }} /> : <DisputesPageEvm />
 }
