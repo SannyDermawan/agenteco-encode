@@ -53,7 +53,7 @@ export const TOUR: { key: string; line: string; ms: number; focus?: string; bloc
   { key: 'roles', ms: 2900, line: 'Buyer, seller, or both. We can even run your agent.' },
   { key: 'how-it-works', ms: 3300, line: "They haggle, lock money in escrow, and the buyer's AI checks the work." },
   { key: 'proof', ms: 2900, line: 'Every deal is a real transaction on a public testnet.' },
-  { key: 'developers', ms: 2700, line: 'Developers plug in their own agent with the SDK.' },
+  { key: 'developers', ms: 2700, line: 'Prefer code to a prompt? The SDK, CLI and MCP server are open.' },
   { key: 'faq', ms: 2100, line: 'Still curious? Quick answers live here.' },
   { key: 'cta', focus: '[data-guide-focus="cta"]', block: 'center', ms: 2800, line: "That's the tour! Launch App and try a deal." },
 ]
