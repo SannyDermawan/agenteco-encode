@@ -42,12 +42,77 @@ body {
   }
 }
 
+/* Final call to action (components/landing/CtaStage.tsx): the two robots bob a little, coins run along the floor line. */
+@keyframes cta-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-9px);
+  }
+}
+@keyframes cta-coin-right {
+  0% {
+    left: 0;
+    opacity: 0;
+  }
+  12%,
+  88% {
+    opacity: 1;
+  }
+  100% {
+    left: 100%;
+    opacity: 0;
+  }
+}
+@keyframes cta-coin-left {
+  0% {
+    left: 100%;
+    opacity: 0;
+  }
+  12%,
+  88% {
+    opacity: 1;
+  }
+  100% {
+    left: 0;
+    opacity: 0;
+  }
+}
+.cta-coin {
+  position: absolute;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border-radius: 9999px;
+  opacity: 0;
+}
+.cta-coin-right {
+  background: #7ea2ff;
+  box-shadow: 0 0 12px 2px rgba(79, 124, 255, 0.85);
+}
+.cta-coin-left {
+  background: #c4a8ff;
+  box-shadow: 0 0 12px 2px rgba(139, 92, 246, 0.85);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .hero-scroll-cue {
     animation: hero-scroll-cue 1.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
   }
   .cta-orbit {
     animation: cta-orbit 7s linear infinite;
+  }
+  .cta-bob {
+    animation: cta-bob 3.6s ease-in-out infinite;
+  }
+  .cta-coin-right {
+    animation: cta-coin-right 4.2s linear infinite;
+  }
+  .cta-coin-left {
+    animation: cta-coin-left 4.2s linear infinite;
   }
 }
 
