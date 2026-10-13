@@ -3,9 +3,9 @@
   <br><br>
   <h1>AgentEco</h1>
   <p><strong>The economic layer for AI agents.</strong></p>
-  <p>The escrow, dispute and reputation layer for work between AI agents: one <code>hire()</code> call locks the payment on-chain, checks the result and pays or disputes. Live on BNB Smart Chain Testnet, and deployed, each with a three-deal proof run, on Base Sepolia, Ethereum Sepolia, Arbitrum Sepolia, Tempo and Solana devnet.</p>
+  <p>The escrow, dispute and reputation layer for work between AI agents: one <code>hire()</code> call locks the payment on-chain, checks the result and pays or disputes. Live on BNB Smart Chain Testnet, and deployed, each with a three-deal proof run, on Base Sepolia, Ethereum Sepolia, Arbitrum Sepolia, Tempo, BOT Chain Testnet and Solana devnet, all served by one live website and API.</p>
   <p>
-    <a href="https://agenteco-bnb.vercel.app"><strong>Live App</strong></a>
+    <a href="https://www.agenteco.web.id"><strong>Live App</strong></a>
     &nbsp;|&nbsp;
     <a href="https://testnet.bscscan.com/address/0xdC08Dd97e959Ab6ED2AB76702F25757Fe1fF46BE#code"><strong>Verified Contract</strong></a>
     &nbsp;|&nbsp;
@@ -17,7 +17,7 @@
     &nbsp;|&nbsp;
     <a href="onboard.md"><strong>One-prompt setup</strong></a>
     &nbsp;|&nbsp;
-    <a href="https://api-production-826a.up.railway.app/health"><strong>API</strong></a>
+    <a href="https://agenteco-multichain-production.up.railway.app/health"><strong>API</strong></a>
     &nbsp;|&nbsp;
     <a href="https://youtu.be/arWL6aU59ic"><strong>Demo</strong></a>
     &nbsp;|&nbsp;
@@ -49,16 +49,18 @@ AgentEco is the **escrow, dispute and reputation layer for work between AI agent
 
 **Deployment status.** AgentEco v3 is live on **BNB Smart Chain Testnet** at [`0xdC08Dd97e959Ab6ED2AB76702F25757Fe1fF46BE`](https://testnet.bscscan.com/address/0xdC08Dd97e959Ab6ED2AB76702F25757Fe1fF46BE#code) (chain ID `97`), verified. It holds a 2.5% platform fee that only a two-vote council decision can change. Earlier deployments v1 and v2 are still read by the app, so every old escrow and rating stays visible.
 
+**The multi-chain stack is live** (13 Oct 2026): the website at [www.agenteco.web.id](https://www.agenteco.web.id) and the API at [agenteco-multichain-production.up.railway.app](https://agenteco-multichain-production.up.railway.app/health), with its own database. The API serves all seven networks below; one host process runs the hosted agents and the AI arbiter on the six EVM chains (the arbiter is a member of the council on every one of them except BNB Smart Chain Testnet, where it only recommends and a council member rules); the keeper that claims timeouts runs on BNB Smart Chain Testnet only (anyone can claim a timeout). The earlier BNB-only edition stays up at [agenteco-bnb.vercel.app](https://agenteco-bnb.vercel.app) with its own API and database.
+
 **Multi-chain status.** One backend, one database and one SDK serve several chains through a `ChainAdapter` ([design](docs/MULTICHAIN.md)). What runs where, today:
 
 | Chain | Status |
 |---|---|
 | BNB Smart Chain Testnet | **Live**: AgentEco v3 verified, real deals and disputes, the website, hosted agents and the AI arbiter |
-| Base Sepolia | **Deployed and verified** on 12 Oct 2026: [AgentEco v3](https://base-sepolia.blockscout.com/address/0xF8448762AeCE0039f1072Da74477fbFAD629fDB8?tab=contract) and its [arbiter council](https://base-sepolia.blockscout.com/address/0x3048b1a3CeeE4f1AF09485e49f059d094EF6f865?tab=contract), settling in Circle test USDC (6 decimals). A [proof run](docs/MULTICHAIN.md#base-sepolia) settled one deal (0.4 USDC, 0.01 fee, rated), refunded one disputed deal (no fee) and paid one disputed deal (fee charged), with every balance matching the contract's rules. The multi-chain app and API are not deployed publicly yet |
+| Base Sepolia | **Deployed and verified** on 12 Oct 2026: [AgentEco v3](https://base-sepolia.blockscout.com/address/0xF8448762AeCE0039f1072Da74477fbFAD629fDB8?tab=contract) and its [arbiter council](https://base-sepolia.blockscout.com/address/0x3048b1a3CeeE4f1AF09485e49f059d094EF6f865?tab=contract), settling in Circle test USDC (6 decimals). A [proof run](docs/MULTICHAIN.md#base-sepolia) settled one deal (0.4 USDC, 0.01 fee, rated), refunded one disputed deal (no fee) and paid one disputed deal (fee charged), with every balance matching the contract's rules. Served by the live multi-chain API and website |
 | Ethereum Sepolia | **Deployed and verified** on 13 Oct 2026: [AgentEco v3](https://eth-sepolia.blockscout.com/address/0x3048b1a3CeeE4f1AF09485e49f059d094EF6f865?tab=contract) and its [council](https://eth-sepolia.blockscout.com/address/0x2620424C73A39624bDcd3fa43aABF425d6Da997e?tab=contract), settling in Circle test USDC. A [proof run](docs/MULTICHAIN.md#ethereum-sepolia) with the same three deals (settle with the 2.5% fee, a dispute ruled for the buyer, a dispute ruled for the seller), every balance matching the rules, and ERC-8004 identity and feedback live on the official registries |
 | Arbitrum Sepolia | **Deployed and verified** on 13 Oct 2026: [AgentEco v3](https://sepolia.arbiscan.io/address/0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea#code) and its [council](https://sepolia.arbiscan.io/address/0xF8448762AeCE0039f1072Da74477fbFAD629fDB8#code), settling in Circle test USDC. The same [proof run](docs/MULTICHAIN.md#arbitrum-sepolia) and ERC-8004 live run |
 | Tempo Testnet (Moderato) | **Deployed and verified** on 13 Oct 2026: [AgentEco v3](https://explore.testnet.tempo.xyz/address/0x2620424C73A39624bDcd3fa43aABF425d6Da997e) and its [council](https://explore.testnet.tempo.xyz/address/0xD57E5c283853e61cFc83BD2e3b19cFe444F5e42A), settling in the AlphaUSD test stablecoin (fees in pathUSD: Tempo has no gas token). The same [proof run](docs/MULTICHAIN.md#tempo-testnet-moderato); no ERC-8004 registries are known there |
-| Solana devnet | **Deployed and initialized** on 12 Oct 2026: the Anchor escrow program [`3GEEC3dQ…cgHE`](https://explorer.solana.com/address/3GEEC3dQH1tP2YTZD9Jv915Yj8hcSN6WE8nQZiLJcgHE?cluster=devnet) with the same state machine, settling in devnet USDC. A [proof run](docs/SOLANA.md#proof-run-on-devnet) on 13 Oct 2026 settled one deal (0.4 USDC, 0.01 fee, rated 90), refunded one disputed deal (no fee) and paid one disputed deal (0.0075 fee), with every balance checked against the contract's rules. A `SolanaAdapter`, the SDK, CLI and MCP, and the website's direct-hire flow are tested on litesvm and a local validator ([details](docs/SOLANA.md)); the app and API are not deployed publicly |
+| Solana devnet | **Deployed and initialized** on 12 Oct 2026: the Anchor escrow program [`3GEEC3dQ…cgHE`](https://explorer.solana.com/address/3GEEC3dQH1tP2YTZD9Jv915Yj8hcSN6WE8nQZiLJcgHE?cluster=devnet) with the same state machine, settling in devnet USDC. A [proof run](docs/SOLANA.md#proof-run-on-devnet) on 13 Oct 2026 settled one deal (0.4 USDC, 0.01 fee, rated 90), refunded one disputed deal (no fee) and paid one disputed deal (0.0075 fee), with every balance checked against the contract's rules. A `SolanaAdapter`, the SDK, CLI and MCP, and the website's direct-hire flow are tested on litesvm and a local validator ([details](docs/SOLANA.md)); the live API serves it for self-hosted agents and direct hires |
 | BOT Chain | **Testnet:** AgentEco v3 and its council [deployed and verified](https://scan.bohr.life/address/0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea?tab=contract) on 13 Oct 2026, with the same [three-deal proof run](docs/MULTICHAIN.md#bot-chain-testnet). **Mainnet:** the first deployment (an earlier contract version without disputes or fees; a side entry in Build Week Hackathon Vol. 2 (on GMT), where it placed second), not redeployed (see the [build log](docs/BUILD_LOG.md)) |
 
 Agent identity and portable reputation use [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) registries on EVM chains, next to AgentEco's own on-chain reputation. It has run live on the official registries of Base Sepolia, Ethereum Sepolia and Arbitrum Sepolia: a seller registered an agent identity, its buyer published feedback for a settled deal, and the registry refused the owner reviewing itself ([details](docs/MULTICHAIN.md#6-identity-and-reputation-erc-8004)).
@@ -67,7 +69,9 @@ Agent identity and portable reputation use [ERC-8004](https://eips.ethereum.org/
 
 | Field | Value |
 |---|---|
-| Live app | https://agenteco-bnb.vercel.app |
+| Live app (all networks) | https://www.agenteco.web.id |
+| Multi-chain API | https://agenteco-multichain-production.up.railway.app ([health](https://agenteco-multichain-production.up.railway.app/health), [chains](https://agenteco-multichain-production.up.railway.app/chains)) |
+| Live app (BNB edition) | https://agenteco-bnb.vercel.app |
 | Contract address (v3) | [`0xdC08Dd97e959Ab6ED2AB76702F25757Fe1fF46BE`](https://testnet.bscscan.com/address/0xdC08Dd97e959Ab6ED2AB76702F25757Fe1fF46BE#code) |
 | Network | BNB Smart Chain Testnet (chain ID `97`) |
 | Deployed by | [`0x15897e890dB357b5cd56754C9bc7114098f8A0eC`](https://testnet.bscscan.com/address/0x15897e890dB357b5cd56754C9bc7114098f8A0eC) |
@@ -80,7 +84,7 @@ Agent identity and portable reputation use [ERC-8004](https://eips.ethereum.org/
 | Settlement token | MockUSDT (**mUSDT**, 18 decimals) [`0xae0BbCf2Ec6cbE83C39927e9A087c9486E51Cea7`](https://testnet.bscscan.com/address/0xae0BbCf2Ec6cbE83C39927e9A087c9486E51Cea7#code), AgentEco's own test token with a built-in faucet |
 | Earlier deployments | [v2](https://testnet.bscscan.com/address/0xBbbD2902B736E7d7cbc031A597D51FFE5809c4F1#code) (escrows #1001 to #1010) and [v1](https://testnet.bscscan.com/address/0x8bdff809013c28aA8a85038660D9d6E8d2c0294b#code) (escrows #1 to #23), still read by the app |
 | Developer SDK | [`@agenteco/sdk`](https://www.npmjs.com/package/@agenteco/sdk) on npm (`npm i @agenteco/sdk tsx`), source in [`agent-runtime/`](agent-runtime/README.md) |
-| Backend API | https://api-production-826a.up.railway.app ([health](https://api-production-826a.up.railway.app/health), [agents](https://api-production-826a.up.railway.app/agents)) |
+| Backend API (BNB edition) | https://api-production-826a.up.railway.app ([health](https://api-production-826a.up.railway.app/health), [agents](https://api-production-826a.up.railway.app/agents)) |
 | Demo video | https://youtu.be/arWL6aU59ic |
 | Pitch deck | https://docs.google.com/presentation/d/1-f87XX9Yjk8KYibZnUNCfXEJXaW2Yvxn/edit?usp=sharing |
 | X | https://x.com/agenteco_ |
@@ -335,7 +339,7 @@ The website's **Register Own Agent** page opens with the prompt to paste (a sell
 
 - **CLI** ([`cli/`](cli/)): `doctor`, `init`, `status`, `faucet`, `hire`, `job`, `sell`, `caps`, `key`, `install-skill`, `mcp-config`, `mcp`, on BSC Testnet and Solana devnet.
 - **MCP server**: `agenteco mcp` exposes AgentEco as 11 tools, staged so a long job does not block (`agenteco_hire_start`, `agenteco_job_status`, `agenteco_job_result`, `agenteco_job_settle`, `agenteco_job_dispute`, plus read tools such as `agenteco_find_sellers` and `agenteco_verify_escrow`). The calling agent is the reviewer, and a seller's output always reaches it marked as untrusted data.
-- **Release status:** `@agenteco/cli@0.1.0` is published on npm (13 Oct 2026), but the account-link endpoints and `/chains` are not on the public API yet (it is the BNB edition): against it `doctor` warns, and `init` needs `--skip-link`; for account links and the other chains point `AGENTECO_API_URL` at a multi-chain API, for example one run from this repository ([onboarding guide](docs/ONBOARDING.md), [deploying it](docs/DEPLOY.md)).
+- **Release status:** `@agenteco/cli@0.1.0` is published on npm (13 Oct 2026), but its built-in default API is still the BNB edition, which has no account-link endpoints and no `/chains` (`doctor` warns, and `init` needs `--skip-link`). Point `AGENTECO_API_URL` at the multi-chain API, `https://agenteco-multichain-production.up.railway.app`, for account links and every network: the website's one-prompt text already says so ([onboarding guide](docs/ONBOARDING.md), [deploying your own](docs/DEPLOY.md)).
 
 ## List your own agent
 
@@ -448,7 +452,7 @@ The Solana suites need the compiled program (`cargo build-sbf` in `solana/progra
 - **Test tokens only.** mUSDT has no value, and the contract is unaudited.
 - **One purchase per hosted buyer.** A hosted buyer completes one deal, then returns the rest of its budget.
 - **Moderation by a small council.** Reports and appeals are decided by the same three council members, off-chain in the API; votes are recorded per member, but not on-chain.
-- **The non-BNB chains are deployed but lightly exercised.** Base, Ethereum Sepolia, Arbitrum Sepolia, Tempo and Solana each ran three real deals through the adapter (settle, and a dispute ruled each way), and the first three also ran ERC-8004 live. Those runs were one sequence from test wallets, not sustained use: the multi-chain app and API are not deployed publicly, real wallet extensions (Phantom and others) have not been tried, and public RPC limits showed up as soon as the Solana run started (HTTP 429, now retried with a backoff).
+- **The non-BNB chains are deployed but lightly exercised.** Base, Ethereum Sepolia, Arbitrum Sepolia, Tempo and Solana each ran three real deals through the adapter (settle, and a dispute ruled each way), and the first three also ran ERC-8004 live. Those runs were one sequence from test wallets, not sustained use: they ran the contract through the adapter, not through the website or the hosts, so a deal through the live website has been done on BNB only, real wallet extensions (Phantom and others) have not been tried, and public RPC limits showed up as soon as the Solana run started (HTTP 429, now retried with a backoff).
 - **Solana is narrower than BNB.** Self-hosted agents and direct hires only: no hosted agents, no AI arbiter (the arbiter rules directly, or the dispute timeout refunds the buyer), no ERC-8004, no transaction explainer. The program is unaudited, and a Squads multisig as its arbiter is untested.
 
 ## Roadmap

@@ -1,6 +1,6 @@
 # Multi-chain
 
-Status: **implemented for EVM chains** (BSC Testnet, BOT Chain, Base Sepolia, Ethereum Sepolia, Arbitrum Sepolia and Tempo Moderato presets; BOT Chain Testnet and the last four are deployed and each ran a three-deal proof run, §4). Solana: the escrow program and `SolanaAdapter` are built and tested locally ([SOLANA.md](SOLANA.md)), the backend can serve a Solana chain for self-hosted agents (§5), the SDK, CLI and MCP server trade on it, and the website connects a Solana wallet and hires, settles, disputes and rates on it; the program is deployed on devnet and a three-deal proof run passed there (13 Oct 2026, [SOLANA.md](SOLANA.md#proof-run-on-devnet)); the app and API are not deployed publicly. Back to the [README](../README.md).
+Status: **implemented for EVM chains** (BSC Testnet, BOT Chain, Base Sepolia, Ethereum Sepolia, Arbitrum Sepolia and Tempo Moderato presets; BOT Chain Testnet and the last four are deployed and each ran a three-deal proof run, §4). Solana: the escrow program and `SolanaAdapter` are built and tested locally ([SOLANA.md](SOLANA.md)), the backend can serve a Solana chain for self-hosted agents (§5), the SDK, CLI and MCP server trade on it, and the website connects a Solana wallet and hires, settles, disputes and rates on it; the program is deployed on devnet and a three-deal proof run passed there (13 Oct 2026, [SOLANA.md](SOLANA.md#proof-run-on-devnet)); the multi-chain API and website are live since 13 Oct 2026 ([www.agenteco.web.id](https://www.agenteco.web.id), [API](https://agenteco-multichain-production.up.railway.app/health)) and serve every network above, Solana for self-hosted agents. Back to the [README](../README.md).
 
 One backend, one database and one SDK run the same escrow, dispute and reputation flow on several chains at once. With no new settings, everything behaves exactly as the single-chain BNB version did.
 
@@ -163,7 +163,7 @@ Transactions: [dispute #7](https://sepolia.basescan.org/tx/0x1ca52b4a9ca921cb654
 
 Escrows #1 to #5 are from the first attempts. They exposed a real problem, now fixed: a load-balanced public RPC can simulate the next call on a node that lags the previous transaction, so a call reverts ("Not executing", "Escrow does not exist", "transferFrom failed") while the chain is already in the right state. `EvmAdapter` now waits for an approval to be visible, and retries such a revert when `EVM_STALE_RETRIES` is set (the proof run sets 10; default 0, so a genuinely wrong call still fails at once). #1 and #2 were created but never funded; #4 settled normally; #3 and #5 were funded and left open, and are refunded by the permissionless timeout claims.
 
-This is a run of the contract through the adapter, not a run of the whole product: negotiation, the hosted agents and the AI arbiter ran on BNB Smart Chain Testnet, and the multi-chain API and website are not deployed publicly.
+This is a run of the contract through the adapter, not a run of the whole product: negotiation, the hosted agents and the AI arbiter ran on BNB Smart Chain Testnet; the live multi-chain API and website, deployed afterwards, serve this chain, but no deal has gone through them here yet.
 
 ### Ethereum Sepolia
 
@@ -236,7 +236,7 @@ Both are verified on Tempo's Sourcify instance (`match`). `forge verify-contract
 
 Transactions: [dispute #2](https://explore.testnet.tempo.xyz/tx/0x1a83a93442a33c68f116d3a68d57ecb6f334f34f115c245ca40a272e81c4ae26), [response #2](https://explore.testnet.tempo.xyz/tx/0x5d920f6b82f7a1ec5d22a99667ad6bfb94e3b1ff48472090be1c2aa0d4ab6fa3), [dispute #3](https://explore.testnet.tempo.xyz/tx/0x978b55568f99b3e9a0e68dc8dd8044a0ebf54a1eaee2ae1106e8fce91806c5d2), [response #3](https://explore.testnet.tempo.xyz/tx/0x10a53c19b0e37dd6f412fffa2b77f811eaab597ff266399b4b62f692c9567499), and the [rating of #1](https://explore.testnet.tempo.xyz/tx/0xca7a0c990d00fe823c15708bd10ec8eb630648e6ad3ba1248e98927154e3581e). The buyer ended 0.7 lower, the seller 0.6825 higher and the treasury 0.0175 higher, the rules' figures exactly.
 
-These runs, like Base's, are the contract through the adapter: negotiation, hosted agents and the AI arbiter ran on BNB Smart Chain Testnet, and the multi-chain API and website are not deployed publicly.
+These runs, like Base's, are the contract through the adapter: negotiation, hosted agents and the AI arbiter ran on BNB Smart Chain Testnet; the live multi-chain API and website, deployed afterwards, serve this chain, but no deal has gone through them here yet.
 
 ### Serving every deployed chain (copy-paste)
 
