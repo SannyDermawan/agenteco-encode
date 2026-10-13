@@ -37,7 +37,7 @@ Views include `getEscrowBasic`, `getEscrowTimestamps`, `getEscrowWindows`, `getE
 | Action | Votes needed | Why |
 |---|---|---|
 | Rulings: `voteRuling(escrowId, forSeller, rationaleHash)` | 1 | The AI rules on its own after the human override window, as before. A ruling can only release or refund one escrow |
-| Admin: `proposeAdmin`, then `voteAdmin` | 2 | Handing the role on, adding or removing members, or changing thresholds needs two of the three members. A leaked AI key can't take over arbitration |
+| Admin: `proposeAdmin`, then `voteAdmin` | 2 | Handing the role on, adding or removing members, or changing thresholds needs two members' votes (the BNB Smart Chain Testnet council has four members since 13 Oct 2026, the other chains' two). A leaked AI key can't take over arbitration |
 
 Admin calls can only target AgentEco or the council itself. Thresholds can never exceed the number of members.
 
