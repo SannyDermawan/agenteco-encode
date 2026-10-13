@@ -9,7 +9,11 @@ import { wagmiConfig } from '@/lib/web3/config'
 import { appChain } from '@/lib/web3/chain'
 import { MOCK_USDT_ABI, USDT_ADDRESS } from '@/lib/web3/abi'
 import { useUsdtBalance, useUsdtDecimals } from '@/lib/web3/hooks'
-import { GAS_FAUCETS, MIN_NATIVE_BALANCE, NATIVE_SYMBOL, TOKEN_HAS_FAUCET, TOKEN_SYMBOL } from '@/lib/web3/network'
+import { GAS_FAUCETS, MIN_NATIVE_BALANCE, NATIVE_SYMBOL, NO_GAS_TOKEN, TOKEN_HAS_FAUCET, TOKEN_SYMBOL } from '@/lib/web3/network'
+
+/** The first faucet that hands out the gas token / the settlement token (a faucet with no tag gives both). */
+const GAS_FAUCET = GAS_FAUCETS.find((f) => (f.provides ?? 'both') !== 'token')
+const TOKEN_FAUCET = GAS_FAUCETS.find((f) => (f.provides ?? 'both') !== 'gas')
 
 /** Below this much of the settlement token the strip offers the faucet. */
 const LOW_TOKEN_BALANCE = 5
@@ -55,7 +59,7 @@ export function FaucetStrip() {
     return () => clearInterval(id)
   }, [])
 
-  if (!TOKEN_HAS_FAUCET || dismissed) return null
+  if (dismissed) return null
 
   function dismiss() {
     setDismissed(true)
@@ -86,9 +90,9 @@ export function FaucetStrip() {
     message = (
       <>
         <span className="font-medium text-[#C9CBFF]">This is a testnet.</span> 1. Connect your wallet.{' '}
-        {onDashboard
-          ? `2. Claim free test tokens (${NATIVE_SYMBOL} for gas + 100 ${TOKEN_SYMBOL}) in the card below.`
-          : `2. Claim free test tokens (${NATIVE_SYMBOL} for gas + 100 ${TOKEN_SYMBOL}) on your Dashboard.`}
+        {TOKEN_HAS_FAUCET
+          ? `2. Claim free test tokens (${NATIVE_SYMBOL} for gas + 100 ${TOKEN_SYMBOL}) ${onDashboard ? 'in the card below' : 'on your Dashboard'}.`
+          : `2. Get free test tokens (${NO_GAS_TOKEN ? `${TOKEN_SYMBOL} for fees and payments` : `${NATIVE_SYMBOL} for gas + ${TOKEN_SYMBOL} to hire agents`}) from the faucets ${onDashboard ? 'in the card below' : 'on your Dashboard'}.`}
       </>
     )
     if (!onDashboard) {
@@ -105,23 +109,41 @@ export function FaucetStrip() {
         {isSwitching ? 'Switching…' : `Switch to ${appChain.name}`}
       </button>
     )
-  } else if (native.data === undefined || token.data === undefined || decimals === undefined) {
+  } else if ((!NO_GAS_TOKEN && native.data === undefined) || token.data === undefined || decimals === undefined) {
     return null
-  } else if (native.data.value < parseEther(String(MIN_NATIVE_BALANCE))) {
+  } else if (!NO_GAS_TOKEN && native.data && native.data.value < parseEther(String(MIN_NATIVE_BALANCE))) {
     message = (
       <>
         <span className="font-medium text-[#C9CBFF]">You need {NATIVE_SYMBOL} for gas</span> before you can do anything on a
-        testnet. Get some free from a faucet, then claim {TOKEN_SYMBOL} here.
+        testnet. Get some free from a faucet, then {TOKEN_HAS_FAUCET ? `claim ${TOKEN_SYMBOL} here` : `get ${TOKEN_SYMBOL} from its faucet`}.
       </>
     )
-    if (GAS_FAUCETS[0]) {
+    if (GAS_FAUCET) {
       action = (
-        <a href={GAS_FAUCETS[0].url} target="_blank" rel="noopener noreferrer" className={BUTTON}>
+        <a href={GAS_FAUCET.url} target="_blank" rel="noopener noreferrer" className={BUTTON}>
           Get {NATIVE_SYMBOL} ↗
         </a>
       )
     }
-  } else if (token.data < parseUnits(String(LOW_TOKEN_BALANCE), decimals)) {
+  } else if (!TOKEN_HAS_FAUCET && token.data < parseUnits(String(LOW_TOKEN_BALANCE), decimals)) {
+    // No faucet contract of ours here: the settlement token comes from the chain's own faucet.
+    message = (
+      <>
+        <span className="font-medium text-[#C9CBFF]">Get free test {TOKEN_SYMBOL}.</span> You hold{' '}
+        {Number(formatUnits(token.data, decimals)).toFixed(2)} {TOKEN_SYMBOL}. You pay agents with it on {appChain.name}
+        {NO_GAS_TOKEN ? ', and it also pays the network fees' : ''}.
+      </>
+    )
+    action = TOKEN_FAUCET ? (
+      <a href={TOKEN_FAUCET.url} target="_blank" rel="noopener noreferrer" className={BUTTON}>
+        Get {TOKEN_SYMBOL} ↗
+      </a>
+    ) : (
+      <Link href="/app/dashboard" className={BUTTON}>
+        Open Dashboard →
+      </Link>
+    )
+  } else if (TOKEN_HAS_FAUCET && token.data < parseUnits(String(LOW_TOKEN_BALANCE), decimals)) {
     const nextClaimAtMs = nextClaim.data ? Number(nextClaim.data) * 1000 : 0
     if (nextClaimAtMs > now) return null // already claimed today; nothing the strip can do
     message = (

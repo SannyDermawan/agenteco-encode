@@ -41,6 +41,8 @@ export type NetworkFamily = 'evm' | 'solana'
 export interface FaucetLink {
   label: string
   url: string
+  /** What the faucet hands out: the native gas token, the settlement token, or both (the default). */
+  provides?: 'gas' | 'token' | 'both'
 }
 
 interface NetworkPreset {
@@ -63,6 +65,8 @@ interface NetworkPreset {
   tokenHasFaucet: boolean
   /** Where users get native gas tokens (and, without a token faucet, test tokens) for this network. */
   gasFaucets: FaucetLink[]
+  /** True when the chain has no gas token of its own: fees are paid in test stablecoins (Tempo). */
+  noGasToken?: boolean
   /** Multicall3, when deployed on this chain — batches contract reads. */
   multicall3?: Address
   /** Largest block span per eth_getLogs call the default RPC accepts (with margin). */
@@ -99,8 +103,8 @@ const PRESETS: Record<EvmNetworkName, NetworkPreset> = {
     tokenSymbol: 'mUSDT',
     tokenHasFaucet: true,
     gasFaucets: [
-      { label: 'QuickNode BNB testnet faucet', url: 'https://faucet.quicknode.com/binance-smart-chain/bnb-testnet' },
-      { label: 'BNB Chain Telegram bot (@bnbchain_official_bot)', url: 'https://t.me/bnbchain_official_bot' },
+      { label: 'QuickNode BNB testnet faucet', url: 'https://faucet.quicknode.com/binance-smart-chain/bnb-testnet', provides: 'gas' },
+      { label: 'BNB Chain Telegram bot (@bnbchain_official_bot)', url: 'https://t.me/bnbchain_official_bot', provides: 'gas' },
     ],
     // BSC Testnet gas is ~0.1–3 gwei; one job costs well under 0.001 tBNB.
     agentGasTopup: '0.005',
@@ -173,8 +177,8 @@ const PRESETS: Record<EvmNetworkName, NetworkPreset> = {
     tokenSymbol: 'USDC',
     tokenHasFaucet: false,
     gasFaucets: [
-      { label: 'Coinbase Developer Platform faucet (Base Sepolia ETH)', url: 'https://portal.cdp.coinbase.com/products/faucet' },
-      { label: 'Circle faucet (test USDC on Base Sepolia)', url: 'https://faucet.circle.com' },
+      { label: 'Coinbase Developer Platform faucet (Base Sepolia ETH)', url: 'https://portal.cdp.coinbase.com/products/faucet', provides: 'gas' },
+      { label: 'Circle faucet (test USDC on Base Sepolia)', url: 'https://faucet.circle.com', provides: 'token' },
     ],
     // Base Sepolia gas is a fraction of a gwei.
     agentGasTopup: '0.002',
@@ -198,8 +202,8 @@ const PRESETS: Record<EvmNetworkName, NetworkPreset> = {
     tokenSymbol: 'USDC',
     tokenHasFaucet: false,
     gasFaucets: [
-      { label: 'Google Cloud Web3 faucet (Sepolia ETH)', url: 'https://cloud.google.com/application/web3/faucet/ethereum/sepolia' },
-      { label: 'Circle faucet (test USDC on Ethereum Sepolia)', url: 'https://faucet.circle.com' },
+      { label: 'Google Cloud Web3 faucet (Sepolia ETH)', url: 'https://cloud.google.com/application/web3/faucet/ethereum/sepolia', provides: 'gas' },
+      { label: 'Circle faucet (test USDC on Ethereum Sepolia)', url: 'https://faucet.circle.com', provides: 'token' },
     ],
     agentGasTopup: '0.005',
     logHistory: BigInt(50000),
@@ -223,8 +227,8 @@ const PRESETS: Record<EvmNetworkName, NetworkPreset> = {
     tokenSymbol: 'USDC',
     tokenHasFaucet: false,
     gasFaucets: [
-      { label: 'Arbitrum docs: faucets and the Ethereum Sepolia bridge', url: 'https://docs.arbitrum.io/build-decentralized-apps/reference/node-providers#faucets' },
-      { label: 'Circle faucet (test USDC on Arbitrum Sepolia)', url: 'https://faucet.circle.com' },
+      { label: 'Arbitrum docs: faucets and the Ethereum Sepolia bridge', url: 'https://docs.arbitrum.io/build-decentralized-apps/reference/node-providers#faucets', provides: 'gas' },
+      { label: 'Circle faucet (test USDC on Arbitrum Sepolia)', url: 'https://faucet.circle.com', provides: 'token' },
     ],
     agentGasTopup: '0.001',
     logHistory: null,
@@ -241,6 +245,7 @@ const PRESETS: Record<EvmNetworkName, NetworkPreset> = {
     explorerName: 'Tempo Explorer',
     // No native gas token: fees are paid in a TIP-20 stablecoin, so a wallet needs test stablecoins and nothing else.
     nativeSymbol: 'USD',
+    noGasToken: true,
     testnet: true,
     // AlphaUSD, a TIP-20 test stablecoin (6 decimals); the fee token is pathUSD (docs/MULTICHAIN.md).
     usdtAddress: '0x20c0000000000000000000000000000000000001',
@@ -404,6 +409,7 @@ export interface NetworkConfig {
   tokenSymbol: string
   tokenHasFaucet: boolean
   gasFaucets: FaucetLink[]
+  noGasToken: boolean
   agentGasTopup: string
   agentEcoAddress: Address
   usdtAddress: Address
@@ -473,6 +479,7 @@ export function networkConfig(name: EvmNetworkName): NetworkConfig {
     tokenSymbol: preset.tokenSymbol,
     tokenHasFaucet: preset.tokenHasFaucet,
     gasFaucets: preset.gasFaucets,
+    noGasToken: !!preset.noGasToken,
     agentGasTopup: clean(env.agentGasTopup) ?? preset.agentGasTopup,
     agentEcoAddress: address('AGENT_ECO_ADDRESS', env.agentEco, preset.deployment?.agentEcoAddress),
     usdtAddress: address('USDT_ADDRESS', env.usdt, preset.usdtAddress),
@@ -510,6 +517,7 @@ export interface SolanaNetworkConfig {
   tokenSymbol: string
   tokenHasFaucet: false
   gasFaucets: FaucetLink[]
+  noGasToken: false
   /** The escrow program (the "contract"). */
   programId: string
   /** The settlement token's mint. */
@@ -537,8 +545,8 @@ const SOLANA_ENV: Record<SolanaNetworkName, DeploymentEnv & { program?: string; 
 const WALLET_CHAIN: Record<SolanaNetworkName, string> = { 'solana-devnet': 'solana:devnet' }
 const SOLANA_FAUCETS: Record<SolanaNetworkName, FaucetLink[]> = {
   'solana-devnet': [
-    { label: 'Solana faucet (devnet SOL)', url: 'https://faucet.solana.com' },
-    { label: 'Circle faucet (devnet USDC — choose Solana Devnet)', url: 'https://faucet.circle.com' },
+    { label: 'Solana faucet (devnet SOL)', url: 'https://faucet.solana.com', provides: 'gas' },
+    { label: 'Circle faucet (devnet USDC — choose Solana Devnet)', url: 'https://faucet.circle.com', provides: 'token' },
   ],
 }
 const SOLANA_ADDRESS = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
@@ -576,6 +584,7 @@ export function solanaNetworkConfig(name: SolanaNetworkName): SolanaNetworkConfi
     tokenSymbol: preset.tokenSymbol,
     tokenHasFaucet: false,
     gasFaucets: SOLANA_FAUCETS[name],
+    noGasToken: false,
     programId,
     mint: base58('TOKEN_MINT', env.mint, preset.defaultMint),
     firstEscrowId: BigInt(first),
@@ -659,6 +668,8 @@ export const NATIVE_SYMBOL = selected.nativeSymbol
 export const TOKEN_SYMBOL = selected.tokenSymbol
 export const TOKEN_HAS_FAUCET = selected.tokenHasFaucet
 export const GAS_FAUCETS = selected.gasFaucets
+/** True on a chain with no gas token of its own (Tempo): the wallet pays fees in test stablecoins. */
+export const NO_GAS_TOKEN = selected.noGasToken
 /** The escrow contract (EVM) or program (Solana) of the selected network. */
 export const CONTRACT_ADDRESS = selected.contractAddress
 
