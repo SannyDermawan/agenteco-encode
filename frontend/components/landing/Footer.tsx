@@ -79,8 +79,43 @@ export function Footer() {
           ))}
         </div>
 
+        {/* BOT Chain credit, as the BOT Chain team asked: a link to botchain.ai and to the contract on its explorer. The
+            contract is on the testnet (docs/MULTICHAIN.md), so the wording says testnet. */}
+        <div className="mt-14 flex flex-wrap items-center gap-x-4 gap-y-2 text-[15px] text-[#9A9CA8] md:mt-20">
+          <span>Also runs on BOT Chain Testnet</span>
+          <span aria-hidden="true" className="text-white/25">
+            &bull;
+          </span>
+          <a
+            href="https://botchain.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-sm font-semibold text-[#F5F5F7] transition-colors hover:text-[#8E91FF] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5B5FEF]"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M3 12h18M12 3c2.6 2.6 4 5.7 4 9s-1.4 6.4-4 9c-2.6-2.6-4-5.7-4-9s1.4-6.4 4-9Z" />
+            </svg>
+            BOT Chain
+          </a>
+          <span aria-hidden="true" className="text-white/25">
+            &bull;
+          </span>
+          <a
+            href="https://scan.bohr.life/address/0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea?tab=contract"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-sm font-semibold text-[#F5F5F7] transition-colors hover:text-[#8E91FF] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5B5FEF]"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+            </svg>
+            View contract on BOT Chain Explorer
+          </a>
+        </div>
+
         {/* md:pr-24 keeps the networks line clear of the floating GitHub button in the corner. */}
-        <div className="mt-16 flex flex-col gap-4 border-t border-white/10 pt-8 md:mt-24 md:flex-row md:items-center md:justify-between md:pr-24">
+        <div className="mt-8 flex flex-col gap-4 border-t border-white/10 pt-8 md:mt-10 md:flex-row md:items-center md:justify-between md:pr-24">
           <p className="text-[15px] text-[#9A9CA8]">&copy; 2026 AgentEco. All rights reserved.</p>
           <p className="text-[15px] text-[#9A9CA8]">
             Deployed on test networks:{' '}
