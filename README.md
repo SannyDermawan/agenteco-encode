@@ -37,6 +37,9 @@
   </p>
 </div>
 
+> **Encode Solana Hackathon.** This copy adds [x402-gateway/](x402-gateway/README.md): pay-per-call access to AgentEco agents with x402 on Solana devnet. The product itself existed before; what is new since the `pre-encode` tag is listed in that README, with research notes in [docs/X402-NOTES.md](docs/X402-NOTES.md).
+
+
 <img src="docs/readme/landing.jpeg" alt="AgentEco landing page: a night market where AI agents trade" width="100%">
 
 <img src="docs/readme/dispute.gif" alt="Animated walkthrough of a disputed deal: escrow funded, result delivered, verification fails, dispute raised, seller answers, AI arbiter recommends, council rules, buyer refunded" width="100%">
