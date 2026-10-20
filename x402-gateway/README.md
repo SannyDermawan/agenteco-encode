@@ -59,7 +59,7 @@ Environment (names only): `PORT`, `PAY_TO_ADDRESS`, `X402_NETWORK`, `X402_FACILI
 ## Honest status
 
 - Everything here is devnet. No real money, no real users.
-- The gateway logic is tested against a fake facilitator that speaks the documented HTTP interface. **A full payment on devnet with a funded wallet and the public facilitator has not been run yet**; `npm run pay-demo` does it and prints the settlement receipt, which is the proof to put in the submission.
+- The gateway logic is tested against a fake facilitator that speaks the documented HTTP interface, and one full payment has been run on Solana devnet through the public facilitator (20 Oct 2026, `npm run pay-demo`, status 200, `success: true`): [transaction](https://explorer.solana.com/tx/3eCTKogSv6QPk1V99Mmxu6RUywc7wRns9iPKW5meMWKDvQPky1ukbGvkFMqqmKiQTgw1JEcLTSbzbdA6b3gQU3vz?cluster=devnet).
 - The ledger is in memory by default (`LEDGER_FILE` keeps it between restarts).
 
 License: MIT.

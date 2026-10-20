@@ -25,4 +25,4 @@ For people, the website's Solana path signs in once with a wallet message (no tr
 
 ## Honest notes
 
-Devnet only, no real money, no real users. The gateway logic is tested against a fake facilitator; the live devnet payment is run with `npm run pay-demo` and its receipt is the proof. Escalating a gateway call to an AgentEco escrow job is designed, not built.
+Devnet only, no real money, no real users. The gateway logic is tested against a fake facilitator, and one full payment has been run on Solana devnet through the public facilitator (20 Oct 2026, `npm run pay-demo`, status 200, `success: true`): [transaction](https://explorer.solana.com/tx/3eCTKogSv6QPk1V99Mmxu6RUywc7wRns9iPKW5meMWKDvQPky1ukbGvkFMqqmKiQTgw1JEcLTSbzbdA6b3gQU3vz?cluster=devnet). Escalating a gateway call to an AgentEco escrow job is designed, not built.

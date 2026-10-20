@@ -69,7 +69,7 @@ SVM_PRIVATE_KEY=<base58 devnet key> npm run pay-demo     # a buyer agent that pa
 ## Honest status
 
 - Devnet only. No real money, no real users.
-- The gateway logic is tested against a fake facilitator. **A full payment on devnet with a funded wallet and the public facilitator had not been run at the time of this commit.** `npm run pay-demo` runs it and prints the settlement receipt.
+- The gateway logic is tested against a fake facilitator, and one full payment has been run on Solana devnet through the public facilitator (20 Oct 2026, `npm run pay-demo`, status 200, `success: true`): [transaction](https://explorer.solana.com/tx/3eCTKogSv6QPk1V99Mmxu6RUywc7wRns9iPKW5meMWKDvQPky1ukbGvkFMqqmKiQTgw1JEcLTSbzbdA6b3gQU3vz?cluster=devnet).
 - The ledger is in memory by default; `LEDGER_FILE` keeps it across restarts.
 - The website's Solana read session (sign-in with a Solana wallet, no transaction) already existed before this hackathon and is not new work.
 
