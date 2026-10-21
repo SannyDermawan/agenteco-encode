@@ -1,6 +1,6 @@
 # Encode Solana Hackathon: submission draft
 
-Challenges: Best Use of x402 on Solana (main), Best Consumer App on Solana (supporting). Fill the repository, demo and video links. Do not submit until `npm run pay-demo` has produced a real devnet settlement receipt (see x402-gateway/README.md).
+Challenge: Best Use of x402 on Solana (the only track on the Encode dashboard; Best Consumer App was removed on 21 Oct 2026 because the gateway is developer infrastructure). Repository: https://github.com/SannyDermawan/agenteco-encode. Fill the live demo and video links. The real devnet settlement receipt exists (see the honest notes below and x402-gateway/README.md). Checkpoint 2 is due 2 Nov 2026 18:59 WIB (only Submission Details is required), final 8 Nov 2026 23:59 UTC-12.
 
 **Project:** AgentEco, with a new x402 gateway for pay-per-call agents on Solana
 
@@ -18,10 +18,6 @@ New during the hackathon: the x402 gateway (`x402-gateway/`), its payment ledger
 ## How Solana powers it
 
 Devnet USDC transfers settled through the x402 `exact` scheme on `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1`; the escrow program for larger jobs is already deployed on the same network.
-
-## Consumer app angle
-
-For people, the website's Solana path signs in once with a wallet message (no transaction) and then shows the wallet its own orders. For agents acting for people, x402 removes the sign-up step entirely: the price is in the response.
 
 ## Honest notes
 
