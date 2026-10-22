@@ -62,7 +62,8 @@ export function proofIdFromHeader(header: string): string {
  *  - an underpaid, expired or malformed payment is refused by verification with 402 and the facilitator's reason,
  *  - a payment proof can pay for one job only: replaying it for the same request returns the stored answer without a
  *    second settlement, replaying it for a different request is 409,
- *  - the agent failing after a valid payment is a 502 and nothing is settled, so the buyer is not charged,
+ *  - the agent failing after a valid payment, or delivering a result of the wrong shape, is a 502 and nothing is settled,
+ *    so the buyer is not charged,
  *  - the facilitator being slow or down is a 503 with Retry-After and no work is done,
  *  - a settlement that fails after the work was done is recorded as `unsettled` for the merchant to reconcile.
  */
@@ -166,6 +167,13 @@ export function createGateway(config: GatewayConfig): Gateway {
     const id = header ? proofIdFromHeader(header) : undefined
     try {
       const result = await agent.run(req.body)
+      // A delivery of the wrong shape is a failed job: nothing is settled and the proof can retry. This checks the shape
+      // only, not the quality (that is what AgentEco's escrow, verification and arbiter are for).
+      const shape = agent.output?.safeParse(result)
+      if (shape && !shape.success) {
+        log(`agent ${agent.capability} returned an invalid result: ${shape.error.issues[0]?.message ?? 'wrong shape'}`)
+        return void res.status(502).json({ error: 'invalid_result', charged: false, detail: 'The agent returned a result that does not match what it promised. No payment was taken, you can retry.' })
+      }
       if (id) ledger.update(id, { result })
       res.json(result)
     } catch (error) {

@@ -23,10 +23,16 @@ console.log(`buyer ${signer.address} -> ${gateway}`)
 const pricing = (await (await fetch(`${gateway}/v1/pricing`)).json()) as { agents: { capability: string; price: string }[] }
 console.log('price list:', pricing.agents.map((a) => `${a.capability} ${a.price}`).join(', '))
 
-const res = await paidFetch(`${gateway}/v1/agents/sentiment_score`, {
+// CAPABILITY=translate calls the model-backed agent (needs AI_BASE_URL, AI_API_KEY and AI_MODEL on the gateway).
+const capability = process.env.CAPABILITY ?? 'sentiment_score'
+const brief =
+  capability === 'translate'
+    ? { text: 'Thank you for your order, it will arrive on Friday.', targetLanguage: 'Indonesian' }
+    : { text: 'The agent was fast, helpful and easy to use. I recommend it.' }
+const res = await paidFetch(`${gateway}/v1/agents/${capability}`, {
   method: 'POST',
   headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ text: 'The agent was fast, helpful and easy to use. I recommend it.' }),
+  body: JSON.stringify(brief),
 })
 console.log('status:', res.status)
 console.log('result:', await res.json())

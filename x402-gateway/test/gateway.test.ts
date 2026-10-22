@@ -151,6 +151,43 @@ test('the agent failing after a valid payment charges nothing and the same proof
   }
 })
 
+test('a delivery of the wrong shape charges nothing, and a good one is charged', async () => {
+  let bad = true
+  const agent = { ...counting(async () => (bad ? { score: 'high' } : { score: 0.5, label: 'positive', evidence: ['great'] })), output: z.object({ score: z.number(), label: z.string(), evidence: z.array(z.string()) }) }
+  const h = await startGateway({}, [agent])
+  try {
+    const headers = await payFor(h.base, PATH, BRIEF)
+    const wrong = await post(h.base, PATH, BRIEF, headers)
+    assert.equal(wrong.status, 502)
+    const body = (await wrong.json()) as { error: string; charged: boolean }
+    assert.deepEqual([body.error, body.charged], ['invalid_result', false])
+    assert.equal(h.facilitator.calls.settle, 0, 'nothing was settled for a result of the wrong shape')
+    bad = false
+    const ok = await post(h.base, PATH, BRIEF, headers)
+    assert.equal(ok.status, 200)
+    assert.equal(h.facilitator.calls.settle, 1)
+  } finally {
+    await h.close()
+  }
+})
+
+test('the model-backed translate agent calls the configured endpoint and its answer is shape-checked', async () => {
+  const { translateAgent } = await import('../src/agents.ts')
+  const answer = { choices: [{ message: { content: '{"translatedText":"Terima kasih","targetLanguage":"Indonesian"}' } }] }
+  let seen: { url: string; body: { model: string; messages: { content: string }[] } } | undefined
+  const fake = (async (url: string, init: { body: string }) => {
+    seen = { url, body: JSON.parse(init.body) }
+    return new Response(JSON.stringify(answer), { status: 200 })
+  }) as unknown as typeof fetch
+  const agent = translateAgent({ baseUrl: 'https://models.example/v1/', apiKey: 'k', model: 'm' }, fake)
+  const out = await agent.run({ text: 'Thank you', targetLanguage: 'Indonesian' })
+  assert.equal(seen?.url, 'https://models.example/v1/chat/completions')
+  assert.equal(seen?.body.model, 'm')
+  assert.ok(seen?.body.messages[1]?.content.includes('Thank you'))
+  assert.equal(agent.output?.safeParse(out).success, true)
+  assert.equal(agent.output?.safeParse({ translatedText: '', targetLanguage: 'id' }).success, false)
+})
+
 test('a facilitator that is down or too slow gives 503 with Retry-After and no work', async () => {
   const agent = counting()
   const h = await startGateway({ facilitatorTimeoutMs: 300 }, [agent])
