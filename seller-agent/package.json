@@ -9,6 +9,8 @@
     "start": "tsx --env-file=.env src/index.ts",
     "typecheck": "tsc --noEmit -p .",
     "sentiment": "tsx --env-file=.env src/sentiment.ts",
+    "sentiment:solana": "tsx --env-file=.env src/sentiment-solana.ts",
+    "new-key": "tsx scripts/new-key.ts",
     "translator": "tsx --env-file=.env src/translator.ts"
   },
   "dependencies": {
