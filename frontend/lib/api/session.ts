@@ -1,6 +1,6 @@
 import { getAddress } from 'viem'
 import { createSiweMessage, generateSiweNonce } from 'viem/siwe'
-import { READ_SESSION_HEADER, READ_SESSION_MAX_AGE_MS, READ_SESSION_STATEMENT, createSolanaSessionMessage } from '@shared/session'
+import { READ_SESSION_HEADER, READ_SESSION_MAX_AGE_MS, READ_SESSION_STATEMENT, createSolanaSessionMessage, solanaChainLabel } from '@shared/session'
 import { normalizeWallet, walletFamily } from '@shared/wallets'
 import { appChain } from '../web3/chain'
 import { CHAIN_KEY } from '../web3/network'
@@ -135,18 +135,31 @@ async function requestSignature(signer: WalletSigner): Promise<void> {
   const issuedAt = new Date()
   const expirationTime = new Date(issuedAt.getTime() + READ_SESSION_MAX_AGE_MS)
   if (walletFamily(signer.address) === 'solana') {
-    const message = createSolanaSessionMessage({
-      domain: window.location.host,
-      address: signer.address,
-      statement: READ_SESSION_STATEMENT,
-      uri: window.location.origin,
-      chainId: CHAIN_KEY,
-      nonce: solanaNonce(),
-      issuedAt,
-      expirationTime,
-    })
-    const signature = await signer.signMessageAsync({ message })
-    save(signer.address, { header: btoa(JSON.stringify({ family: 'solana', message, signature })), expiresAt: expirationTime.getTime() })
+    const sign = async (chainId: string) => {
+      const message = createSolanaSessionMessage({
+        domain: window.location.host,
+        address: signer.address,
+        statement: READ_SESSION_STATEMENT,
+        uri: window.location.origin,
+        chainId,
+        nonce: solanaNonce(),
+        issuedAt,
+        expirationTime,
+      })
+      return { message, signature: await signer.signMessageAsync({ message }) }
+    }
+    let signed
+    try {
+      signed = await sign(CHAIN_KEY)
+    } catch (error) {
+      // Phantom refuses to show a message whose Chain ID is a full CAIP-2 id and says so at once, with no prompt.
+      // Ask again with the cluster name (`devnet`), which the API also reads. Any other error (the person
+      // rejecting the prompt, say) is not retried.
+      const label = solanaChainLabel(CHAIN_KEY)
+      if (label === CHAIN_KEY || !/invalid formatting|cannot be shown/i.test(error instanceof Error ? error.message : String(error))) throw error
+      signed = await sign(label)
+    }
+    save(signer.address, { header: btoa(JSON.stringify({ family: 'solana', message: signed.message, signature: signed.signature })), expiresAt: expirationTime.getTime() })
     return
   }
   const message = createSiweMessage({

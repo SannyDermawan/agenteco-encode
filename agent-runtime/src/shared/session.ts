@@ -45,7 +45,26 @@ export interface SolanaSessionFields {
   expirationTime: Date
 }
 
-/** The text the wallet signs. Parsing it again (parseSolanaSessionMessage) gives exactly these fields. */
+/**
+ * Phantom (and wallets that follow its Sign-In With Solana rules) refuse to show a message whose Chain ID is a full
+ * CAIP-2 id ("signature request cannot be shown due to invalid formatting"); they accept the cluster name. The API reads
+ * both forms and treats a cluster name as the CAIP-2 id of that cluster.
+ */
+const CLUSTER_LABELS: Record<string, string> = {
+  'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp': 'mainnet',
+  'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1': 'devnet',
+}
+const CLUSTER_IDS: Record<string, string> = Object.fromEntries(Object.entries(CLUSTER_LABELS).map(([id, label]) => [label, id]))
+
+/** The Chain ID wallets like Phantom accept for a CAIP-2 id: `devnet` or `mainnet`; any other id is returned unchanged. */
+export function solanaChainLabel(chainId: string): string {
+  return CLUSTER_LABELS[chainId] ?? chainId
+}
+
+/**
+ * The text the wallet signs. Parsing it again (parseSolanaSessionMessage) gives exactly these fields.
+ * `chainId` is written as given: a CAIP-2 id, or the cluster name from solanaChainLabel.
+ */
 export function createSolanaSessionMessage(f: SolanaSessionFields): string {
   return [
     `${f.domain} wants you to sign in with your Solana account:`,
@@ -65,14 +84,18 @@ export function createSolanaSessionMessage(f: SolanaSessionFields): string {
 /**
  * The fields of a Solana session message, or null when it is not exactly what createSolanaSessionMessage
  * writes, a message with anything extra or reordered is refused, so there is one way to say each thing.
+ * The Chain ID may be a CAIP-2 id or the cluster name `devnet` / `mainnet` (see solanaChainLabel); the returned
+ * `chainId` is always the CAIP-2 id.
  */
 export function parseSolanaSessionMessage(text: string): SolanaSessionFields | null {
   const m =
-    /^(\S+) wants you to sign in with your Solana account:\n([1-9A-HJ-NP-Za-km-z]{32,44})\n\n(.+)\n\nURI: (\S+)\nVersion: 1\nChain ID: (solana:[1-9A-HJ-NP-Za-km-z]{32})\nNonce: ([A-Za-z0-9]{8,64})\nIssued At: (\S+)\nExpiration Time: (\S+)$/.exec(text)
+    /^(\S+) wants you to sign in with your Solana account:\n([1-9A-HJ-NP-Za-km-z]{32,44})\n\n(.+)\n\nURI: (\S+)\nVersion: 1\nChain ID: (solana:[1-9A-HJ-NP-Za-km-z]{32}|mainnet|devnet)\nNonce: ([A-Za-z0-9]{8,64})\nIssued At: (\S+)\nExpiration Time: (\S+)$/.exec(text)
   if (!m) return null
   const issuedAt = new Date(m[7])
   const expirationTime = new Date(m[8])
   if (Number.isNaN(issuedAt.getTime()) || Number.isNaN(expirationTime.getTime())) return null
-  const fields: SolanaSessionFields = { domain: m[1], address: m[2], statement: m[3], uri: m[4], chainId: m[5], nonce: m[6], issuedAt, expirationTime }
-  return createSolanaSessionMessage(fields) === text ? fields : null
+  const written = m[5]
+  const fields: SolanaSessionFields = { domain: m[1], address: m[2], statement: m[3], uri: m[4], chainId: CLUSTER_IDS[written] ?? written, nonce: m[6], issuedAt, expirationTime }
+  // Re-create it exactly as it was written (name or id) so only that one spelling is read.
+  return createSolanaSessionMessage({ ...fields, chainId: written }) === text ? fields : null
 }

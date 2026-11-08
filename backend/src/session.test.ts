@@ -4,7 +4,7 @@ import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { createSiweMessage } from 'viem/siwe'
 import { accountOf } from '../../agent-runtime/src/sdk/wallet.ts'
 import { generateSolanaSecretKey } from '../../agent-runtime/src/chain/solana-keys.ts'
-import { READ_SESSION_STATEMENT, createSolanaSessionMessage, parseSolanaSessionMessage, type SolanaSessionFields } from '../../agent-runtime/src/shared/session.ts'
+import { READ_SESSION_STATEMENT, createSolanaSessionMessage, parseSolanaSessionMessage, solanaChainLabel, type SolanaSessionFields } from '../../agent-runtime/src/shared/session.ts'
 import { verifyReadSession } from './session.ts'
 
 const account = privateKeyToAccount(generatePrivateKey())
@@ -144,4 +144,46 @@ test('Solana: a payload that claims Solana but is not, is rejected, never thrown
   // An EVM session whose payload says "solana" is read as a Solana one, and fails there.
   const evm = JSON.parse(Buffer.from(await session(), 'base64').toString('utf8'))
   assert.equal((await verifyReadSession(bad({ ...evm, family: 'solana' }), solRules)).ok, false)
+})
+
+// --- Phantom shows a Sign-In With Solana message only with a cluster name as its Chain ID (`devnet`), not a CAIP-2 id ---
+
+const asDevnet = (message: string) => message.replace(`Chain ID: ${SOL}`, 'Chain ID: devnet')
+
+test('Solana: a session whose Chain ID is the cluster name is read as that cluster, and the CAIP-2 form still works', async () => {
+  assert.deepEqual(await verifyReadSession(await solSession({}, solSigner, asDevnet), solRules), { ok: true, wallet: solSigner.address })
+  assert.deepEqual(await verifyReadSession(await solSession(), solRules), { ok: true, wallet: solSigner.address }, 'the old spelling is unchanged')
+})
+
+test('Solana: the cluster name parses to the CAIP-2 id, and each spelling is read only exactly', () => {
+  const fields: SolanaSessionFields = {
+    domain: 'localhost:3000',
+    address: solSigner.address,
+    statement: READ_SESSION_STATEMENT,
+    uri: 'http://localhost:3000',
+    chainId: SOL,
+    nonce: 'abcdefgh12345678',
+    issuedAt: new Date(NOW),
+    expirationTime: new Date(NOW + HOUR),
+  }
+  const named = asDevnet(createSolanaSessionMessage(fields))
+  assert.ok(named.includes('Chain ID: devnet'))
+  assert.deepEqual(parseSolanaSessionMessage(named), fields, 'the id comes back as CAIP-2')
+  assert.equal(parseSolanaSessionMessage(named.replace('Chain ID: devnet', 'Chain ID: Devnet')), null, 'another capitalisation is refused')
+  assert.equal(parseSolanaSessionMessage(named.replace('Chain ID: devnet', 'Chain ID: solana:devnet')), null)
+  assert.equal(parseSolanaSessionMessage(named.replace('Chain ID: devnet', 'Chain ID: localnet')), null, 'only devnet and mainnet have a name')
+  assert.equal(parseSolanaSessionMessage(named.replace('Chain ID: devnet', 'Chain ID: devnet ')), null)
+})
+
+test('Solana: the cluster name is still checked against the chains the server serves', async () => {
+  const asMainnet = (message: string) => message.replace(`Chain ID: ${SOL}`, 'Chain ID: mainnet')
+  assert.deepEqual(await verifyReadSession(await solSession({}, solSigner, asMainnet), solRules), { ok: false, error: 'Session was signed for another chain' })
+  const both = { ...rules, solanaChainIds: [SOL, 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp'] }
+  assert.equal((await verifyReadSession(await solSession({}, solSigner, asMainnet), both)).ok, true)
+})
+
+test('Solana: solanaChainLabel names the two known clusters and leaves any other id alone', () => {
+  assert.equal(solanaChainLabel(SOL), 'devnet')
+  assert.equal(solanaChainLabel('solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp'), 'mainnet')
+  assert.equal(solanaChainLabel('solana:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'), 'solana:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')
 })
