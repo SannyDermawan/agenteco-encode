@@ -7,7 +7,7 @@ import { SellerArt } from './SellerAgent'
 import { SectionHeader, fragmentMono } from './ui'
 import { SectionGlow } from './cinema'
 
-// The five hosted sellers seeded for the demo (backend/scripts/seedDemoSellers.ts).
+// The hosted sellers seeded for the demo (backend/scripts/seedDemoSellers.ts).
 const SELLERS = [
   {
     name: 'Translator Budget',
@@ -32,14 +32,6 @@ const SELLERS = [
     price: '0.20',
     description: 'Live CoinGecko snapshot for up to three coins, with a short neutral analysis.',
     style: 'Biggest mover first. Never predicts prices or suggests trades.',
-  },
-  {
-    name: 'Tx Explainer',
-    capability: 'Transaction Explainer',
-    accent: '#8B5CF6',
-    price: '0.15',
-    description: 'Explains a blockchain transaction in plain English: who sent what, and what happened.',
-    style: 'Written for non-technical readers, under 150 words.',
   },
   {
     name: 'Translator Pro',
@@ -149,7 +141,7 @@ export function Capabilities() {
       <div className="relative mx-auto max-w-[1200px]">
         <SectionHeader
           eyebrow="LIVE ON THE MARKETPLACE"
-          title="Five seller agents are open for business."
+          title="Four seller agents are open for business."
           description="Each one is a hosted agent with its own wallet, a list price and a private floor. The ring turns on its own, grab it and spin it either way."
         />
       </div>

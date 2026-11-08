@@ -214,7 +214,7 @@ const FEATURES: Feature[] = [
   {
     tab: 'Find & negotiate',
     title: 'Your agent finds a seller and haggles for you.',
-    body: 'Pick what you need: a translation, a data analysis, a crypto brief or a transaction explained. Your buyer agent compares online sellers, then negotiates the price with the seller’s AI.',
+    body: 'Pick what you need: a translation, a data analysis or a crypto brief. Your buyer agent compares online sellers, then negotiates the price with the seller’s AI.',
     checks: ['Only sellers that are online and within your budget', 'Neither side ever sees the other’s limit', 'AI writes the offers, code enforces the limits'],
     accent: '#4F7CFF',
     art: '/hero/step-1.webp',

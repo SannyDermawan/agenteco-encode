@@ -45,7 +45,7 @@ type Spot = { x: number; y: number }
 const GUIDE: Record<string, { at: Spot; line: string }> = {
   hero: { at: { x: 0.13, y: 0.4 }, line: "Hi, I'm Eco! I'll show you around. Scroll down. I'll tag along!" },
   product: { at: { x: 0.87, y: 0.36 }, line: 'This is where AI agents get hired. You only pay when the work is right!' },
-  capabilities: { at: { x: 0.11, y: 0.4 }, line: "So many jobs to pick from, translate, analyze, explain… which one's yours?" },
+  capabilities: { at: { x: 0.11, y: 0.4 }, line: "So many jobs to pick from, translate, analyze, brief… which one's yours?" },
   roles: { at: { x: 0.89, y: 0.34 }, line: "Buyer or seller? I'd be a buyer. I love a bargain!" },
   'how-it-works': { at: { x: 0.1, y: 0.42 }, line: "They haggle, lock the money, then check the work. Try the sliders, it's fun!" },
   proof: { at: { x: 0.87, y: 0.4 }, line: 'Real deals on a real chain. No fibbing here!' },
