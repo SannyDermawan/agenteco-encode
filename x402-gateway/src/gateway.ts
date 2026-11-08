@@ -5,6 +5,7 @@ import { HTTPFacilitatorClient } from '@x402/core/server'
 import { ExactSvmScheme } from '@x402/svm/exact/server'
 import { DEFAULT_AGENTS, type AgentService } from './agents.ts'
 import { Ledger, requestHash } from './ledger.ts'
+import { buildPlan, DEFAULT_API_URL, DEFAULT_ESCROW_THRESHOLD_USD, ESCROW_PROGRAM, isCapabilityId, parseBudget, SOLANA_DEVNET_ID } from './escrow.ts'
 
 export const SOLANA_DEVNET = 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1'
 export const PUBLIC_FACILITATOR = 'https://x402.org/facilitator'
@@ -18,6 +19,14 @@ export interface GatewayConfig {
   agents?: AgentService[]
   ledger?: Ledger
   log?: (message: string) => void
+  /** AgentEco API the escrow plan reads sellers from. Default: the public one. */
+  apiUrl?: string
+  /** Jobs worth less than this many dollars are paid per call. Default 0.05. */
+  escrowThresholdUsd?: number
+  /** For tests: the fetch the escrow plan uses to reach the AgentEco API. */
+  fetchImpl?: typeof fetch
+  /** Access-Control-Allow-Origin for browsers. Default `*`: this API has no cookies, a payment is its own proof. */
+  corsOrigin?: string
 }
 
 export interface Gateway {
@@ -105,7 +114,27 @@ export function createGateway(config: GatewayConfig): Gateway {
   )
 
   const app = express()
+  // Behind a host's proxy (Railway, Render) the request arrives as http: trust it, so the resource URL in a 402 says https.
+  app.set('trust proxy', true)
+
+  // A browser may call the gateway directly (the website pays per call from the visitor's wallet). The answers a browser
+  // must be able to read are exposed: the price (PAYMENT-REQUIRED), the receipt (PAYMENT-RESPONSE) and Retry-After.
+  const corsOrigin = config.corsOrigin ?? '*'
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    res.set({
+      'access-control-allow-origin': corsOrigin,
+      'access-control-allow-methods': 'GET, POST, OPTIONS',
+      'access-control-allow-headers': 'content-type, payment-signature, x-payment',
+      'access-control-expose-headers': 'payment-required, payment-response, x-payment-response, x-payment-replay, retry-after',
+      'access-control-max-age': '600',
+    })
+    if (req.method === 'OPTIONS') return void res.status(204).end()
+    next()
+  })
   app.use(express.json({ limit: '8kb' }))
+
+  const thresholdUsd = Number.isFinite(config.escrowThresholdUsd) && (config.escrowThresholdUsd as number) > 0 ? (config.escrowThresholdUsd as number) : DEFAULT_ESCROW_THRESHOLD_USD
+  const apiUrl = config.apiUrl ?? DEFAULT_API_URL
 
   app.get('/health', (_req, res) => {
     const all = ledger.list()
@@ -113,7 +142,22 @@ export function createGateway(config: GatewayConfig): Gateway {
   })
 
   app.get('/v1/pricing', (_req, res) => {
-    res.json({ network, payTo: config.payTo, agents: agents.map((a) => ({ capability: a.capability, description: a.description, price: a.priceUsd, endpoint: `/v1/agents/${a.capability}` })) })
+    res.json({
+      network,
+      payTo: config.payTo,
+      agents: agents.map((a) => ({ capability: a.capability, description: a.description, price: a.priceUsd, endpoint: `/v1/agents/${a.capability}` })),
+      // Bigger jobs go through AgentEco's escrow: see GET /v1/escrow/plan.
+      escrow: { chain: SOLANA_DEVNET_ID, program: ESCROW_PROGRAM, thresholdUsd, plan: '/v1/escrow/plan' },
+    })
+  })
+
+  // Free, without a key and without side effects: which way to pay for a job of this size, and the steps. It never runs a paid agent.
+  app.get('/v1/escrow/plan', async (req: Request, res: Response) => {
+    const capability = req.query.capability
+    const budgetUsd = parseBudget(req.query.budgetUsd)
+    if (!isCapabilityId(capability)) return void res.status(400).json({ error: 'invalid_capability', detail: 'Pass ?capability=<id>, for example sentiment_score.' })
+    if (budgetUsd === null) return void res.status(400).json({ error: 'invalid_budget', detail: 'Pass ?budgetUsd=<dollars>, a positive number such as 0.01 or 2.' })
+    res.json(await buildPlan({ capability, budgetUsd, agents, thresholdUsd, apiUrl, fetchImpl: config.fetchImpl }))
   })
 
   // Everything before the payment middleware runs for free, so it must never do the paid work.

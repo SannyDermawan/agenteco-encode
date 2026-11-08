@@ -16,6 +16,9 @@ const gateway = createGateway({
   facilitatorUrl: process.env.X402_FACILITATOR_URL || PUBLIC_FACILITATOR,
   facilitatorTimeoutMs: Number(process.env.X402_FACILITATOR_TIMEOUT_MS || 15_000),
   ledger: new Ledger(process.env.LEDGER_FILE || undefined),
+  apiUrl: process.env.AGENTECO_API_URL || undefined,
+  escrowThresholdUsd: process.env.ESCROW_THRESHOLD_USD ? Number(process.env.ESCROW_THRESHOLD_USD) : undefined,
+  corsOrigin: process.env.CORS_ORIGIN || undefined,
   log: (message) => console.log(`[gateway] ${message}`),
 })
 await gateway.ready
