@@ -11,7 +11,6 @@
     "start": "npm run start:api",
     "start:api": "npm run start:api --prefix backend",
     "start:host": "npm run start:host --prefix backend",
-    "start:keeper": "npm run start --prefix backend",
-    "gen:abi": "node scripts/gen-abi.mjs"
+    "start:keeper": "npm run start --prefix backend"
   }
 }
