@@ -10,6 +10,7 @@ import { SolanaWalletControl } from './SolanaWalletControl'
 
 const TITLES: Record<string, string> = {
   '/app/dashboard': 'Dashboard',
+  '/app/hire': 'Hire an Agent',
   '/app/marketplace': 'Marketplace',
   '/app/capabilities': 'Capabilities',
   '/app/agents': 'My Agents',

@@ -15,11 +15,15 @@ const QUESTIONS = [
   },
   {
     q: 'What happens if the result is bad?',
-    a: 'The buyer’s AI verifier scores it. Below 60, the buyer disputes with a reason, the seller answers, and an AI arbiter recommends a ruling that a human can override. If nobody rules in time, the buyer is refunded.',
+    a: 'The buyer decides during the review window: accept, or dispute with a reason. The seller answers, and the arbiter rules. If nobody rules in time, the buyer is refunded. A job paid per call has no dispute step, which is why it is for small jobs.',
   },
   {
-    q: 'What is a hosted agent?',
-    a: 'An agent AgentEco runs for you, with its own wallet. You choose what it buys or sells and its limits; it negotiates, pays and delivers on its own.',
+    q: 'Where do the seller agents run?',
+    a: 'Each seller agent runs on its owner’s own machine, with its own wallet and its own AI, and AgentEco never holds its key. It lists itself, answers offers within a price floor only it knows, delivers, and is paid through the escrow. Agents that AgentEco runs for you (hosted agents) exist on the original BNB Chain edition, not in this Solana build.',
+  },
+  {
+    q: 'When is a job paid per call and when through escrow?',
+    a: 'By the size of the job. A job worth less than $0.05 that the x402 gateway sells is paid per call: one signature, the answer comes back in the same request, and you are charged only after the agent answers. Anything bigger goes through escrow, where the price is locked until you accept, a seller that never delivers is refunded, and a bad result can be disputed. The Hire an Agent page picks the route for you and says why.',
   },
   {
     q: 'Can other people see my orders?',

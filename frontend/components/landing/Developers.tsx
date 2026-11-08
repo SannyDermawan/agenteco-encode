@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { fadeUp, REVEAL_VIEWPORT } from './scrollReveal'
 import { SectionHeader, fragmentMono } from './ui'
 import { SectionGlow } from './cinema'
+import { GATEWAY_URL } from '@/lib/x402/gateway'
 
 /**
  * What is under the one-prompt setup (OnePromptHook.tsx): the four things that make it safe to trust, and a line
@@ -98,6 +99,51 @@ function BuildingBlocks() {
   )
 }
 
+const ROUTES = [
+  {
+    tag: 'x402 · under $0.05',
+    title: 'Small jobs: pay per call',
+    body: 'An agent calls an HTTP endpoint and gets a 402 with the price. One signature pays it in devnet USDC, and the answer comes back in the same request. The payment settles only after the agent has answered, so a failed call costs nothing. There is no refund step, which is why it is for small jobs.',
+  },
+  {
+    tag: 'AgentEco escrow · $0.05 and up',
+    title: 'Bigger jobs: escrow',
+    body: 'The price is locked in the escrow program on Solana until the buyer accepts. A seller that never delivers is refunded, and a bad result can be disputed. Every step is a transaction anyone can check.',
+  },
+]
+
+const ROUTE_LINKS = [
+  { label: 'Hire an agent', href: '/app/hire' },
+  { label: 'Per-call prices', href: `${GATEWAY_URL}/v1/pricing` },
+  { label: 'Which route for a $0.01 job?', href: `${GATEWAY_URL}/v1/escrow/plan?capability=sentiment_score&budgetUsd=0.01` },
+]
+
+/** The two ways to pay, and the rule that picks one. The Hire an Agent page applies it live. */
+function PaymentRoutes() {
+  return (
+    <motion.div custom={0} initial="hidden" whileInView="show" viewport={REVEAL_VIEWPORT} variants={fadeUp} className="mt-8 rounded-2xl border border-white/10 bg-[#0B0A24]/60 p-6 backdrop-blur-xl md:p-8">
+      <div className="text-[12px] font-medium tracking-[0.14em] text-[#8FA9FF]">HOW A JOB IS PAID</div>
+      <p className="mt-2 max-w-[62ch] text-[15px] leading-relaxed text-[#C4C6CF]">The size of the job picks the route, and the same rule answers an AI agent over HTTP.</p>
+      <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+        {ROUTES.map((r) => (
+          <div key={r.title} className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <div className="text-[12px] text-[#8FA9FF]">{r.tag}</div>
+            <h3 className="mt-1 text-[16px] font-semibold tracking-[-0.01em] text-[#F5F5F7]">{r.title}</h3>
+            <p className="mt-2 text-[14px] leading-relaxed text-[#A3A5AE]">{r.body}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-5 flex flex-wrap gap-3">
+        {ROUTE_LINKS.map((l) => (
+          <a key={l.href} href={l.href} target={l.href.startsWith('/') ? undefined : '_blank'} rel="noopener noreferrer" className={`rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[13px] text-[#D5D6DE] transition hover:border-[#5B5FEF]/50 hover:bg-white/[0.07] ${fragmentMono.className}`}>
+            {l.label} {l.href.startsWith('/') ? '→' : '↗'}
+          </a>
+        ))}
+      </div>
+    </motion.div>
+  )
+}
+
 export function Developers() {
   return (
     <section data-guide="developers" id="trust" className="relative px-5 py-24 text-[#F5F5F7] md:py-32">
@@ -107,10 +153,11 @@ export function Developers() {
         <SectionHeader
           eyebrow="TRUST"
           title="Nothing hidden under the prompt."
-          description="The hosted agents are just clients: anything that can sign with a wallet uses the same REST API and escrow contract. Prefer code to a prompt? The SDK, CLI and MCP server are open."
+          description="Anything that can sign with a wallet uses the same REST API, x402 gateway and escrow program. Prefer code to a prompt? The SDK, CLI and MCP server are open."
         />
 
         <BuildingBlocks />
+        <PaymentRoutes />
 
         <motion.div
           custom={0}

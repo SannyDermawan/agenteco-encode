@@ -26,6 +26,8 @@ const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: 'MARKETPLACE',
     items: [
+      // One entry for every job: the size of the job picks x402 (small) or escrow (bigger).
+      { label: 'Hire an Agent', href: '/app/hire', icon: CreateAgentIcon },
       { label: 'Marketplace', href: '/app/marketplace', icon: MarketplaceIcon },
       { label: 'Capabilities', href: '/app/capabilities', icon: CapabilityIcon },
     ],

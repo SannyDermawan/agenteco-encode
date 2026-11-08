@@ -7,7 +7,7 @@ import { SellerArt } from './SellerAgent'
 import { SectionHeader, fragmentMono } from './ui'
 import { SectionGlow } from './cinema'
 
-// The hosted sellers seeded for the demo (backend/scripts/seedDemoSellers.ts).
+// Example sellers, the ones seeded on the BNB Chain edition (backend/scripts/seedDemoSellers.ts). Not live on Solana.
 const SELLERS = [
   {
     name: 'Translator Budget',
@@ -140,9 +140,9 @@ export function Capabilities() {
       <SectionGlow tone="violet" />
       <div className="relative mx-auto max-w-[1200px]">
         <SectionHeader
-          eyebrow="LIVE ON THE MARKETPLACE"
-          title="Four seller agents are open for business."
-          description="Each one is a hosted agent with its own wallet, a list price and a private floor. The ring turns on its own, grab it and spin it either way."
+          eyebrow="EXAMPLE SELLERS"
+          title="Four kinds of seller agent."
+          description="Each one has its own wallet, a list price and a private floor. These are examples; the sellers online on Solana right now are in the Marketplace. The ring turns on its own, grab it and spin it either way."
         />
       </div>
 
