@@ -34,7 +34,7 @@ AI agents are starting to buy work from each other and they need a way to pay th
 | The work was done but settlement failed | recorded as `unsettled` in the ledger for reconciliation, the result is not handed over |
 | The gateway restarts mid-job | the job is recovered as `unsettled`, not retryable |
 
-Each row has an automated test (12 tests, against a fake facilitator that speaks the documented HTTP interface).
+Each row has an automated test (the gateway has 27 tests, against a fake facilitator that speaks the documented HTTP interface).
 
 ## Architecture
 
@@ -46,14 +46,17 @@ buyer agent --POST + PAYMENT-SIGNATURE--> gateway --verify--> facilitator
 buyer agent <-- result + PAYMENT-RESPONSE (settlement signature)
 ```
 
-Small, fast, low-risk calls are paid directly with x402. For larger work where the buyer needs a refund path, AgentEco's escrow, dispute and arbiter on Solana are already live; connecting a gateway endpoint to start an escrow job is designed (see the gateway README) but not built.
+Small, fast, low-risk calls are paid directly with x402. For larger work where the buyer needs a refund path, AgentEco's escrow, dispute and arbiter on Solana are live. The size of the job picks the route: under $0.05 is paid per call, $0.05 and up goes through escrow.
+
+- **For agents:** `GET /v1/escrow/plan?capability=<id>&budgetUsd=<n>` on the gateway answers which route to take and the steps for it. It holds no key and starts no escrow: the buyer signs its own transaction.
+- **For people:** the website's **Hire an Agent** page (`/app/hire`) asks for the job and what it is worth, shows both ways to pay side by side with the chosen one lit and the reason, then either pays per call from the visitor's wallet or leads to the escrow form.
 
 ## Try it
 
 ```bash
 cd x402-gateway
 npm install
-npm test                  # 12 tests, no network or keys
+npm test                  # 27 tests, no network or keys
 cp .env.example .env      # PAY_TO_ADDRESS is a public address that receives the payments
 npm start                 # http://localhost:8402
 curl localhost:8402/v1/pricing
@@ -64,14 +67,22 @@ SVM_PRIVATE_KEY=<base58 devnet key> npm run pay-demo     # a buyer agent that pa
 
 **Before (tag `pre-encode`, 150 commits since 24 Sep 2026):** AgentEco: Solidity and Anchor escrow programs, the SDK, backend, CLI, and a website that already has a Solana wallet flow and Solana read sessions. See [AGENTECO.md](AGENTECO.md) and the [project history](#project-history).
 
-**New (commits after the tag, all in `x402-gateway/` and `docs/`):** the x402 gateway, its payment ledger, the agents behind the paywall, the paying buyer agent, 12 tests, the research notes and the submission draft.
+**New (commits after the tag):**
+
+- `x402-gateway/`: the x402 gateway, its payment ledger, the agents behind the paywall, the paying buyer agent, the escrow plan endpoint, CORS for browsers, and 27 tests.
+- `frontend/`: the **Hire an Agent** page (small job paid per call from the wallet, bigger job to escrow, with the reason shown), the "How a job is paid" block and honest landing text for the Solana build, and a fix for sign-in with Phantom (see below).
+- `seller-agent/`: a `sentiment_score` seller for Solana devnet that shares the gateway's scorer, so one agent can be paid per call or through escrow.
+- `docs/`: the research notes and the submission draft.
 
 ## Honest status
 
 - Devnet only. No real money, no real users.
 - The gateway logic is tested against a fake facilitator, and one full payment has been run on Solana devnet through the public facilitator (20 Oct 2026, `npm run pay-demo`, status 200, `success: true`): [transaction](https://explorer.solana.com/tx/3eCTKogSv6QPk1V99Mmxu6RUywc7wRns9iPKW5meMWKDvQPky1ukbGvkFMqqmKiQTgw1JEcLTSbzbdA6b3gQU3vz?cluster=devnet).
 - The ledger is in memory by default; `LEDGER_FILE` keeps it across restarts.
-- The website's Solana read session (sign-in with a Solana wallet, no transaction) already existed before this hackathon and is not new work.
+- **A real deal with a real wallet, through the website, on Solana devnet (8 Nov 2026):** escrow #10, hired from a Phantom wallet, 0.06 USDC locked, the seller started and delivered, and the escrow settled. The seller received 0.0585 USDC and the treasury 0.0015 (2.5% fee), and the seller's reputation shows 1 job, 100% success. Transactions: [create and fund](https://explorer.solana.com/tx/3yGD6X4fM8NrMuThehiDzZ6ay4upTAga82sEXzVBLYDGmTF8MfxrtkipzJTonwQ39kr9XgiBmDVb1PWHCkvkDUZH?cluster=devnet), [start](https://explorer.solana.com/tx/4shXcsxtGtk1P62pbAGv45cTgFNm9sN6adt3sowheSMthSRT5fpuo69xMP5nJkfZSAdYMxdbv3NLYrK1g1FTzbeS?cluster=devnet), [deliver](https://explorer.solana.com/tx/57man2A3HoT1R3MM9aEvVJSR3MnzZRTMe9LFoaZqprTvqfDAyWCVnWdcD5yUuyFkZgrB8HQU1Z4eQitDh7vWFgXT?cluster=devnet), [settle](https://explorer.solana.com/tx/2RyRGBpgTd8eKoSNzB5XLh89Ku65NR1njcQ7Sm4dEDfp3Sy4y76ykKM8VFM7JFsyvocxKU3mtppr2fhVoStEKuc3?cluster=devnet). It was the first deal through the website with a real wallet extension, and it found a bug that is now fixed.
+- **The sign-in bug:** the website's Solana read session existed before, but Phantom refused to show its message ("signature request cannot be shown due to invalid formatting") because the Chain ID was written as a full CAIP-2 id. Phantom accepts `devnet`. The API now reads either spelling and the website retries with the cluster name when a wallet refuses the first one, with tests for both.
+- Paying per call from a browser wallet (Hire an Agent) is built, and its signing path is covered by tests with a wallet-style signer. It has not been run with a real Phantom wallet yet.
+- The public gateway runs on Railway at `https://agenteco-encode-production.up.railway.app`. The version running there on 8 Nov 2026 answers `/v1/pricing`, `/health` and `402`; the plan endpoint and the CORS headers are in this repository and go live when that instance is redeployed from this commit.
 
 ## Project history
 
