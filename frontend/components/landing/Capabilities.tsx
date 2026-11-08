@@ -7,7 +7,7 @@ import { SellerArt } from './SellerAgent'
 import { SectionHeader, fragmentMono } from './ui'
 import { SectionGlow } from './cinema'
 
-// The five hosted sellers seeded on BSC Testnet (backend/scripts/seedDemoSellers.ts).
+// The five hosted sellers seeded for the demo (backend/scripts/seedDemoSellers.ts).
 const SELLERS = [
   {
     name: 'Translator Budget',
@@ -38,7 +38,7 @@ const SELLERS = [
     capability: 'Transaction Explainer',
     accent: '#8B5CF6',
     price: '0.15',
-    description: 'Explains any EVM testnet transaction in plain English: who sent what, and what happened.',
+    description: 'Explains a blockchain transaction in plain English: who sent what, and what happened.',
     style: 'Written for non-technical readers, under 150 words.',
   },
   {

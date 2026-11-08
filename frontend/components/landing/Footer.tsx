@@ -17,15 +17,10 @@ const COLUMNS: { heading: string; links: ResourceLink[] }[] = [
   },
   {
     heading: 'Contracts',
-    // The deployed AgentEco escrow on each network's explorer (docs/MULTICHAIN.md and docs/SOLANA.md list them).
+    // The deployed AgentEco escrow program on Solana devnet (docs/SOLANA.md), and the x402 gateway code.
     links: [
-      { label: 'BNB Smart Chain', href: 'https://testnet.bscscan.com/address/0xdC08Dd97e959Ab6ED2AB76702F25757Fe1fF46BE' },
-      { label: 'Base Sepolia', href: 'https://base-sepolia.blockscout.com/address/0xF8448762AeCE0039f1072Da74477fbFAD629fDB8?tab=contract' },
-      { label: 'Ethereum Sepolia', href: 'https://eth-sepolia.blockscout.com/address/0x3048b1a3CeeE4f1AF09485e49f059d094EF6f865?tab=contract' },
-      { label: 'Arbitrum Sepolia', href: 'https://sepolia.arbiscan.io/address/0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea#code' },
-      { label: 'Tempo Moderato', href: 'https://explore.testnet.tempo.xyz/address/0x2620424C73A39624bDcd3fa43aABF425d6Da997e' },
-      { label: 'BOT Chain Testnet', href: 'https://scan.bohr.life/address/0xaf77570B25D2EAD24a53Eead61deEB0bc21a83ea?tab=contract' },
       { label: 'Solana devnet', href: 'https://explorer.solana.com/address/3GEEC3dQH1tP2YTZD9Jv915Yj8hcSN6WE8nQZiLJcgHE?cluster=devnet' },
+      { label: 'x402 gateway', href: 'https://github.com/SannyDermawan/agenteco-encode/tree/main/x402-gateway' },
     ],
   },
 ]
@@ -79,54 +74,11 @@ export function Footer() {
           ))}
         </div>
 
-        {/* BOT Chain credit, as the BOT Chain team asked: a link to botchain.ai and to the contract on its explorer. The
-            mainnet contract is the first, escrow-only version (docs/MULTICHAIN.md); the current v3 runs on the testnet,
-            which the Contracts column links. Teal to cyan matches BOT Chain's own colours. */}
-        <div className="mt-14 md:mt-20">
-          <div className="inline-flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-[#2DE2B0]/25 bg-gradient-to-r from-[#2DE2B0]/[0.09] to-[#22D3EE]/[0.07] px-5 py-3 text-[15px] text-[#B4B6C2] shadow-[0_0_32px_-12px_rgba(45,226,176,0.55)]">
-            <span className="inline-flex items-center gap-2">
-              <span aria-hidden="true" className="h-2 w-2 rounded-full bg-[#2DE2B0] shadow-[0_0_10px_2px_rgba(45,226,176,0.7)]" />
-              Deployed on{' '}
-              <span className="bg-gradient-to-r from-[#2DE2B0] to-[#22D3EE] bg-clip-text font-semibold text-transparent">BOT Chain Mainnet</span>
-            </span>
-            <span aria-hidden="true" className="text-[#22D3EE]/40">
-              &bull;
-            </span>
-            <a
-              href="https://botchain.ai"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-sm font-semibold text-[#22D3EE] transition-colors hover:text-[#7CF0FF] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#22D3EE]"
-            >
-              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M3 12h18M12 3c2.6 2.6 4 5.7 4 9s-1.4 6.4-4 9c-2.6-2.6-4-5.7-4-9s1.4-6.4 4-9Z" />
-              </svg>
-              BOT Chain
-            </a>
-            <span aria-hidden="true" className="text-[#22D3EE]/40">
-              &bull;
-            </span>
-            <a
-              href="https://scan.botchain.ai/address/0x3d3b68bC66e51721e3294E9EaA04Dd7921B043b2?tab=contract"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-sm font-semibold text-[#2DE2B0] transition-colors hover:text-[#8CFFDD] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2DE2B0]"
-            >
-              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
-              </svg>
-              View contract on BOT Chain Explorer
-            </a>
-          </div>
-        </div>
-
-        {/* md:pr-24 keeps the networks line clear of the floating GitHub button in the corner. */}
-        <div className="mt-8 flex flex-col gap-4 border-t border-white/10 pt-8 md:mt-10 md:flex-row md:items-center md:justify-between md:pr-24">
+        {/* md:pr-24 keeps the network line clear of the floating GitHub button in the corner. */}
+        <div className="mt-14 flex flex-col gap-4 border-t border-white/10 pt-8 md:mt-20 md:flex-row md:items-center md:justify-between md:pr-24">
           <p className="text-[15px] text-[#9A9CA8]">&copy; 2026 AgentEco. All rights reserved.</p>
           <p className="text-[15px] text-[#9A9CA8]">
-            Deployed on test networks:{' '}
-            <span className="font-semibold text-[#F5F5F7]">BNB Smart Chain, Base, Ethereum, Arbitrum, Tempo, BOT Chain and Solana</span>
+            Deployed on <span className="font-semibold text-[#F5F5F7]">Solana devnet</span>, test tokens only
           </p>
         </div>
       </div>

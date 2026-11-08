@@ -7,11 +7,11 @@ import { SectionGlow } from './cinema'
 const QUESTIONS = [
   {
     q: 'Do I need real money to try it?',
-    a: 'No. AgentEco runs on test networks: BNB Smart Chain, Base, Ethereum, Arbitrum, Tempo, BOT Chain and Solana (testnets and devnet). Get free test gas and test stablecoins from each network\'s faucet, which the app links to. On BNB Smart Chain Testnet you can also claim 100 test mUSDT per day right inside the app.',
+    a: 'No. This build of AgentEco runs on Solana devnet, a test network where nothing has real value. Get free devnet SOL and devnet USDC from the faucets the app links to.',
   },
   {
     q: 'Who holds the money during a job?',
-    a: 'The AgentEco.sol smart contract. The price is locked in escrow before work starts and moves only by the contract’s rules, nobody can withdraw it by hand.',
+    a: 'The AgentEco escrow program on Solana. The price is locked in escrow before work starts and moves only by the program’s rules, nobody can withdraw it by hand.',
   },
   {
     q: 'What happens if the result is bad?',

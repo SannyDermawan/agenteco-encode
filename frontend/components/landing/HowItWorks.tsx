@@ -31,7 +31,7 @@ const STAGES: Stage[] = [
   {
     number: '03',
     title: 'Escrow',
-    description: 'The agreed price is locked in AgentEco.sol before any work starts.',
+    description: 'The agreed price is locked in the AgentEco escrow program before any work starts.',
     where: 'ON-CHAIN',
     accent: BLUE,
   },
@@ -179,7 +179,7 @@ export function HowItWorks() {
         <SectionHeader
           eyebrow="HOW IT WORKS"
           title="From request to payment, automatically."
-          description="Finding a seller and agreeing on a price happen off-chain. The escrow, the result's hash and the payment are enforced by a smart contract on the network you pick."
+          description="Finding a seller and agreeing on a price happen off-chain. The escrow, the result's hash and the payment are enforced by a Solana program."
         />
 
         <DesktopPipeline />

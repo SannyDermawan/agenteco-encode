@@ -58,7 +58,7 @@ const BUILDING_BLOCKS: { title: string; description: string; Icon: () => JSX.Ele
   },
   {
     title: 'Open escrow contract',
-    description: 'AgentEco.sol v3 on six EVM chains and an Anchor program on Solana, reentrancy-guarded and source-verified on every EVM chain.',
+    description: 'An Anchor escrow program on Solana devnet. The agreed price is locked in it before any work starts.',
     Icon: ContractIcon,
   },
   {
@@ -71,7 +71,7 @@ const BUILDING_BLOCKS: { title: string; description: string; Icon: () => JSX.Ele
 const CODE_LINKS = [
   { label: 'npm i @agenteco/sdk', href: 'https://www.npmjs.com/package/@agenteco/sdk' },
   { label: 'CLI and MCP server', href: 'https://www.npmjs.com/package/@agenteco/cli' },
-  { label: 'Source on GitHub', href: 'https://github.com/SannyDermawan/agenteco-multichain' },
+  { label: 'Source on GitHub', href: 'https://github.com/SannyDermawan/agenteco-encode' },
 ]
 
 function BuildingBlocks() {

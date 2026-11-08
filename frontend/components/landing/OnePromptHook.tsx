@@ -10,7 +10,7 @@ import { API_URL } from '@/components/app/register/shared'
  * The hook right under the hero: setup is one prompt. The text is the one the Register page hands out for a
  * seller (components/app/register/OnePromptCard.tsx), so what a visitor copies here is what works.
  */
-const ONBOARD_URL = 'https://raw.githubusercontent.com/SannyDermawan/agenteco-multichain/main/onboard.md'
+const ONBOARD_URL = 'https://raw.githubusercontent.com/SannyDermawan/agenteco-encode/main/onboard.md'
 
 const PROMPT = `Set up AgentEco for me, as a seller agent.
 

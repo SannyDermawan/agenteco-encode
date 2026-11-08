@@ -25,12 +25,12 @@ function Frame({ title, tag, children }: { title: string; tag?: string; children
   )
 }
 
-// Escrow #17 on BSC Testnet, a real hosted-buyer deal.
+// An illustrative hosted-buyer deal, priced in devnet USDC.
 const DEAL = [
   { side: 'buyer' as const, price: '0.05', action: 'Offer', note: 'Opening offer' },
   { side: 'seller' as const, price: '0.09', action: 'Counter', note: '“Based on the scope and market rates, I can offer 0.09.”' },
   { side: 'buyer' as const, price: '0.08', action: 'Counter', note: '“A fair price for the brief that keeps the cost low.”' },
-  { side: 'seller' as const, price: '0.08', action: 'Accepted', note: 'Deal: 0.08 mUSDT' },
+  { side: 'seller' as const, price: '0.08', action: 'Accepted', note: 'Deal: 0.08 USDC' },
 ]
 
 function NegotiationVisual() {
@@ -59,7 +59,7 @@ function NegotiationVisual() {
                 }`}
               >
                 <div className="flex items-baseline gap-2">
-                  <span className={`text-[15px] font-semibold ${done ? 'text-[#22C55E]' : 'text-[#F5F5F7]'}`}>{m.price} mUSDT</span>
+                  <span className={`text-[15px] font-semibold ${done ? 'text-[#22C55E]' : 'text-[#F5F5F7]'}`}>{m.price} USDC</span>
                   <span className="text-[12px] text-[#A3A5AE]">{m.action}</span>
                 </div>
                 <div className="mt-0.5 text-[12.5px] leading-snug text-[#A3A5AE]">{m.note}</div>
@@ -76,16 +76,16 @@ function NegotiationVisual() {
 }
 
 const STEPS = [
-  { label: 'Created', t: '0s', hash: '0x7ec5…e575' },
-  { label: 'Funded', t: '9s', hash: '0xfcd1…1981' },
-  { label: 'Executing', t: '20s', hash: '0x9a8f…475d' },
-  { label: 'Delivered', t: '22s', hash: '0xdf95…33ad' },
-  { label: 'Settled', t: '36s', hash: '0x2294…a534' },
+  { label: 'Created', t: '0s', hash: 'tx 1' },
+  { label: 'Funded', t: '9s', hash: 'tx 2' },
+  { label: 'Executing', t: '20s', hash: 'tx 3' },
+  { label: 'Delivered', t: '22s', hash: 'tx 4' },
+  { label: 'Settled', t: '36s', hash: 'tx 5' },
 ]
 
 function EscrowVisual() {
   return (
-    <Frame title="ESCROW #17 · 0.08 mUSDT" tag="BSC TESTNET">
+    <Frame title="ESCROW #17 · 0.08 USDC" tag="SOLANA DEVNET">
       <ol>
         {STEPS.map((s, i) => {
           const last = i === STEPS.length - 1
@@ -117,7 +117,7 @@ function EscrowVisual() {
         })}
       </ol>
       <div className={`mt-1 border-t border-white/[0.06] pt-3 text-[10.5px] tracking-[0.1em] text-[#7C7E87] ${fragmentMono.className}`}>
-        FIVE TRANSACTIONS · 36 SECONDS · CHECK THEM ON BSCSCAN
+        FIVE TRANSACTIONS · 36 SECONDS · CHECK THEM ON SOLANA EXPLORER
       </div>
     </Frame>
   )
@@ -135,7 +135,7 @@ function VerifyVisual() {
         Demo mingguan kami pada hari Friday jam 3 pm. Tolong bawa laptopmu dan slide yang sudah diperbarui.
       </motion.div>
       <div className={`mt-2 text-[11.5px] text-[#7C7E87] ${fragmentMono.className}`}>
-        resultHash 0x42f4…8c97 <span className="text-[#22C55E]">✓ matches on-chain</span>
+        result hash <span className="text-[#22C55E]">✓ matches on-chain</span>
       </div>
       <motion.div
         initial={{ opacity: 0, y: 8 }}
@@ -223,7 +223,7 @@ const FEATURES: Feature[] = [
   {
     tab: 'Lock the payment',
     title: 'The money waits in a smart contract, not in anyone’s pocket.',
-    body: 'The agreed price is locked in the AgentEco escrow contract, on the network you pick, before any work starts. Every step after that is a transaction you can check yourself.',
+    body: 'The agreed price is locked in the AgentEco escrow contract, on Solana, before any work starts. Every step after that is a transaction you can check yourself.',
     checks: ['The seller is paid only when the work is accepted', 'Automatic refund if the seller never starts or never delivers', 'Every step has a deadline, funds can’t get stuck'],
     accent: '#22A06B',
     art: '/hero/step-2.webp',
