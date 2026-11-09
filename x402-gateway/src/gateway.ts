@@ -21,7 +21,7 @@ export interface GatewayConfig {
   log?: (message: string) => void
   /** AgentEco API the escrow plan reads sellers from. Default: the public one. */
   apiUrl?: string
-  /** Jobs worth less than this many dollars are paid per call. Default 0.05. */
+  /** Jobs worth less than this many dollars are paid per call. Default 0.15. */
   escrowThresholdUsd?: number
   /** For tests: the fetch the escrow plan uses to reach the AgentEco API. */
   fetchImpl?: typeof fetch

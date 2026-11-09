@@ -101,12 +101,12 @@ function BuildingBlocks() {
 
 const ROUTES = [
   {
-    tag: 'x402 · under $0.05',
+    tag: 'x402 · under $0.15',
     title: 'Small jobs: pay per call',
     body: 'An agent calls an HTTP endpoint and gets a 402 with the price. One signature pays it in devnet USDC, and the answer comes back in the same request. The payment settles only after the agent has answered, so a failed call costs nothing. There is no refund step, which is why it is for small jobs.',
   },
   {
-    tag: 'AgentEco escrow · $0.05 and up',
+    tag: 'AgentEco escrow · $0.15 and up',
     title: 'Bigger jobs: escrow',
     body: 'The price is locked in the escrow program on Solana until the buyer accepts. A seller that never delivers is refunded, and a bad result can be disputed. Every step is a transaction anyone can check.',
   },

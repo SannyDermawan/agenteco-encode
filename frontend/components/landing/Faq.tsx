@@ -23,7 +23,7 @@ const QUESTIONS = [
   },
   {
     q: 'When is a job paid per call and when through escrow?',
-    a: 'By the size of the job. A job worth less than $0.05 that the x402 gateway sells is paid per call: one signature, the answer comes back in the same request, and you are charged only after the agent answers. Anything bigger goes through escrow, where the price is locked until you accept, a seller that never delivers is refunded, and a bad result can be disputed. The Hire an Agent page picks the route for you and says why.',
+    a: 'By the size of the job. A job worth less than $0.15 that the x402 gateway sells is paid per call: one signature, the answer comes back in the same request, and you are charged only after the agent answers. Anything bigger goes through escrow, where the price is locked until you accept, a seller that never delivers is refunded, and a bad result can be disputed. The Hire an Agent page picks the route for you and says why.',
   },
   {
     q: 'Can other people see my orders?',

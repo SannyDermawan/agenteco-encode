@@ -83,7 +83,7 @@ export function SmartHire() {
   }, [capability, budget])
 
   const mode = plan?.recommendedMode ?? null
-  const threshold = plan?.thresholdUsd ?? pricing.data?.escrow.thresholdUsd ?? 0.05
+  const threshold = plan?.thresholdUsd ?? pricing.data?.escrow.thresholdUsd ?? 0.15
   const perCall = plan?.x402?.price ?? pricing.data?.agents.find((a) => a.capability === capability)?.price ?? null
 
   const [paying, setPaying] = useState(false)

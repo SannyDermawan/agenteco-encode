@@ -37,7 +37,7 @@ test('plan: a job below the threshold that the gateway sells is paid per call wi
     const plan = (await res.json()) as Plan
     assert.equal(plan.recommendedMode, 'x402')
     assert.deepEqual(plan.x402, { endpoint: '/v1/agents/sentiment_score', price: '$0.005' })
-    assert.equal(plan.thresholdUsd, 0.05)
+    assert.equal(plan.thresholdUsd, 0.15)
     assert.deepEqual(plan.escrow.sellers, [], 'no seller list is fetched for a job that does not use escrow')
     assert.ok(plan.notes.some((n) => /pay per call with x402/.test(n)))
   } finally {
@@ -48,17 +48,17 @@ test('plan: a job below the threshold that the gateway sells is paid per call wi
 test('plan: a job at or above the threshold goes through escrow, with the online Solana sellers of that capability first', async () => {
   const h = await startGateway({ fetchImpl: okApi })
   try {
-    for (const budget of ['0.05', '0.06', '2']) {
+    for (const budget of ['0.15', '0.2', '2']) {
       const plan = (await (await getPlan(h.base, `capability=sentiment_score&budgetUsd=${budget}`)).json()) as Plan
       assert.equal(plan.recommendedMode, 'escrow', `budget ${budget}`)
       assert.ok(plan.x402, 'the per-call price is still shown, so a buyer can compare')
     }
-    const plan = (await (await getPlan(h.base, 'capability=sentiment_score&budgetUsd=0.06')).json()) as Plan
+    const plan = (await (await getPlan(h.base, 'capability=sentiment_score&budgetUsd=0.2')).json()) as Plan
     assert.deepEqual(plan.escrow.sellers.map((s) => s.id), ['a-online', 'a-offline'], 'online first; other chains, other capabilities and buyers are left out')
     assert.equal(plan.escrow.chain, SOL)
     assert.equal(plan.escrow.program, '3GEEC3dQH1tP2YTZD9Jv915Yj8hcSN6WE8nQZiLJcgHE')
     assert.equal(plan.escrow.tokenMint, '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU')
-    assert.match(plan.escrow.cli, /^agenteco hire --capability sentiment_score --brief '<json>' --max-budget 0\.06 --chain solana-devnet$/)
+    assert.match(plan.escrow.cli, /^agenteco hire --capability sentiment_score --brief '<json>' --max-budget 0\.2 --chain solana-devnet$/)
     assert.match(plan.escrow.sdk, /hire\(\{ chain: 'solana-devnet', capability: 'sentiment_score'/)
   } finally {
     await h.close()
@@ -185,7 +185,7 @@ test('pricing keeps its old fields and tells where the escrow path is', async ()
     const pricing = (await (await fetch(`${h.base}/v1/pricing`)).json()) as { network: string; payTo: string; agents: { capability: string; price: string; endpoint: string }[]; escrow: Record<string, unknown> }
     assert.deepEqual(pricing.agents.map((a) => a.capability), ['sentiment_score', 'keyword_extract'])
     assert.ok(pricing.network && pricing.payTo)
-    assert.deepEqual(pricing.escrow, { chain: SOL, program: '3GEEC3dQH1tP2YTZD9Jv915Yj8hcSN6WE8nQZiLJcgHE', thresholdUsd: 0.05, plan: '/v1/escrow/plan' })
+    assert.deepEqual(pricing.escrow, { chain: SOL, program: '3GEEC3dQH1tP2YTZD9Jv915Yj8hcSN6WE8nQZiLJcgHE', thresholdUsd: 0.15, plan: '/v1/escrow/plan' })
   } finally {
     await h.close()
   }
@@ -218,4 +218,20 @@ test('the budget parser accepts plain decimals only, and prices read as numbers'
   assert.equal(parseBudget('1,5'), null)
   assert.equal(parseBudget(' 1'), 1)
   assert.equal(priceNumber('$0.005'), 0.005)
+})
+
+test('the default threshold is $0.15: $0.14 is paid per call, $0.15 and up goes through escrow', async () => {
+  const h = await startGateway({ fetchImpl: okApi })
+  try {
+    for (const budget of ['0.01', '0.1', '0.14']) {
+      const plan = (await (await getPlan(h.base, `capability=sentiment_score&budgetUsd=${budget}`)).json()) as Plan
+      assert.equal(plan.recommendedMode, 'x402', `budget ${budget}`)
+    }
+    for (const budget of ['0.15', '0.16', '0.5']) {
+      const plan = (await (await getPlan(h.base, `capability=sentiment_score&budgetUsd=${budget}`)).json()) as Plan
+      assert.equal(plan.recommendedMode, 'escrow', `budget ${budget}`)
+    }
+  } finally {
+    await h.close()
+  }
 })

@@ -11,7 +11,7 @@ export const ESCROW_PROGRAM = '3GEEC3dQH1tP2YTZD9Jv915Yj8hcSN6WE8nQZiLJcgHE'
 export const DEVNET_USDC = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'
 export const DEFAULT_API_URL = 'https://agenteco-multichain-production.up.railway.app'
 /** A job worth less than this (in dollars) is paid per call with x402; this or more goes through escrow. */
-export const DEFAULT_ESCROW_THRESHOLD_USD = 0.05
+export const DEFAULT_ESCROW_THRESHOLD_USD = 0.15
 
 export interface EscrowSeller {
   id: string

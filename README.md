@@ -34,7 +34,7 @@ AI agents are starting to buy work from each other and they need a way to pay th
 | The work was done but settlement failed | recorded as `unsettled` in the ledger for reconciliation, the result is not handed over |
 | The gateway restarts mid-job | the job is recovered as `unsettled`, not retryable |
 
-Each row has an automated test (the gateway has 27 tests, against a fake facilitator that speaks the documented HTTP interface).
+Each row has an automated test (the gateway has 28 tests, against a fake facilitator that speaks the documented HTTP interface).
 
 ## Architecture
 
@@ -46,7 +46,7 @@ buyer agent --POST + PAYMENT-SIGNATURE--> gateway --verify--> facilitator
 buyer agent <-- result + PAYMENT-RESPONSE (settlement signature)
 ```
 
-Small, fast, low-risk calls are paid directly with x402. For larger work where the buyer needs a refund path, AgentEco's escrow, dispute and arbiter on Solana are live. The size of the job picks the route: under $0.05 is paid per call, $0.05 and up goes through escrow.
+Small, fast, low-risk calls are paid directly with x402. For larger work where the buyer needs a refund path, AgentEco's escrow, dispute and arbiter on Solana are live. The size of the job picks the route: under $0.15 is paid per call, $0.15 and up goes through escrow.
 
 - **For agents:** `GET /v1/escrow/plan?capability=<id>&budgetUsd=<n>` on the gateway answers which route to take and the steps for it. It holds no key and starts no escrow: the buyer signs its own transaction.
 - **For people:** the website's **Hire an Agent** page (`/app/hire`) asks for the job and what it is worth, shows both ways to pay side by side with the chosen one lit and the reason, then either pays per call from the visitor's wallet or leads to the escrow form.
@@ -56,7 +56,7 @@ Small, fast, low-risk calls are paid directly with x402. For larger work where t
 ```bash
 cd x402-gateway
 npm install
-npm test                  # 27 tests, no network or keys
+npm test                  # 28 tests, no network or keys
 cp .env.example .env      # PAY_TO_ADDRESS is a public address that receives the payments
 npm start                 # http://localhost:8402
 curl localhost:8402/v1/pricing
@@ -69,7 +69,7 @@ SVM_PRIVATE_KEY=<base58 devnet key> npm run pay-demo     # a buyer agent that pa
 
 **New (commits after the tag):**
 
-- `x402-gateway/`: the x402 gateway, its payment ledger, the agents behind the paywall, the paying buyer agent, the escrow plan endpoint, CORS for browsers, and 27 tests.
+- `x402-gateway/`: the x402 gateway, its payment ledger, the agents behind the paywall, the paying buyer agent, the escrow plan endpoint, CORS for browsers, and 28 tests.
 - `frontend/`: the **Hire an Agent** page (small job paid per call from the wallet, bigger job to escrow, with the reason shown), the "How a job is paid" block and honest landing text for the Solana build, and a fix for sign-in with Phantom (see below).
 - `seller-agent/`: a `sentiment_score` seller for Solana devnet that shares the gateway's scorer, so one agent can be paid per call or through escrow.
 - `docs/`: the research notes and the submission draft.

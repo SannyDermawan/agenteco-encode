@@ -16,7 +16,7 @@ New in `x402-gateway/` (commits after the tag):
 - `src/escrow.ts` and `GET /v1/escrow/plan`: tells a buyer which way to pay for a job of a given size (x402 or AgentEco escrow) and the steps for it. It holds no key and starts no escrow
 - CORS and proxy handling, so a browser can pay per call from the visitor's wallet (the website's Hire an Agent page does)
 - `scripts/pay-demo.ts`: a buyer agent that pays automatically
-- 27 tests against a fake facilitator
+- 28 tests against a fake facilitator
 
 ## How Solana and x402 are used
 
@@ -47,7 +47,7 @@ Direct x402 payment suits small, fast, low-risk calls (a sentiment score for hal
 
 `GET /v1/escrow/plan?capability=<id>&budgetUsd=<dollars>` is the bridge. It is free, needs no key and runs no paid agent:
 
-- A job worth **less than the threshold** (`ESCROW_THRESHOLD_USD`, default `0.05`) that the gateway sells, and at least the per-call price, gets `recommendedMode: "x402"` with the endpoint and the price.
+- A job worth **less than the threshold** (`ESCROW_THRESHOLD_USD`, default `0.15`) that the gateway sells, and at least the per-call price, gets `recommendedMode: "x402"` with the endpoint and the price.
 - Anything else gets `recommendedMode: "escrow"`, with the escrow program and token, the online Solana sellers of that capability (read from the AgentEco API, online first), and the `agenteco hire ...` command and the `hire({ ... })` call for it.
 - If the AgentEco API does not answer, the plan is still `200`, with no sellers and a note. A missing or invalid budget or capability is `400`.
 
@@ -61,7 +61,7 @@ The website's Hire an Agent page (`/app/hire`) applies this rule for people: a s
 cd x402-gateway
 npm install
 cp .env.example .env     # PAY_TO_ADDRESS is a public address that receives the payments
-npm test                 # 27 tests, no network, no keys
+npm test                 # 28 tests, no network, no keys
 npm start                # http://localhost:8402
 curl localhost:8402/v1/pricing
 # a buyer agent, with a devnet wallet that holds devnet USDC:
